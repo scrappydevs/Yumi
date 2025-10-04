@@ -13,10 +13,15 @@ import {
   ChevronDown,
   MessageSquare,
   Mic,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
+import { useVoiceOutput } from '@/hooks/use-voice-output';
+import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase/client';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -182,6 +187,26 @@ const SAMPLE_RESTAURANTS = [
   },
 ];
 
+// City coordinates mapping
+const CITY_COORDINATES: { [key: string]: { lat: number; lng: number } } = {
+  'New York City': { lat: 40.7580, lng: -73.9855 },
+  'San Francisco': { lat: 37.7749, lng: -122.4194 },
+  'Los Angeles': { lat: 34.0522, lng: -118.2437 },
+  'Chicago': { lat: 41.8781, lng: -87.6298 },
+  'Miami': { lat: 25.7617, lng: -80.1918 },
+  'Austin': { lat: 30.2672, lng: -97.7431 },
+};
+
+interface SearchResult {
+  name: string;
+  cuisine: string;
+  rating: number;
+  address: string;
+  price_level: number;
+  match_score: number;
+  reasoning: string;
+}
+
 export default function DiscoverPage() {
   const [prompt, setPrompt] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
@@ -193,6 +218,14 @@ export default function DiscoverPage() {
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
   const [flowingIndex, setFlowingIndex] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const { speak, isSpeaking, stop } = useVoiceOutput();
+  const { user } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -250,10 +283,129 @@ export default function DiscoverPage() {
     setAbsorbedIndices(currentAbsorbed);
   }, [flowingIndex, isThinking]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Initialize Web Speech API
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) return;
+    
+    const recognitionInstance = new SpeechRecognition();
+    recognitionInstance.continuous = true;
+    recognitionInstance.interimResults = true;
+    recognitionInstance.lang = 'en-US';
+    
+    recognitionInstance.onresult = (event: any) => {
+      let transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setPrompt(transcript);
+    };
+    
+    recognitionInstance.onerror = () => setIsRecording(false);
+    recognitionInstance.onend = () => setIsRecording(false);
+    
+    setRecognition(recognitionInstance);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Prompt:', prompt);
-    // TODO: Implement natural language search
+    if (!prompt.trim()) return;
+    
+    setIsThinking(true);
+    setSearchError(null);
+    setSearchResults([]);
+    
+    const thinkingPhrases = [
+      "Finding restaurants",
+      "Hang on tight",
+      "Looking for the perfect spot",
+      "Searching nearby",
+      "Let me check what's available",
+      "One moment please",
+      "Analyzing your options",
+    ];
+    
+    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
+    setCurrentPhrase(randomPhrase);
+    
+    if (!isMuted) {
+      await speak(randomPhrase);
+    }
+    
+    try {
+      // Get coordinates for selected location
+      const coords = CITY_COORDINATES[location] || CITY_COORDINATES['New York City'];
+      
+      // Get auth session for JWT token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated. Please sign in.');
+      }
+      
+      // Call backend API
+      const formData = new FormData();
+      formData.append('query', prompt);
+      formData.append('latitude', coords.lat.toString());
+      formData.append('longitude', coords.lng.toString());
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/search`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
+        throw new Error(errorData.detail || 'Failed to search restaurants');
+      }
+      
+      const data = await response.json();
+      
+      // Update results
+      if (data.top_restaurants && data.top_restaurants.length > 0) {
+        setSearchResults(data.top_restaurants);
+        
+        // Speak result if not muted
+        if (!isMuted) {
+          const resultPhrase = `Found ${data.top_restaurants.length} great options for you`;
+          await speak(resultPhrase);
+        }
+      } else {
+        setSearchError('No restaurants found. Try a different query or location.');
+      }
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
+      
+      if (!isMuted) {
+        await speak('Sorry, something went wrong');
+      }
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const toggleVoiceRecording = () => {
+    if (!recognition) return;
+    if (isRecording) {
+      recognition.stop();
+      setIsRecording(false);
+    } else {
+      setPrompt('');
+      try {
+        recognition.start();
+        setIsRecording(true);
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+      }
+    }
   };
 
   if (!mounted) {
@@ -267,8 +419,8 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
       
-      {/* Test Button - Top Left */}
-      <div className="absolute top-6 left-6 z-10">
+      {/* Test Button & Mute - Top Left */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
         <motion.button
           onClick={() => setIsThinking(!isThinking)}
           className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
@@ -280,6 +432,23 @@ export default function DiscoverPage() {
           <span className="text-xs font-medium">
             {isThinking ? 'Thinking...' : 'Test AI'}
           </span>
+        </motion.button>
+
+        <motion.button
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (!isMuted && isSpeaking) stop();
+          }}
+          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          {isMuted ? (
+            <VolumeX className="w-5 h-5 text-red-500" />
+          ) : (
+            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+          )}
         </motion.button>
       </div>
 
@@ -380,12 +549,12 @@ export default function DiscoverPage() {
               zIndex: isThinking ? 10 : -1,
             }}
           >
-            {/* Vibrant purple-blue glow effect */}
+            {/* Apple-style pink and blue glow effect */}
             <motion.div
               className="absolute inset-0 rounded-full pointer-events-none"
               animate={{
-                scale: isThinking ? [1, 1.4, 1] : 1,
-                opacity: isThinking ? [0.6, 0.8, 0.6] : 0,
+                scale: isThinking ? [1, 1.3, 1] : 1,
+                opacity: isThinking ? [0.4, 0.6, 0.4] : 0,
                 rotate: isThinking ? [0, 180, 360] : 0,
               }}
               transition={{
@@ -394,17 +563,17 @@ export default function DiscoverPage() {
                 ease: "easeInOut"
               }}
               style={{
-                background: 'radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.7), rgba(59, 130, 246, 0.6), transparent 70%)',
-                filter: 'blur(80px)',
+                background: 'radial-gradient(circle at 30% 40%, rgba(255, 107, 157, 0.5), rgba(0, 122, 255, 0.4), transparent 70%)',
+                filter: 'blur(60px)',
               }}
             />
             
-            {/* Secondary glow - blue to purple */}
+            {/* Secondary glow - blue to pink */}
             <motion.div
               className="absolute inset-0 rounded-full pointer-events-none"
               animate={{
-                scale: isThinking ? [1.2, 1.5, 1.2] : 1,
-                opacity: isThinking ? [0.5, 0.7, 0.5] : 0,
+                scale: isThinking ? [1.1, 1.4, 1.1] : 1,
+                opacity: isThinking ? [0.3, 0.5, 0.3] : 0,
                 rotate: isThinking ? [360, 180, 0] : 0,
               }}
               transition={{
@@ -414,27 +583,8 @@ export default function DiscoverPage() {
                 delay: 0.5
               }}
               style={{
-                background: 'radial-gradient(circle at 70% 60%, rgba(96, 165, 250, 0.6), rgba(167, 139, 250, 0.5), transparent 70%)',
-                filter: 'blur(90px)',
-              }}
-            />
-            
-            {/* Inner glow - directly behind blob */}
-            <motion.div
-              className="absolute inset-0 rounded-full pointer-events-none"
-              animate={{
-                scale: isThinking ? [0.9, 1.1, 0.9] : 1,
-                opacity: isThinking ? [0.8, 1, 0.8] : 0,
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.2
-              }}
-              style={{
-                background: 'radial-gradient(circle at center, rgba(196, 181, 253, 0.8), rgba(147, 197, 253, 0.7), transparent 60%)',
-                filter: 'blur(40px)',
+                background: 'radial-gradient(circle at 70% 60%, rgba(90, 200, 250, 0.4), rgba(255, 55, 95, 0.3), transparent 70%)',
+                filter: 'blur(70px)',
               }}
             />
             
@@ -454,7 +604,7 @@ export default function DiscoverPage() {
                 ease: [0.25, 0.46, 0.45, 0.94]
               }}
             >
-              Finding Restaurants
+              {currentPhrase}
             </motion.p>
           </div>
           
@@ -467,59 +617,21 @@ export default function DiscoverPage() {
               zIndex: 5,
             }}
           >
-            {/* Primary glow - purple */}
+            {/* Subtle glow */}
             <motion.div
               className="absolute inset-0 rounded-full"
               animate={{
-                opacity: [0.4, 0.6, 0.4],
-                scale: [1, 1.3, 1],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              style={{
-                background: 'radial-gradient(circle at center, rgba(167, 139, 250, 0.5), rgba(139, 92, 246, 0.4), transparent 70%)',
-                filter: 'blur(50px)',
-              }}
-            />
-            
-            {/* Secondary glow - blue */}
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              animate={{
-                opacity: [0.3, 0.5, 0.3],
-                scale: [1.1, 1.4, 1.1],
-              }}
-              transition={{
-                duration: 5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.5
-              }}
-              style={{
-                background: 'radial-gradient(circle at center, rgba(96, 165, 250, 0.4), rgba(59, 130, 246, 0.3), transparent 70%)',
-                filter: 'blur(60px)',
-              }}
-            />
-            
-            {/* Inner glow - directly behind sphere */}
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              animate={{
-                opacity: [0.5, 0.7, 0.5],
-                scale: [0.8, 1, 0.8],
+                opacity: [0.15, 0.25, 0.15],
+                scale: [1, 1.1, 1],
               }}
               transition={{
                 duration: 3,
                 repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.2
+                ease: "easeInOut"
               }}
               style={{
-                background: 'radial-gradient(circle at center, rgba(196, 181, 253, 0.6), rgba(147, 197, 253, 0.5), transparent 60%)',
-                filter: 'blur(30px)',
+                background: 'radial-gradient(circle at center, rgba(200, 200, 220, 0.2), transparent 70%)',
+                filter: 'blur(20px)',
               }}
             />
             
@@ -762,6 +874,38 @@ export default function DiscoverPage() {
               
               <motion.button
                 type="button"
+                onClick={toggleVoiceRecording}
+                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
+                style={{
+                  background: isRecording 
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.7), rgba(220, 38, 38, 0.6))'
+                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.6))',
+                  backdropFilter: 'blur(12px)',
+                  border: '0.5px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.05)',
+                }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                animate={isRecording ? {
+                  boxShadow: [
+                    'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(239, 68, 68, 0.3)',
+                    'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 16px rgba(239, 68, 68, 0.6)',
+                  ]
+                } : {}}
+                transition={isRecording ? { duration: 1.5, repeat: Infinity } : {}}
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                {isRecording ? (
+                  <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                    <Mic className="w-4 h-4 text-white" />
+                  </motion.div>
+                ) : (
+                  <Mic className="w-4 h-4 text-[hsl(var(--foreground))]" />
+                )}
+              </motion.button>
+              
+              <motion.button
+                type="submit"
                 className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden"
                 style={{
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
@@ -773,12 +917,93 @@ export default function DiscoverPage() {
                 whileTap={{ scale: 0.95 }}
               >
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
-                <Mic className="w-4 h-4 text-white" />
+                <Send className="w-4 h-4 text-white" />
               </motion.button>
               </div>
           </form>
         </motion.div>
       </div>
+
+      {/* Search Results Panel */}
+      <AnimatePresence>
+        {searchResults.length > 0 && (
+          <motion.div
+            className="w-full max-w-4xl mb-8 z-10"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+              
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                Top Recommendations for you
+              </h3>
+              
+              <div className="space-y-4">
+                {searchResults.map((restaurant, index) => (
+                  <motion.div
+                    key={index}
+                    className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                    
+                    <div className="flex items-start justify-between relative">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl font-bold text-purple-600">#{index + 1}</span>
+                          <div>
+                            <h4 className="text-lg font-bold">{restaurant.name}</h4>
+                            <p className="text-sm text-gray-600">{restaurant.cuisine} • {'$'.repeat(restaurant.price_level)}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 mb-2">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                            <span className="font-semibold">{restaurant.rating}</span>
+                          </div>
+                          <div className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
+                            {Math.round(restaurant.match_score * 100)}% match
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-gray-700 mb-2">{restaurant.reasoning}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {restaurant.address}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error Message */}
+      <AnimatePresence>
+        {searchError && (
+          <motion.div
+            className="w-full max-w-4xl mb-8 z-10"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+          >
+            <div className="glass-layer-1 rounded-2xl p-4 border-2 border-red-300 bg-red-50/50">
+              <p className="text-red-700 font-medium">{searchError}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Selected Restaurant Details Modal - Minimalist */}
       <AnimatePresence>

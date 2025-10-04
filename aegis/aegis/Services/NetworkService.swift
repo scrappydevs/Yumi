@@ -30,8 +30,15 @@ class NetworkService {
         // Create multipart body
         var body = Data()
 
+        // Resize image to max 1024x1024 (saves ~70% upload/processing time)
+        print("📸 [IMAGE RESIZE] Original size: \(image.size.width)×\(image.size.height)")
+        let resizedImage = image.resizedForUpload(maxDimension: 1024)
+        print("📸 [IMAGE RESIZE] Resized to: \(resizedImage.size.width)×\(resizedImage.size.height)")
+        
         // Add image
-        if let imageData = image.jpegData(compressionQuality: 0.8) {
+        if let imageData = resizedImage.jpegData(compressionQuality: 0.8) {
+            let sizeInKB = Double(imageData.count) / 1024.0
+            print("📸 [IMAGE RESIZE] Final size: \(String(format: "%.1f", sizeInKB)) KB")
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
             body.append("Content-Disposition: form-data; name=\"image\"; filename=\"issue.jpg\"\r\n".data(using: .utf8)!)
             body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
