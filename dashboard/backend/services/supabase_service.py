@@ -301,6 +301,33 @@ class SupabaseService:
         except Exception as e:
             print(f"Database query error: {str(e)}")
             raise Exception(f"Failed to fetch all reviews: {str(e)}")
+    
+    def get_review_with_image(self, review_id: str) -> Dict[str, Any]:
+        """
+        Fetch a single review by ID with joined image data.
+        Used for taste profile updates after review submission.
+        
+        Args:
+            review_id: Review UUID
+            
+        Returns:
+            Review record with nested image data
+            
+        Raises:
+            Exception: If fetch fails
+        """
+        try:
+            response = self.client.table("reviews")\
+                .select("*, images(*)")\
+                .eq("id", review_id)\
+                .single()\
+                .execute()
+            
+            return response.data if response.data else {}
+            
+        except Exception as e:
+            print(f"Database query error: {str(e)}")
+            raise Exception(f"Failed to fetch review: {str(e)}")
 
 
 # Singleton instance

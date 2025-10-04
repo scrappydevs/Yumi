@@ -2,7 +2,7 @@
 Aegis Backend API
 FastAPI application for handling infrastructure issue submissions.
 """
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -13,6 +13,7 @@ from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
 from services.embedding_service import get_embedding_service
+from services.taste_profile_service import get_taste_profile_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config
@@ -266,8 +267,48 @@ async def upload_image(
         raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
 
 
+async def update_taste_profile_background(user_id: str, review_id: str):
+    """
+    Background task to update user's taste profile after review submission.
+    Runs asynchronously without blocking the API response.
+    
+    Args:
+        user_id: User UUID
+        review_id: Review UUID that was just created
+    """
+    try:
+        print(f"[TASTE PROFILE] Starting background update for user {user_id}, review {review_id}")
+        
+        # Get services
+        supabase_service = get_supabase_service()
+        taste_profile_service = get_taste_profile_service()
+        
+        # Fetch full review data with joined image
+        review_data = supabase_service.get_review_with_image(review_id)
+        
+        if not review_data:
+            print(f"[TASTE PROFILE] Review {review_id} not found, skipping profile update")
+            return
+        
+        # Update taste profile
+        updated_prefs = await taste_profile_service.update_profile_from_review(
+            user_id=user_id,
+            review_data=review_data
+        )
+        
+        print(f"[TASTE PROFILE] ✅ Profile updated successfully!")
+        print(f"[TASTE PROFILE] New preferences: {updated_prefs}")
+        
+    except Exception as e:
+        # Log error but don't crash (background task should be resilient)
+        print(f"[TASTE PROFILE ERROR] Failed to update profile: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
 @app.post("/api/reviews/submit")
 async def submit_review(
+    background_tasks: BackgroundTasks,
     user_id: str = Depends(get_user_id_from_token),
     image_id: int = Form(...),
     user_review: str = Form(...),
@@ -278,7 +319,11 @@ async def submit_review(
     Create review entry linked to an existing image.
     Image should already be uploaded via /api/images/upload
     
+    After creating the review, automatically updates user's taste profile
+    in the background based on the review content.
+    
     Args:
+        background_tasks: FastAPI background tasks (automatic)
         user_id: Extracted from JWT token (automatic)
         image_id: ID from images table (returned from upload endpoint)
         user_review: User's written review
@@ -319,6 +364,14 @@ async def submit_review(
         )
         
         print(f"[SUBMIT REVIEW] Review created: {review.get('id')}")
+        
+        # 🆕 Trigger background task to update taste profile
+        background_tasks.add_task(
+            update_taste_profile_background,
+            user_id=user_id,
+            review_id=review['id']
+        )
+        print(f"[SUBMIT REVIEW] ✅ Taste profile update queued")
 
         return review
 
