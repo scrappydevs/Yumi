@@ -1461,14 +1461,15 @@ export default function DiscoverPage() {
                         match_score: r.match_score
                       }));
                       
-                      // Store data in sessionStorage
+                      // Store data in sessionStorage with route flag
                       sessionStorage.setItem('selectedRestaurants', JSON.stringify(restaurantData));
+                      sessionStorage.setItem('showAsRoute', 'true'); // Flag to show as route
                       if (userCoords) {
                         sessionStorage.setItem('userLocation', JSON.stringify(userCoords));
                       }
                       
                       // Navigate to spatial page
-                      window.location.href = '/spatial?view=results';
+                      window.location.href = '/spatial?view=route';
                     }}
                     initial={{ opacity: 0, scale: 0.8, width: 36 }}
                     animate={{ opacity: 1, scale: 1, width: 'auto' }}
@@ -1486,7 +1487,7 @@ export default function DiscoverPage() {
                   >
                     <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
                     <MapPin className="w-4 h-4 text-white" />
-                    <span className="text-sm font-semibold text-white">View on Map</span>
+                    <span className="text-sm font-semibold text-white">Plan Route</span>
                   </motion.button>
                 )}
               </AnimatePresence>
