@@ -46,7 +46,6 @@ const navigation: NavigationItem[] = [
   { name: 'Reservations', icon: Calendar, href: '/reservations' },
   { name: 'Explore', icon: MapPin, href: '/spatial' },
   { name: 'Friends', icon: Users, href: '/friends' },
-  { name: 'Favorites', icon: BookHeart, href: '/favorites' },
 ];
 
 const secondaryNav: NavigationItem[] = [

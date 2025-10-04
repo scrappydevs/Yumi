@@ -113,6 +113,8 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   // View mode state
   const [reservation, setReservation] = useState<ReservationData | null>(null)
   const [inviteeAvatarUrl, setInviteeAvatarUrl] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -369,8 +371,9 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   if (!isOpen) return null
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <motion.div
+        key="reservation-modal"
         className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -528,7 +531,7 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 <Label className="text-sm font-semibold text-black mb-2 block">Invitees</Label>
                 <div className="space-y-3">
                   {invitees.map((invitee, index) => (
-                    <div key={index} className="flex gap-2">
+                    <div key={`invitee-${index}-${invitee.phone || index}`} className="flex gap-2">
                       <Input
                         placeholder="+17149410453"
                         value={invitee.phone}
@@ -623,7 +626,11 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                   {reservation.restaurant.images.slice(0, 3).map((image, idx) => (
                     <div 
                       key={image.id}
-                      className={`relative aspect-video overflow-hidden ${idx === 0 ? 'col-span-3 aspect-[21/9]' : ''} ${idx === 0 ? '' : 'rounded-bl-3xl'} ${idx === 2 ? 'rounded-br-3xl' : ''}`}
+                      className={`relative overflow-hidden ${
+                        idx === 0 
+                          ? 'col-span-3 aspect-[5/2]' 
+                          : 'aspect-[4/3]'
+                      } ${idx === 1 ? 'rounded-bl-3xl' : ''} ${idx === 2 ? 'rounded-br-3xl' : ''}`}
                     >
                       <img 
                         src={image.url} 

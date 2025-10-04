@@ -107,66 +107,45 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-        {/* Bouncing purple highlights */}
-        <motion.div
-          className="absolute w-6 h-6 rounded-full bg-purple-400 shadow-lg shadow-purple-400/50"
-          animate={{
-            x: [0, 60, -40, 80, -60, 0],
-            y: [0, -80, 60, -40, 80, 0],
-            scale: [1, 1.5, 0.8, 1.3, 0.9, 1],
-            opacity: [0.7, 1, 0.6, 0.9, 0.7, 0.7],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute w-5 h-5 rounded-full bg-purple-500 shadow-lg shadow-purple-500/50"
-          animate={{
-            x: [0, -70, 50, -30, 70, 0],
-            y: [0, 70, -50, 90, -70, 0],
-            scale: [1, 1.2, 0.9, 1.4, 0.8, 1],
-            opacity: [0.6, 0.9, 0.7, 1, 0.6, 0.6],
-          }}
-          transition={{
-            duration: 2.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.3,
-          }}
-        />
-        <motion.div
-          className="absolute w-7 h-7 rounded-full bg-purple-300 shadow-lg shadow-purple-300/50"
-          animate={{
-            x: [0, 50, -60, 40, -50, 0],
-            y: [0, -60, -40, 70, -50, 0],
-            scale: [1, 0.9, 1.4, 0.8, 1.2, 1],
-            opacity: [0.5, 0.8, 0.6, 0.9, 0.5, 0.5],
-          }}
-          transition={{
-            duration: 2.8,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.6,
-          }}
-        />
-        <motion.div
-          className="absolute w-4 h-4 rounded-full bg-purple-600 shadow-lg shadow-purple-600/50"
-          animate={{
-            x: [0, -50, 70, -80, 60, 0],
-            y: [0, 80, -70, 50, -60, 0],
-            scale: [1, 1.3, 0.7, 1.5, 0.9, 1],
-            opacity: [0.8, 1, 0.7, 0.9, 0.8, 0.8],
-          }}
-          transition={{
-            duration: 3.2,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.9,
-          }}
-        />
+        {/* Glowing animated liquid glass blobs */}
+        <div className="absolute inset-0 pointer-events-none">
+          <motion.div
+            animate={{
+              opacity: [0.4, 0.8, 0.4],
+              scale: [1, 1.1, 1],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute top-20 left-20"
+          >
+            <LiquidGlassBlob 
+              isAnimating={true}
+              className="w-[300px] h-[300px] shadow-[0_0_60px_rgba(168,85,247,0.6)]"
+            />
+          </motion.div>
+          
+          <motion.div
+            animate={{
+              opacity: [0.5, 0.9, 0.5],
+              scale: [1, 1.15, 1],
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.5,
+            }}
+            className="absolute bottom-20 right-20"
+          >
+            <LiquidGlassBlob 
+              isAnimating={true}
+              className="w-[400px] h-[400px] shadow-[0_0_80px_rgba(147,51,234,0.7)]"
+            />
+          </motion.div>
+        </div>
         
         {/* Central spinner */}
         <motion.div

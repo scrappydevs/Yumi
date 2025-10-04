@@ -558,3 +558,40 @@ async def download_ics(reservation_id: str):
         print(f"Error generating ICS file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.delete("/{reservation_id}")
+async def delete_reservation(reservation_id: str):
+    """
+    Delete/cancel a reservation (organizer only)
+    """
+    try:
+        supabase = get_supabase()
+        
+        # First check if reservation exists and get organizer info
+        reservation_result = supabase.table("reservations").select("*").eq("id", reservation_id).single().execute()
+        
+        if not reservation_result.data:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        
+        reservation = reservation_result.data
+        
+        # Delete the reservation (cascade will delete related invites)
+        delete_result = supabase.table("reservations").delete().eq("id", reservation_id).execute()
+        
+        if not delete_result.data:
+            raise HTTPException(status_code=500, detail="Failed to delete reservation")
+        
+        print(f"✅ Deleted reservation {reservation_id}")
+        
+        return {
+            "success": True,
+            "message": "Reservation deleted successfully",
+            "reservation_id": reservation_id
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting reservation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

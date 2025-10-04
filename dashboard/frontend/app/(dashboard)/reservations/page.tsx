@@ -181,7 +181,7 @@ export default function ReservationsPage() {
           {/* Calendar Column */}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm h-full flex flex-col">              
-              <div className="flex-1 flex items-start justify-center pt-4 max-w-full">
+              <div className="flex justify-center">
                 <Calendar
                   mode="single"
                   selected={selectedDate}
@@ -192,6 +192,7 @@ export default function ReservationsPage() {
                   modifiersClassNames={{
                     booked: 'font-bold text-purple-600 bg-purple-50 ring-2 ring-purple-200'
                   }}
+                  className="rounded-md border-0"
                 />
               </div>
 

@@ -926,8 +926,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         )}
 
         {/* Bottom Search Bar - Compact */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 pointer-events-none z-15">
-          <div className="max-w-2xl mx-auto pointer-events-auto">
+        <div className="absolute bottom-3 left-0 right-0 pointer-events-none z-15">
+          <div className="max-w-2xl mx-auto px-3 pointer-events-auto">
             <div className="bg-white rounded-full shadow-strong px-4 py-2 relative overflow-hidden">
               <div className="relative">
                 <form onSubmit={(e) => { 
