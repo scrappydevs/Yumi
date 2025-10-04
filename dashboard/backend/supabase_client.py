@@ -1,31 +1,33 @@
 """
-Supabase client configuration (placeholder)
+Supabase client configuration
 """
 import os
+from supabase import create_client, Client
 from typing import Optional
 
-# Placeholder for Supabase client
 class SupabaseClient:
-    def __init__(self):
-        self.url = os.getenv("SUPABASE_URL", "")
-        self.key = os.getenv("SUPABASE_KEY", "")
-        # TODO: Initialize actual Supabase client when ready
-        # from supabase import create_client, Client
-        # self.client: Client = create_client(self.url, self.key)
-        self.client = None
+    _instance: Optional[Client] = None
     
-    def is_configured(self) -> bool:
-        """Check if Supabase credentials are configured"""
-        return bool(self.url and self.key)
+    @classmethod
+    def initialize(cls):
+        """Initialize Supabase client"""
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        
+        if not url or not key:
+            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set")
+        
+        cls._instance = create_client(url, key)
+        print(f"✅ Supabase client initialized: {url}")
+        return cls._instance
     
-    async def get_data(self, table: str):
-        """Placeholder method for fetching data"""
-        if not self.is_configured():
-            return {"error": "Supabase not configured"}
-        # TODO: Implement actual data fetching
-        # return self.client.table(table).select("*").execute()
-        return {"data": [], "message": "Supabase implementation pending"}
+    @classmethod
+    def get_client(cls) -> Client:
+        """Get the Supabase client instance"""
+        if cls._instance is None:
+            cls.initialize()
+        return cls._instance
 
-# Singleton instance
-supabase_client = SupabaseClient()
-
+def get_supabase() -> Client:
+    """Dependency to get Supabase client"""
+    return SupabaseClient.get_client()

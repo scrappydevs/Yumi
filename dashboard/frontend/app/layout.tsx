@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "iFix Dashboard",
-  description: "Intelligent infrastructure management and monitoring",
+  title: "Aegis - Civic Infrastructure Intelligence",
+  description: "AI-powered civic engagement platform for municipal infrastructure management",
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-[#0a0a0a]`}
+        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         style={{ fontFamily: 'var(--font-inter)' }}
       >
         {children}
