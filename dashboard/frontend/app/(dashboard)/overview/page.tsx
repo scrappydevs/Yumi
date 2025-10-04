@@ -266,24 +266,26 @@ export default function DiscoverPage() {
 
     let phraseIndex = 0;
     
-    // Speak the first phrase when thinking starts
-    if (!isMuted) {
-      speak(loadingPhrases[0]);
+    // Speak the first phrase when thinking starts (always say the exact text)
+    console.log('[Overview] Starting thinking, first phrase:', loadingPhrases[0]);
+    if (!isMuted && speak) {
+      speak(loadingPhrases[0]).catch(err => console.error('Speak error:', err));
     }
 
     const interval = setInterval(() => {
       phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
       const newPhrase = loadingPhrases[phraseIndex];
+      console.log('[Overview] Rotating to phrase:', newPhrase);
       setCurrentPhrase(newPhrase);
       
-      // Speak each new phrase if not muted
-      if (!isMuted) {
-        speak(newPhrase);
+      // Speak each new phrase if not muted (exact text match)
+      if (!isMuted && speak) {
+        speak(newPhrase).catch(err => console.error('Speak error:', err));
       }
     }, 3000); // Change phrase every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isThinking, loadingPhrases, isMuted]); // Removed 'speak' from deps
+  }, [isThinking, loadingPhrases, isMuted, speak]); // Added speak back with proper handling
 
   useEffect(() => {
     if (isThinking) {
