@@ -39,10 +39,10 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
-  { name: 'Reservations', icon: Calendar, href: '/reservations' },
-  { name: 'Explore', icon: MapPin, href: '/spatial' },
-  { name: 'Friends', icon: Users, href: '/friends' },
   { name: 'Social Network', icon: Network, href: '/social-network' },
+  { name: 'Friends', icon: Users, href: '/friends' },
+  { name: 'Explore', icon: MapPin, href: '/spatial' },
+  { name: 'Reservations', icon: Calendar, href: '/reservations' },
 ];
 
 const secondaryNav: NavigationItem[] = [

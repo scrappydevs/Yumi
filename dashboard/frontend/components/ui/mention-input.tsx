@@ -101,10 +101,10 @@ export function MentionInput({
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
     
     if (lastAtIndex !== -1) {
-      // Replace @query with @username
+      // Remove @query from input (friend is already shown in orbit)
       const beforeAt = value.slice(0, lastAtIndex);
       const afterCursor = value.slice(cursorPosition);
-      const newValue = `${beforeAt}@${friend.username} ${afterCursor}`;
+      const newValue = `${beforeAt}${afterCursor}`.trim();
       
       onChange(newValue);
       
@@ -136,10 +136,8 @@ export function MentionInput({
     setSelectedMentions(updatedMentions);
     onMentionsChange(updatedMentions);
     
-    // Remove from input text
-    const regex = new RegExp(`@${username}\\s?`, 'g');
-    const newValue = value.replace(regex, '');
-    onChange(newValue);
+    // No need to remove from input text since @mention is not in the input
+    // (it's only shown visually in the orbit)
   };
 
   // Keyboard navigation in dropdown

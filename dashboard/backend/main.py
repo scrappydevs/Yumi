@@ -776,7 +776,7 @@ async def get_nearby_restaurants(
             limit=limit
         )
 
-        # Filter to only those with photos
+        # Filter to only those with photos, valid cuisine, and description
         restaurants_with_photos = [
             {
                 'name': r['name'],
@@ -787,7 +787,11 @@ async def get_nearby_restaurants(
                 'address': r.get('address', ''),
                 'price_level': r.get('price_level', 2)
             }
-            for r in restaurants if r.get('photo_url')
+            for r in restaurants 
+            if r.get('photo_url') 
+            and r.get('cuisine') 
+            and r.get('cuisine') != 'Unknown' 
+            and r.get('cuisine') != ''
         ]
 
         print(f"[NEARBY RESTAURANTS] ✅ Found {len(restaurants_with_photos)} restaurants with photos")

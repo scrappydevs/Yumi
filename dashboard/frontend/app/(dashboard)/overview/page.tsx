@@ -208,6 +208,7 @@ export default function DiscoverPage() {
   const [volume, setVolume] = useState(0.8); // 80% default volume
   const [friendsData, setFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string, recent_activity?: string}>>([]);
   const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, recentReviews?: any[], favoriteRestaurants?: any[]} | null>(null);
+  const [mentionedFriendsData, setMentionedFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string}>>([]);
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
   
@@ -357,24 +358,66 @@ export default function DiscoverPage() {
     loadFriends();
   }, [user, mounted]);
 
-  // Rotate phrases while thinking/loading
+  // Load mentioned friends' full profiles
+  useEffect(() => {
+    if (!user || mentions.length === 0) {
+      setMentionedFriendsData([]);
+      return;
+    }
+
+    async function loadMentionedFriends() {
+      try {
+        const supabase = createClient();
+        const mentionIds = mentions.map(m => m.id);
+        
+        const { data: mentionedProfiles } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .in('id', mentionIds);
+
+        if (mentionedProfiles) {
+          setMentionedFriendsData(mentionedProfiles);
+          console.log(`👤 Loaded ${mentionedProfiles.length} mentioned friends`);
+        }
+      } catch (error) {
+        console.error('Error loading mentioned friends:', error);
+      }
+    }
+
+    loadMentionedFriends();
+  }, [user, mentions]);
+
+  // Rotate phrases while thinking/loading - Pick 1-3 random phrases
   useEffect(() => {
     if (!isThinking) {
       setCurrentPhrase(loadingPhrases[0]); // Reset to first phrase
       return;
     }
 
+    // Randomly select 1-3 phrases from the list
+    const numPhrases = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3 phrases
+    const shuffled = [...loadingPhrases].sort(() => Math.random() - 0.5);
+    const selectedPhrases = shuffled.slice(0, numPhrases);
+    
+    console.log(`[Overview] Selected ${numPhrases} phrases to speak:`, selectedPhrases);
+
     let phraseIndex = 0;
     
-    // Speak the first phrase when thinking starts (always say the exact text)
-    console.log('[Overview] Starting thinking, first phrase:', loadingPhrases[0]);
+    // Speak the first selected phrase when thinking starts
+    console.log('[Overview] Starting thinking, first phrase:', selectedPhrases[0]);
+    setCurrentPhrase(selectedPhrases[0]);
     if (!isMuted && speak) {
-      speak(loadingPhrases[0]).catch(err => console.error('Speak error:', err));
+      speak(selectedPhrases[0]).catch(err => console.error('Speak error:', err));
+    }
+
+    if (selectedPhrases.length === 1) {
+      // Only one phrase, no need for interval
+      return;
     }
 
     const interval = setInterval(() => {
-      phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-      const newPhrase = loadingPhrases[phraseIndex];
+      phraseIndex = (phraseIndex + 1) % selectedPhrases.length;
+      const newPhrase = selectedPhrases[phraseIndex];
       console.log('[Overview] Rotating to phrase:', newPhrase);
       setCurrentPhrase(newPhrase);
       
@@ -382,10 +425,10 @@ export default function DiscoverPage() {
       if (!isMuted && speak) {
         speak(newPhrase).catch(err => console.error('Speak error:', err));
       }
-    }, 3000); // Change phrase every 3 seconds
+    }, 6000); // Change phrase every 6 seconds (more spaced out)
 
     return () => clearInterval(interval);
-  }, [isThinking, loadingPhrases, isMuted, speak]); // Added speak back with proper handling
+  }, [isThinking, loadingPhrases, isMuted, speak]);
 
   useEffect(() => {
     if (isThinking) {
@@ -432,10 +475,22 @@ export default function DiscoverPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    
+    // Check if prompt is empty
+    if (!prompt.trim()) {
+      // If we have mentions but no text, show specific message
+      if (mentions.length > 0) {
+        console.log('⚠️ Submission blocked: No query text. Please add what you want (e.g., "I want sushi")');
+      } else {
+        console.log('⚠️ Submission blocked: Empty query');
+      }
+      return;
+    }
     
     const searchQuery = prompt;  // Save the query before clearing
+    const searchMentions = [...mentions];  // Save mentions before clearing
     setPrompt('');  // Clear the input immediately
+    setMentions([]);  // Clear mentions (but keep mentionedFriendsData to show in orbit)
     setIsThinking(true);
     setShowingResults(false);  // Reset results state
     setIsNarrowing(false);  // Reset narrowing state
@@ -446,7 +501,7 @@ export default function DiscoverPage() {
     rotationCyclesRef.current = 0;  // Reset rotation cycles for next latent state
     
     // Check if this is a group search (has mentions)
-    const isGroupSearch = mentions.length > 0;
+    const isGroupSearch = searchMentions.length > 0;
     
     // Note: The rotating phrases with voice are handled by the useEffect hook
     // No need to speak here to avoid voice overlap
@@ -458,6 +513,7 @@ export default function DiscoverPage() {
       setSearchError(timeoutText);
       setIsThinking(false);
       setShowingResults(false);
+      setMentionedFriendsData([]);  // Clear mentioned friends on timeout
       if (!isMuted) {
         speak(timeoutText);
       }
@@ -542,7 +598,7 @@ export default function DiscoverPage() {
         console.log(`   Query: "${searchQuery}"`);
         console.log(`   Location: (${coords.lat}, ${coords.lng})`);
         if (isGroupSearch) {
-          console.log(`👥 Group search with ${mentions.length} friends: ${mentions.map(m => m.username).join(', ')}`);
+          console.log(`👥 Group search with ${searchMentions.length} friends: ${searchMentions.map(m => m.username).join(', ')}`);
         }
 
         const searchFormData = new FormData();
@@ -552,7 +608,7 @@ export default function DiscoverPage() {
         
         // Add friend IDs if this is a group search
         if (isGroupSearch) {
-          const friendIds = mentions.map(m => m.id).join(',');
+          const friendIds = searchMentions.map(m => m.id).join(',');
           searchFormData.append('friend_ids', friendIds);
           console.log(`📋 Including friend IDs: ${friendIds}`);
         }
@@ -585,8 +641,27 @@ export default function DiscoverPage() {
         
         // PHASE 3: Show final results
         if (data.top_restaurants && data.top_restaurants.length > 0) {
+          console.log(`✅ Received ${data.top_restaurants.length} restaurants from LLM`);
+          
           // Filter to only restaurants with place_ids (photos have fallbacks now)
           const restaurantsWithIds = data.top_restaurants.filter((r: SearchResult) => r.place_id);
+          console.log(`✅ After filtering for place_ids: ${restaurantsWithIds.length} restaurants`);
+          
+          if (restaurantsWithIds.length === 0) {
+            console.error('❌ No restaurants have place_ids!');
+            const noResultsText = 'No valid restaurants found. Try a different query.';
+            setSearchError(noResultsText);
+            setCurrentPhrase(noResultsText);
+            setIsThinking(false);
+            setShowingResults(false);
+            setMentionedFriendsData([]);  // Clear mentioned friends
+            if (!isMuted) {
+              await speak(noResultsText);
+            }
+            clearTimeout(timeoutId);
+            return;
+          }
+          
           const finalCount = Math.min(5, restaurantsWithIds.length);
           
           // Ensure all restaurants have a photo_url (use fallback if needed)
@@ -705,6 +780,9 @@ export default function DiscoverPage() {
           // Use the processed restaurants (with fallback images)
           setSearchResults(restaurantsWithIds.slice(0, finalCount));
           
+          // Clear mentioned friends data after results are shown
+          setMentionedFriendsData([]);
+          
           // Speak result if not muted - ensure TTS matches displayed text
           if (!isMuted) {
             await speak(step3Text);
@@ -716,6 +794,7 @@ export default function DiscoverPage() {
           setCurrentPhrase(noResultsText);
           setIsThinking(false);
           setShowingResults(false);
+          setMentionedFriendsData([]);  // Clear mentioned friends
           if (!isMuted) {
             await speak(noResultsText);
           }
@@ -731,6 +810,7 @@ export default function DiscoverPage() {
       setSearchError(errorText);
       setCurrentPhrase('Sorry, something went wrong');
       setIsThinking(false);
+      setMentionedFriendsData([]);  // Clear mentioned friends on error
       
       // Clear timeout on error
       clearTimeout(timeoutId);
@@ -771,7 +851,7 @@ export default function DiscoverPage() {
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
-      formData.append('limit', '15');  // Fetch 20 for latent state
+      formData.append('limit', '25');  // Fetch 25 since we filter for cuisine/description
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -1097,6 +1177,7 @@ export default function DiscoverPage() {
             >
               Feeling Hungry?
             </motion.p>
+
           </div>
 
           {/* Orbiting Restaurant Photos - Dynamic from actual search results */}
@@ -1249,12 +1330,21 @@ export default function DiscoverPage() {
 
           {/* Orbiting Friend Avatars - Between center and restaurants */}
           <AnimatePresence>
-          {friendsData.length > 0 && !isThinking && !showingResults && friendsData.map((friend, index) => {
+          {friendsData.length > 0 && friendsData.map((friend, index) => {
+            // Check if this friend is mentioned
+            const isMentioned = mentionedFriendsData.some(m => m.id === friend.id);
+            // Hide non-mentioned friends during thinking/results
+            if (!isMentioned && (isThinking || showingResults)) return null;
+            
             // Calculate position on inner circle (radius 150)
             const angle = ((index / friendsData.length) * 360 + rotation * 0.7) * (Math.PI / 180); // Slower rotation
             const friendRadius = 150;
             const x = 350 + Math.cos(angle) * friendRadius;
             const y = 350 + Math.sin(angle) * friendRadius;
+            
+            // Enhanced styling for mentioned friends
+            const avatarSize = isMentioned ? 72 : 64;
+            const marginOffset = isMentioned ? -36 : -32;
             
             return (
               <motion.div
@@ -1264,7 +1354,7 @@ export default function DiscoverPage() {
                 animate={{
                   left: `${x}px`,
                   top: `${y}px`,
-                  scale: 1,
+                  scale: isMentioned ? 1.1 : 1,
                   opacity: 1,
                 }}
                 exit={{ scale: 0, opacity: 0 }}
@@ -1275,11 +1365,11 @@ export default function DiscoverPage() {
                   scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
                 }}
                 style={{
-                  width: '64px',
-                  height: '64px',
-                  marginLeft: '-32px',
-                  marginTop: '-32px',
-                  zIndex: 5,
+                  width: `${avatarSize}px`,
+                  height: `${avatarSize}px`,
+                  marginLeft: `${marginOffset}px`,
+                  marginTop: `${marginOffset}px`,
+                  zIndex: isMentioned ? 10 : 5,
                   cursor: 'pointer',
                 }}
                 onMouseEnter={async () => {
@@ -1309,12 +1399,15 @@ export default function DiscoverPage() {
                 onMouseLeave={() => setHoveredFriend(null)}
               >
                 <div className="relative w-full h-full">
-                  {/* Liquid glass container with gradient border */}
+                  {/* Liquid glass container with gradient border - enhanced for mentioned friends */}
                   <div 
                     className="absolute inset-0 rounded-full"
                     style={{
-                      background: 'linear-gradient(135deg, rgba(155, 135, 245, 0.6), rgba(99, 102, 241, 0.6))',
-                      padding: '2px',
+                      background: isMentioned 
+                        ? 'linear-gradient(135deg, rgba(155, 135, 245, 0.9), rgba(99, 102, 241, 0.9))'
+                        : 'linear-gradient(135deg, rgba(155, 135, 245, 0.6), rgba(99, 102, 241, 0.6))',
+                      padding: isMentioned ? '3px' : '2px',
+                      boxShadow: isMentioned ? '0 0 20px rgba(155, 135, 245, 0.6), 0 0 40px rgba(99, 102, 241, 0.4)' : 'none',
                     }}
                   >
                     <div 
@@ -1332,6 +1425,22 @@ export default function DiscoverPage() {
                       />
                     </div>
                   </div>
+                  
+                  {/* "Searching for" indicator for mentioned friends */}
+                  {isMentioned && (
+                    <motion.div
+                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap"
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        background: 'rgba(155, 135, 245, 0.95)',
+                        color: 'white',
+                        boxShadow: '0 2px 8px rgba(155, 135, 245, 0.4)',
+                      }}
+                    >
+                      Included
+                    </motion.div>
+                  )}
 
                   {/* Small name label on hover */}
                   {hoveredFriend?.id === friend.id && (

@@ -28,6 +28,7 @@ import { FriendNode } from './components/types';
 import { useGraphData } from './components/hooks/useGraphData';
 import { useGraphLayout } from './components/hooks/useGraphLayout';
 import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
 
 // Register node types (like auctor-1)
 type GraphNode = FriendNode;
@@ -103,10 +104,8 @@ function FriendsGraphFlow() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center liquid-glass">
-        <div className="glass-panel p-8 rounded-2xl">
-          <p className="text-slate-700">Loading friend network...</p>
-        </div>
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
