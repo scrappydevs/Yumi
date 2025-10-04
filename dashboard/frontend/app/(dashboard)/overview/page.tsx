@@ -25,6 +25,7 @@ import { useSimpleTTS } from '@/hooks/use-simple-tts';
 import { useVADRecording } from '@/hooks/use-vad-recording';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
+import { trackView, trackClick, trackMapsView, trackReservation } from '@/lib/track-interaction';
 
 // Cuisine-based fallback images for restaurants without photos
 const CUISINE_FALLBACK_IMAGES: { [key: string]: string } = {
@@ -1066,9 +1067,35 @@ export default function DiscoverPage() {
                       boxShadow: 'inset 0 0 35px -8px rgba(255, 255, 255, 0.95), 0 16px 48px rgba(0, 0, 0, 0.2)',
                       transition: { duration: 0.3 }
                     }}
-                    onMouseEnter={() => matchingRestaurant && setHoveredRestaurant(matchingRestaurant)}
+                    onMouseEnter={() => {
+                      if (matchingRestaurant) {
+                        setHoveredRestaurant(matchingRestaurant);
+                        // Track view (hover = lightweight view signal)
+                        trackView({
+                          place_id: matchingRestaurant.place_id,
+                          name: matchingRestaurant.name,
+                          cuisine: matchingRestaurant.cuisine,
+                          address: matchingRestaurant.address,
+                          latitude: matchingRestaurant.latitude,
+                          longitude: matchingRestaurant.longitude,
+                        });
+                      }
+                    }}
                     onMouseLeave={() => setHoveredRestaurant(null)}
-                    onClick={() => matchingRestaurant && setSelectedRestaurant(matchingRestaurant)}
+                    onClick={() => {
+                      if (matchingRestaurant) {
+                        setSelectedRestaurant(matchingRestaurant);
+                        // Track click (explicit selection)
+                        trackClick({
+                          place_id: matchingRestaurant.place_id,
+                          name: matchingRestaurant.name,
+                          cuisine: matchingRestaurant.cuisine,
+                          address: matchingRestaurant.address,
+                          latitude: matchingRestaurant.latitude,
+                          longitude: matchingRestaurant.longitude,
+                        });
+                      }
+                    }}
                   >
                     {/* Inner specular highlight */}
                     <div 
@@ -1555,6 +1582,16 @@ export default function DiscoverPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => {
+                      // Track reservation intent (HIGHEST signal weight: 10.0)
+                      trackReservation({
+                        place_id: selectedRestaurant.place_id,
+                        name: selectedRestaurant.name,
+                        cuisine: selectedRestaurant.cuisine,
+                        address: selectedRestaurant.address,
+                        latitude: selectedRestaurant.latitude,
+                        longitude: selectedRestaurant.longitude,
+                      });
+                      
                       // Navigate to reservations page with restaurant details and auto-open modal
                       const params = new URLSearchParams({
                         restaurant_name: selectedRestaurant.name,
@@ -1574,6 +1611,16 @@ export default function DiscoverPage() {
                     whileHover={{ scale: 1.02, backgroundColor: '#f3f4f6' }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => {
+                      // Track maps view (HIGH signal weight: 5.0)
+                      trackMapsView({
+                        place_id: selectedRestaurant.place_id,
+                        name: selectedRestaurant.name,
+                        cuisine: selectedRestaurant.cuisine,
+                        address: selectedRestaurant.address,
+                        latitude: selectedRestaurant.latitude,
+                        longitude: selectedRestaurant.longitude,
+                      });
+                      
                       // Navigate to discover page with maps tab (assuming tabs exist)
                       // Or use Google Maps as fallback
                       if (selectedRestaurant.latitude && selectedRestaurant.longitude) {
