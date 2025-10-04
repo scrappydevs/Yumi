@@ -98,12 +98,6 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
               className="h-36 w-36 object-contain"
             />
           )}
-          <Utensils className="w-7 h-7 mb-2 -ml-5 mr-4" style={{
-            background: 'linear-gradient(135deg, #9B87F5 0%, #7B61FF 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }} />
         </div>
       </div>
 

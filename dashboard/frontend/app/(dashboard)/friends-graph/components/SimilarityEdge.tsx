@@ -25,8 +25,9 @@ function SimilarityEdge({
   source,
   target,
 }: EdgeProps<SimilarityEdgeType>) {
-  const [isHovered, setIsHovered] = useState(false);
+  const [isSelected, setIsSelected] = useState(false);
 
+  // Get edge path and center position (like auctor-1)
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -43,32 +44,27 @@ function SimilarityEdge({
   const sharedCuisines = data?.sharedCuisines ?? [];
   const tasteOverlap = data?.tasteOverlap ?? {};
   
-  console.log('📊 Edge data:', { id, similarityScore, explanation, isHovered, data });
+  console.log('📊 Edge data:', { id, similarityScore, explanation, isSelected, data });
 
-  const handleMouseEnter = useCallback(() => {
-    console.log('🔵 Edge hover ENTER:', { id, source, target, similarityScore });
-    setIsHovered(true);
-  }, [id, source, target, similarityScore]);
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering pane click
+    console.log('🔵 Edge CLICKED:', { id, source, target, similarityScore });
+    setIsSelected(!isSelected);
+  }, [id, source, target, similarityScore, isSelected]);
 
-  const handleMouseLeave = useCallback(() => {
-    console.log('🔴 Edge hover LEAVE:', { id });
-    setIsHovered(false);
-  }, [id]);
-
-  // Constant styling (like auctor-1) - distance encodes similarity
-  const strokeWidth = 2;
-  const edgeColor = isHovered ? `rgba(99, 102, 241, 0.8)` : `rgba(155, 135, 245, 0.4)`;
+  // Styling - highlight when selected
+  const strokeWidth = isSelected ? 3 : 2;
+  const edgeColor = isSelected ? `rgba(99, 102, 241, 0.9)` : `rgba(155, 135, 245, 0.4)`;
 
   return (
     <>
-      {/* Visible edge with hover detection */}
+      {/* Visible edge with click detection */}
       <path
         d={edgePath}
         fill="none"
         stroke={edgeColor}
-        strokeWidth={isHovered ? 3 : strokeWidth}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        strokeWidth={strokeWidth}
+        onClick={handleClick}
         style={{
           cursor: 'pointer',
           transition: 'all 0.2s ease-in-out',
@@ -76,30 +72,30 @@ function SimilarityEdge({
         }}
       />
       
-      {/* Invisible wide hitbox for easier hovering */}
+      {/* Invisible wide hitbox for easier clicking */}
       <path
         d={edgePath}
         fill="none"
         stroke="transparent"
         strokeWidth={20}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         style={{
           cursor: 'pointer',
           pointerEvents: 'stroke',
         }}
       />
 
-      {/* Hover tooltip with liquid glass */}
-      {isHovered && (
+      {/* Tooltip positioned at edge center (like auctor-1) */}
+      {isSelected && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              pointerEvents: 'none',
+              transform: `translate(-50%, -100%) translate(${labelX}px, ${labelY - 10}px)`,
+              pointerEvents: 'all',
+              zIndex: 1000,
             }}
-            className="glass-panel similarity-tooltip"
+            className="glass-panel similarity-tooltip nodrag"
           >
             {/* Score badge */}
             <div className="similarity-score-badge">

@@ -79,11 +79,12 @@ export function UserDetailPanel({ userId, currentUserId, onClose }: UserDetailPa
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 400, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="absolute top-4 right-4 bottom-4 w-96 glass-panel rounded-2xl overflow-hidden shadow-2xl z-50"
+          className="fixed top-4 right-4 bottom-4 w-96 glass-panel rounded-2xl overflow-hidden shadow-2xl"
           style={{
             backdropFilter: 'blur(40px) saturate(180%)',
             background: 'rgba(248, 250, 252, 0.85)',
             border: '1px solid rgba(148, 163, 184, 0.2)',
+            zIndex: 9999,
           }}
         >
           {/* Close button */}

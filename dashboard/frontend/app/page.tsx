@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { motion } from 'framer-motion';
 import { Loader2, ArrowRight, Utensils } from 'lucide-react';
-import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
+import { DemoSocialGraph } from '@/components/DemoSocialGraph';
 import Image from 'next/image';
 
 export default function Home() {
@@ -107,45 +107,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-        {/* Glowing animated liquid glass blobs */}
-        <div className="absolute inset-0 pointer-events-none">
-          <motion.div
-            animate={{
-              opacity: [0.4, 0.8, 0.4],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            className="absolute top-20 left-20"
-          >
-            <LiquidGlassBlob 
-              isAnimating={true}
-              className="w-[300px] h-[300px] shadow-[0_0_60px_rgba(168,85,247,0.6)]"
-            />
-          </motion.div>
-          
-          <motion.div
-            animate={{
-              opacity: [0.5, 0.9, 0.5],
-              scale: [1, 1.15, 1],
-            }}
-            transition={{
-              duration: 2.5,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0.5,
-            }}
-            className="absolute bottom-20 right-20"
-          >
-            <LiquidGlassBlob 
-              isAnimating={true}
-              className="w-[400px] h-[400px] shadow-[0_0_80px_rgba(147,51,234,0.7)]"
-            />
-          </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
+        {/* Demo Social Network Graph Background - takes up most of the page */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-20">
+          <DemoSocialGraph className="w-full h-full" />
         </div>
         
         {/* Central spinner */}
@@ -160,17 +125,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0 pointer-events-none">
-        <LiquidGlassBlob 
-          isAnimating={true}
-          className="absolute top-20 left-20 w-[300px] h-[300px]"
-        />
-        <LiquidGlassBlob 
-          isAnimating={true}
-          className="absolute bottom-20 right-20 w-[400px] h-[400px]"
-        />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
+      {/* Demo Social Network Graph Background - takes up most of the page */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-25">
+        <DemoSocialGraph className="w-full h-full" />
       </div>
 
       <motion.div
