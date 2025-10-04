@@ -1,482 +1,326 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   MapPin, 
-  TrendingUp, 
-  FileText,
-  AlertCircle,
-  Filter,
-  Search,
-  Loader2,
-  X,
+  Users,
+  Sparkles,
+  Send,
+  TrendingUp,
+  Calendar,
+  Star,
 } from 'lucide-react';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useIssues, useIssueStats } from '@/hooks/use-issues';
-import { useMemo, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { format, subDays, formatDistanceToNow } from 'date-fns';
-import { apiClient, type Group } from '@/lib/api';
-import { reverseGeocode } from '@/lib/geocoding';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const formatTimeAgo = (date: Date) => {
-  return formatDistanceToNow(date, { addSuffix: true });
-};
+// Mock restaurant data with photos
+const SAMPLE_RESTAURANTS = [
+  {
+    id: 1,
+    name: 'Nobu Downtown',
+    image: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=400&h=400&fit=crop',
+    cuisine: 'Japanese',
+    rating: 4.8,
+    location: 'Downtown NYC',
+  },
+  {
+    id: 2,
+    name: 'Le Bernardin',
+    image: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop',
+    cuisine: 'French',
+    rating: 4.9,
+    location: 'Midtown',
+  },
+  {
+    id: 3,
+    name: 'Carbone',
+    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=400&fit=crop',
+    cuisine: 'Italian',
+    rating: 4.7,
+    location: 'Greenwich Village',
+  },
+  {
+    id: 4,
+    name: 'Momofuku Ko',
+    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop',
+    cuisine: 'Asian Fusion',
+    rating: 4.6,
+    location: 'East Village',
+  },
+  {
+    id: 5,
+    name: 'Eleven Madison Park',
+    image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop',
+    cuisine: 'American',
+    rating: 4.9,
+    location: 'Flatiron',
+  },
+  {
+    id: 6,
+    name: 'Cosme',
+    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop',
+    cuisine: 'Mexican',
+    rating: 4.7,
+    location: 'Flatiron',
+  },
+];
 
-const getStatusBadge = (status: string) => {
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', className: string }> = {
-    resolved: { variant: 'outline', className: 'border-[hsl(var(--success))] text-[hsl(var(--success))]' },
-    in_progress: { variant: 'outline', className: 'border-[hsl(var(--primary))] text-[hsl(var(--primary))]' },
-    pending: { variant: 'outline', className: 'border-[hsl(var(--warning))] text-[hsl(var(--warning))]' },
-  };
-  const config = variants[status] || variants.pending;
-  return (
-    <Badge variant={config.variant} className={config.className}>
-      {status.replace('_', ' ')}
-    </Badge>
-  );
-};
+export default function DiscoverPage() {
+  const [prompt, setPrompt] = useState('');
+  const [rotation, setRotation] = useState(0);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-const getPriorityBadge = (priority: string) => {
-  const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', className: string }> = {
-    high: { variant: 'destructive', className: 'bg-[hsl(var(--danger))] hover:bg-[hsl(var(--danger))]/90' },
-    medium: { variant: 'outline', className: 'border-[hsl(var(--warning))] text-[hsl(var(--warning))]' },
-    low: { variant: 'secondary', className: 'bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]' },
-  };
-  const config = variants[priority] || variants.medium;
-  return (
-    <Badge variant={config.variant} className={config.className}>
-      {priority}
-    </Badge>
-  );
-};
-
-export default function OverviewPage() {
-  const router = useRouter();
-  const { issues, loading, error } = useIssues();
-  const stats = useIssueStats();
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [locationNames, setLocationNames] = useState<Record<string, string>>({});
-  
-  // Recent issues filters
-  const [recentSearchQuery, setRecentSearchQuery] = useState('');
-  const [recentStatusFilter, setRecentStatusFilter] = useState<string>('all');
-  const [showRecentFilters, setShowRecentFilters] = useState(false);
-
-  // Fetch groups
+  // Only start rotation after mount to avoid hydration errors
   useEffect(() => {
-    async function fetchGroups() {
-      try {
-        const data = await apiClient.getGroups();
-        setGroups(data);
-      } catch (err) {
-        console.error('Failed to fetch groups:', err);
-      }
-    }
-    fetchGroups();
+    setMounted(true);
+    const interval = setInterval(() => {
+      setRotation((prev) => (prev + 0.3) % 360);
+    }, 30);
+    return () => clearInterval(interval);
   }, []);
 
-  // Reverse geocode locations for recent issues
-  useEffect(() => {
-    async function geocodeLocations() {
-      const names: Record<string, string> = {};
-      const recentIssuesList = issues.slice(0, 6);
-      
-      for (const issue of recentIssuesList) {
-        if (issue.geolocation && !locationNames[issue.id]) {
-          try {
-            const result = await reverseGeocode(issue.geolocation);
-            names[issue.id] = result.formatted;
-          } catch (err) {
-            names[issue.id] = issue.geolocation;
-          }
-        }
-      }
-      
-      if (Object.keys(names).length > 0) {
-        setLocationNames(prev => ({ ...prev, ...names }));
-      }
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Prompt:', prompt);
+    // TODO: Implement natural language search
+  };
 
-    if (issues.length > 0) {
-      geocodeLocations();
-    }
-  }, [issues]);
+  const radius = 240;
+  const centerX = 0;
+  const centerY = 0;
 
-  // Generate trend data from actual issues
-  const issuesTrendData = useMemo(() => {
-    const days = 5;
-    const trendData = [];
-    
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-      const dateStr = format(date, 'MM/dd');
-      
-      // Count issues reported on or before this day
-      const reportedCount = issues.filter(issue => 
-        new Date(issue.timestamp) <= date
-      ).length;
-      
-      // Count resolved issues as of this day
-      const resolvedCount = issues.filter(issue => 
-        issue.status === 'complete' && new Date(issue.timestamp) <= date
-      ).length;
-      
-      trendData.push({
-        date: dateStr,
-        reported: reportedCount,
-        resolved: resolvedCount,
-      });
-    }
-    
-    return trendData;
-  }, [issues]);
-
-  // Generate category data from groups
-  const categoryData = useMemo(() => {
-    const categories: Record<number, { name: string; count: number }> = {};
-    
-    issues.forEach(issue => {
-      if (issue.group_id) {
-        if (!categories[issue.group_id]) {
-          const group = groups.find(g => g.id === issue.group_id);
-          categories[issue.group_id] = { 
-            name: group?.name || 'Unknown', 
-            count: 0 
-          };
-        }
-        categories[issue.group_id].count++;
-      }
-    });
-    
-    return Object.values(categories)
-      .map(({ name, count }) => ({ category: name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [issues, groups]);
-
-  // Get recent issues with group names and full issue data - with filtering
-  const recentIssues = useMemo(() => {
-    let filtered = issues;
-
-    // Apply search filter
-    if (recentSearchQuery) {
-      const query = recentSearchQuery.toLowerCase();
-      filtered = filtered.filter(issue => 
-        issue.description?.toLowerCase().includes(query) ||
-        issue.id.toLowerCase().includes(query) ||
-        (locationNames[issue.id] && locationNames[issue.id].toLowerCase().includes(query))
-      );
-    }
-
-    // Apply status filter
-    if (recentStatusFilter !== 'all') {
-      filtered = filtered.filter(issue => issue.status === recentStatusFilter);
-    }
-
-    return filtered.slice(0, 6).map(issue => {
-      const group = groups.find(g => g.id === issue.group_id);
-      return {
-        fullId: issue.id,  // Keep full ID for navigation
-        id: issue.id.slice(0, 8).toUpperCase(),
-        type: group?.name || issue.description?.slice(0, 30) || 'Unknown',
-        location: locationNames[issue.id] || issue.geolocation || 'Location unknown',
-        priority: issue.priority === 3 ? 'high' as const : issue.priority === 2 ? 'medium' as const : 'low' as const,
-        status: issue.status === 'complete' ? 'resolved' : issue.status === 'incomplete' ? 'in_progress' : 'pending' as const,
-        reported: formatTimeAgo(new Date(issue.timestamp)),
-      };
-    });
-  }, [issues, groups, locationNames, recentSearchQuery, recentStatusFilter]);
-
-  if (loading) {
+  if (!mounted) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--primary))]" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <AlertCircle className="w-12 h-12 text-[hsl(var(--danger))]" />
-        <div className="text-center">
-          <h2 className="text-lg font-semibold">Error loading issues</h2>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">{error}</p>
-        </div>
+      <div className="h-full flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full gradient-purple-blue animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="px-6 py-6 space-y-6 w-full max-w-[2100px]">
-      {/* Quick Stats - Inline */}
-      <div className="flex gap-8 items-center flex-wrap">
-        <div className="flex flex-col">
-          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-1">Total Issues</span>
-          <span className="text-3xl font-semibold tabular-nums">{stats.totalIssues}</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-1">Resolved</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-semibold tabular-nums">{stats.resolved}</span>
-            <span className="text-sm text-[hsl(var(--success))]">({stats.resolutionRate}%)</span>
+    <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background gradient - more prominent */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 pointer-events-none" />
+      
+      {/* Simplified top badge */}
+      <div className="absolute top-6 flex items-center justify-center w-full z-10">
+        <div className="liquid-glass-dark px-5 py-2 rounded-full shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] animate-pulse" />
+            <span className="text-xs font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
+              12 friends dining nearby
+            </span>
           </div>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-1">In Progress</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-semibold tabular-nums">{stats.inProgress}</span>
-            <span className="text-sm text-[hsl(var(--muted-foreground))]">({stats.avgTime}d avg)</span>
-          </div>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-1">Critical</span>
-          <span className="text-3xl font-semibold tabular-nums text-[hsl(var(--danger))]">{stats.critical}</span>
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Issues Trend Chart - Takes 2 columns */}
-        <Card className="lg:col-span-2 bg-[hsl(var(--card))]/80 backdrop-blur-xl border-white/10 shadow-xl hover:border-white/20 transition-colors">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-medium">Issue Trend</CardTitle>
-            <CardDescription className="text-xs">Reported vs Resolved over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={issuesTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorReported" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                    width={30}
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      padding: '8px 12px'
-                    }}
-                    labelStyle={{ fontWeight: 600, marginBottom: 4 }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="reported" 
-                    name="Reported"
-                    stroke="hsl(var(--primary))" 
-                    fill="url(#colorReported)" 
-                    strokeWidth={2}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="resolved" 
-                    name="Resolved"
-                    stroke="hsl(var(--success))" 
-                    fill="url(#colorResolved)" 
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Content - Photo Wheel */}
+      <div className="flex-1 flex items-center justify-center relative">
+        {/* Center Element - Minimalist Gradient Circle */}
+        <motion.div
+          className="absolute rounded-full w-32 h-32 flex flex-col items-center justify-center z-20 shadow-xl"
+          style={{
+            background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%)',
+          }}
+          animate={{
+            scale: [1, 1.08, 1],
+            rotate: [0, 360],
+          }}
+          transition={{
+            scale: { duration: 4, repeat: Infinity, ease: "easeInOut" },
+            rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+          }}
+        >
+          <Sparkles className="w-8 h-8 text-white mb-1" />
+          <span className="text-sm font-bold text-white">
+            {SAMPLE_RESTAURANTS.length}
+          </span>
+          <span className="text-[10px] text-white/80 uppercase tracking-wider">
+            spots
+          </span>
+        </motion.div>
 
-        {/* Issue Categories - 1 column */}
-        <Card className="bg-[hsl(var(--card))]/80 backdrop-blur-xl border-white/10 shadow-xl hover:border-white/20 transition-colors">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-            <CardDescription className="text-xs">Issue distribution</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {categoryData.map((item) => (
-                <div
-                  key={item.category}
-                  className="flex justify-between items-center py-2 px-2 rounded-md transition-colors hover:bg-white/5"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-2 h-2 rounded-full bg-[hsl(var(--primary))]" />
-                    <span className="text-sm text-foreground">{item.category}</span>
-                  </div>
-                  <span className="text-lg tabular-nums font-medium text-muted-foreground">{item.count}</span>
+        {/* Rotating Photos - Smaller & More Animated */}
+        <div className="relative w-[550px] h-[550px]">
+          {SAMPLE_RESTAURANTS.map((restaurant, index) => {
+            const angle = (index * (360 / SAMPLE_RESTAURANTS.length) + rotation) * (Math.PI / 180);
+            const x = centerX + radius * Math.cos(angle);
+            const y = centerY + radius * Math.sin(angle);
+            const scale = 0.9 + 0.1 * Math.sin(rotation * Math.PI / 180 + index);
+            
+            return (
+              <motion.div
+                key={restaurant.id}
+                className="absolute cursor-pointer"
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  transform: `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale})`,
+                }}
+                whileHover={{ 
+                  scale: 1.2, 
+                  zIndex: 30,
+                  rotate: [0, -5, 5, 0],
+                }}
+                transition={{
+                  rotate: { duration: 0.3 }
+                }}
+                onClick={() => setSelectedRestaurant(restaurant.id)}
+              >
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-400/20 to-blue-400/20 blur-xl" />
+                  <img
+                    src={restaurant.image}
+                    alt={restaurant.name}
+                    className="w-20 h-20 object-cover rounded-2xl shadow-2xl relative border-2 border-white/50"
+                  />
+                  <motion.div 
+                    className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full gradient-purple-blue flex items-center justify-center shadow-lg"
+                    whileHover={{ scale: 1.2 }}
+                  >
+                    <Star className="w-4 h-4 fill-white text-white" />
+                  </motion.div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Recent Issues */}
-      <Card className="bg-[hsl(var(--card))]/80 backdrop-blur-xl border-white/10 shadow-xl hover:border-white/20 transition-colors">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-medium">Recent Issues</CardTitle>
-              <CardDescription className="text-xs mt-1">Latest infrastructure reports</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 text-xs hover:bg-white/10"
-                onClick={() => setShowRecentFilters(!showRecentFilters)}
-              >
-                <Filter className="w-3.5 h-3.5 mr-1.5" />
-                Filter
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 text-xs hover:bg-white/10"
-                onClick={() => setShowRecentFilters(!showRecentFilters)}
-              >
-                <Search className="w-3.5 h-3.5 mr-1.5" />
-                Search
-              </Button>
-            </div>
-          </div>
-
-          {/* Filter Controls */}
-          {showRecentFilters && (
-            <div className="mt-4 space-y-3 pt-4 border-t border-white/5">
-              {/* Search */}
+      {/* Bottom Prompt Panel - Minimalist Gradient */}
+      <div className="w-full max-w-2xl mb-6 z-10">
+        <motion.div
+          className="relative rounded-[32px] p-[1px] shadow-2xl overflow-hidden"
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 100 }}
+        >
+          {/* Gradient border */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 opacity-60" />
+          
+          <div className="relative bg-white/90 backdrop-blur-2xl rounded-[31px] p-6">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
-                <Input
-                  type="text"
-                  placeholder="Search recent issues..."
-                  value={recentSearchQuery}
-                  onChange={(e) => setRecentSearchQuery(e.target.value)}
-                  className="h-8 pl-9 pr-9 text-xs bg-[hsl(var(--card))]/60 backdrop-blur-xl border-white/10 shadow-lg"
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Where should we eat? Try natural language..."
+                  className="w-full px-5 py-4 bg-gradient-to-br from-purple-50/50 to-blue-50/50 border-0 rounded-2xl 
+                            resize-none text-sm leading-relaxed
+                            text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]
+                            focus:outline-none focus:ring-2 focus:ring-purple-400/40
+                            transition-all"
+                  rows={2}
                 />
-                {recentSearchQuery && (
-                  <button
-                    onClick={() => setRecentSearchQuery('')}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <motion.button
+                  type="submit"
+                  disabled={!prompt.trim()}
+                  className="absolute right-2 bottom-2 rounded-xl gradient-purple-blue text-white h-9 px-5 
+                            shadow-lg disabled:opacity-40 font-medium text-sm"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Send className="w-4 h-4" />
+                </motion.button>
               </div>
 
-              {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider whitespace-nowrap">
-                  Status:
-                </label>
-                <Select value={recentStatusFilter} onValueChange={setRecentStatusFilter}>
-                  <SelectTrigger className="h-8 text-xs bg-[hsl(var(--card))]/60 backdrop-blur-xl border-white/10 shadow-lg">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[hsl(var(--card))]/95 backdrop-blur-xl border-white/10 shadow-2xl">
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="incomplete">Incomplete</SelectItem>
-                    <SelectItem value="complete">Complete</SelectItem>
-                  </SelectContent>
-                </Select>
-                {(recentSearchQuery || recentStatusFilter !== 'all') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setRecentSearchQuery('');
-                      setRecentStatusFilter('all');
-                    }}
-                    className="h-7 text-xs hover:bg-white/10"
-                  >
-                    <X className="w-3 h-3 mr-1" />
-                    Clear
-                  </Button>
-                )}
+              {/* Quick Action Chips - Gradient style */}
+              <div className="flex flex-wrap gap-2">
+                <motion.button
+                  type="button"
+                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 text-xs font-medium transition-all"
+                  onClick={() => setPrompt('Show me trendy spots my friends have been to')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Users className="w-3 h-3 inline mr-1" />
+                  Friends
+                </motion.button>
+                <motion.button
+                  type="button"
+                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 hover:from-blue-200 hover:to-indigo-200 text-xs font-medium transition-all"
+                  onClick={() => setPrompt('Find restaurants open now near me')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <MapPin className="w-3 h-3 inline mr-1" />
+                  Nearby
+                </motion.button>
+                <motion.button
+                  type="button"
+                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 hover:from-indigo-200 hover:to-purple-200 text-xs font-medium transition-all"
+                  onClick={() => setPrompt('Surprise me with something new')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Sparkles className="w-3 h-3 inline mr-1" />
+                  Surprise
+                </motion.button>
               </div>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {recentIssues.length === 0 ? (
-              <div className="text-center py-8 text-[hsl(var(--muted-foreground))] text-sm">
-                {recentSearchQuery || recentStatusFilter !== 'all' 
-                  ? 'No issues match your filters' 
-                  : 'No issues found'}
-              </div>
-            ) : (
-              recentIssues.map((issue, index) => (
-              <div
-                key={issue.id}
-                className={`flex items-center justify-between py-3 px-3 rounded-md hover:bg-white/5 transition-colors cursor-pointer ${
-                  index !== recentIssues.length - 1 ? 'border-b border-white/5' : ''
-                }`}
-                onClick={() => router.push(`/issues/${issue.fullId}`)}
-              >
-                <div className="flex-1 min-w-0 flex items-center gap-4">
-                  <span className="text-xs font-mono font-medium text-muted-foreground min-w-[75px]">
-                    {issue.id}
-                  </span>
-                  <div className="flex items-center gap-2 min-w-[140px]">
-                    <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm">{issue.type}</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <MapPin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm truncate">{issue.location}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 ml-4">
-                  {getPriorityBadge(issue.priority)}
-                  {getStatusBadge(issue.status)}
-                  <span className="text-xs text-muted-foreground min-w-[60px] text-right">
-                    {issue.reported}
-                  </span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 px-3 text-xs hover:bg-white/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/issues/${issue.fullId}`);
-                    }}
-                  >
-                    View
-                  </Button>
-                </div>
-              </div>
-            )))}
+            </form>
           </div>
-        </CardContent>
-      </Card>
+        </motion.div>
+      </div>
+
+      {/* Selected Restaurant Details Modal - Minimalist */}
+      <AnimatePresence>
+        {selectedRestaurant && (
+          <motion.div
+            className="absolute inset-0 bg-black/10 backdrop-blur-md flex items-center justify-center z-50 p-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedRestaurant(null)}
+          >
+            <motion.div
+              className="relative bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 max-w-lg w-full shadow-2xl"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 25 }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            >
+              {/* Gradient border effect */}
+              <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-purple-400 via-blue-400 to-indigo-400 opacity-20 blur-xl" />
+              
+              {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant) && (
+                <div className="relative">
+                  <img
+                    src={SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.image}
+                    alt=""
+                    className="w-full h-56 object-cover rounded-2xl mb-5 shadow-lg"
+                  />
+                  <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
+                    {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.name}
+                  </h2>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold gradient-purple-blue text-white">
+                      {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.cuisine}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      <span className="font-bold">{SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.rating}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>{SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.location}</span>
+                    </div>
+                  </div>
+                  <motion.button 
+                    className="w-full gradient-purple-blue text-white rounded-2xl h-12 text-base font-semibold shadow-lg"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Reserve Table
+                  </motion.button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

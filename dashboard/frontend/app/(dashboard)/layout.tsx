@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { AegisSidebar } from '@/components/aegis-sidebar';
 import { AIPanel } from '@/components/ai-panel';
 import { Button } from '@/components/ui/button';
-import { Activity, Users, Sparkles } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -12,6 +12,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // const [aiPanelOpen, setAiPanelOpen] = useState(false); // Disabled - AI features coming soon
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   // Keyboard shortcuts
@@ -34,7 +35,7 @@ export default function DashboardLayout({
   }, []);
 
   return (
-    <div className="flex h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+    <div className="flex h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] gradient-overlay">
       {/* Sidebar */}
       <AegisSidebar 
         isCollapsed={sidebarCollapsed} 
@@ -44,34 +45,24 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] backdrop-blur supports-[backdrop-filter]:bg-[hsl(var(--card))]/95">
+        <header className="h-16 border-b border-[hsl(var(--border))] liquid-glass">
           <div className="h-full px-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-lg font-semibold tracking-tight">Civic Infrastructure Intelligence</h1>
-                <p className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                  Municipal Operations Dashboard
-                </p>
+                <h1 className="text-xl font-semibold tracking-tight bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
+                  Discover
+                </h1>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-                <Activity className="w-4 h-4" />
-                <span className="uppercase tracking-wide text-xs">System Operational</span>
-              </div>
               <Button 
-                variant="outline" 
-                size="sm" 
-                className={`border-[hsl(var(--border))] ${aiPanelOpen ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : ''}`}
+                variant="ghost" 
+                size="icon"
+                className={`rounded-xl hover:bg-[hsl(var(--muted))] ${aiPanelOpen ? 'bg-[hsl(var(--muted))]' : ''}`}
                 onClick={() => setAiPanelOpen(!aiPanelOpen)}
               >
-                <Sparkles className="w-4 h-4 mr-2" />
-                AI Assistant
-              </Button>
-              <Button variant="outline" size="sm" className="border-[hsl(var(--border))]">
-                <Users className="w-4 h-4 mr-2" />
-                Admin
+                <MessageSquare className="w-5 h-5" />
               </Button>
             </div>
           </div>
@@ -83,12 +74,16 @@ export default function DashboardLayout({
             {children}
           </main>
           
-          {/* AI Panel */}
-          {aiPanelOpen && (
-            <div className="w-[400px] h-full flex-shrink-0">
-              <AIPanel onClose={() => setAiPanelOpen(false)} />
+          {/* AI Panel Sidebar */}
+          <div 
+            className={`h-full flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+              aiPanelOpen ? 'w-[400px]' : 'w-0'
+            }`}
+          >
+            <div className="w-[400px] h-full">
+              <AIPanel isOpen={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

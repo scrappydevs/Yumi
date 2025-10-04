@@ -195,18 +195,9 @@ export default function IssueDetailPage({
 
           {/* Description Section - Emphasized at top */}
           <div className="mb-6">
-            <h2 className="text-2xl font-semibold leading-tight mb-4">
+            <h2 className="text-2xl font-semibold leading-tight">
               {issue.description || 'Untitled Issue'}
             </h2>
-            <div className="flex items-center gap-3 flex-wrap">
-              {getStatusBadge(issue.status || 'incomplete')}
-              {getPriorityBadge(issue.priority)}
-              {group && (
-                <Badge variant="outline" className="bg-[hsl(var(--muted))]/30">
-                  {group.name}
-                </Badge>
-              )}
-            </div>
           </div>
 
           {/* Image Section - Proportional */}

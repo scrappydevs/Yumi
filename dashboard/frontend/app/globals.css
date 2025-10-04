@@ -1,50 +1,57 @@
 @import "tailwindcss";
 
-/* Palantir Blueprint Design System Colors */
+/* Apple-Inspired Design System - WWDC 2025 Aesthetic */
 :root {
-  /* Base colors - Deep dark theme */
-  --background: 10 12% 9%; /* #15191E - Blueprint dark bg */
-  --foreground: 0 0% 92%; /* #EBEBEBFF - Light text */
+  /* Base colors - Clean white theme */
+  --background: 0 0% 100%; /* Pure white */
+  --foreground: 0 0% 10%; /* Near black text */
   
-  /* Blueprint primary colors */
-  --primary: 211 70% 50%; /* #2D72D2 - Blueprint blue */
+  /* Purple-Blue gradient primary colors (Apple-style) */
+  --primary: 260 60% 65%; /* #9B87F5 - Purple */
   --primary-foreground: 0 0% 100%;
   
-  /* Semantic colors from Blueprint */
-  --success: 145 70% 35%; /* #238551 - Blueprint green */
+  --secondary: 220 90% 60%; /* #3B82F6 - Blue */
+  --secondary-foreground: 0 0% 100%;
+  
+  /* Semantic colors */
+  --success: 142 71% 45%; /* #10B981 - Green */
   --success-foreground: 0 0% 100%;
   
-  --danger: 355 70% 55%; /* #CD4246 - Blueprint red */
+  --danger: 0 72% 51%; /* #DC2626 - Red */
   --danger-foreground: 0 0% 100%;
   
-  --warning: 36 75% 55%; /* #D99E0B - Blueprint gold */
-  --warning-foreground: 10 12% 9%;
+  --warning: 38 92% 50%; /* #F59E0B - Amber */
+  --warning-foreground: 0 0% 100%;
   
-  /* UI elements */
-  --card: 215 15% 13%; /* #1C2127 - Blueprint card bg */
-  --card-foreground: 0 0% 92%;
+  /* UI elements - Liquid glass aesthetic */
+  --card: 0 0% 98%; /* #FAFAFA - Very light gray */
+  --card-foreground: 0 0% 10%;
   
-  --popover: 215 15% 13%;
-  --popover-foreground: 0 0% 92%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
   
-  --muted: 215 12% 20%; /* #2F343C */
-  --muted-foreground: 215 10% 60%; /* #A7B6C2 */
+  --muted: 240 5% 96%; /* #F5F5F7 - Apple gray */
+  --muted-foreground: 0 0% 45%; /* #737373 */
   
-  --accent: 211 70% 50%;
+  --accent: 260 60% 65%;
   --accent-foreground: 0 0% 100%;
   
-  --border: 215 15% 25%; /* #394B59 - Blueprint borders */
-  --input: 215 15% 25%;
-  --ring: 211 70% 50%;
+  --border: 240 6% 90%; /* #E5E5E7 - Apple border */
+  --input: 240 6% 90%;
+  --ring: 260 60% 65%;
   
-  /* Chart colors from Blueprint palette */
-  --chart-1: 211 70% 50%; /* Blue */
-  --chart-2: 145 70% 35%; /* Green */
-  --chart-3: 36 75% 55%; /* Gold */
-  --chart-4: 355 70% 55%; /* Red */
-  --chart-5: 271 46% 55%; /* Violet */
+  /* Liquid glass specific */
+  --glass-bg: 0 0% 100% / 0.7; /* Translucent white */
+  --glass-border: 240 6% 90% / 0.5;
   
-  --radius: 3px; /* Blueprint uses minimal radius */
+  /* Chart colors - Apple palette */
+  --chart-1: 260 60% 65%; /* Purple */
+  --chart-2: 220 90% 60%; /* Blue */
+  --chart-3: 200 95% 55%; /* Cyan */
+  --chart-4: 340 75% 60%; /* Pink */
+  --chart-5: 280 65% 60%; /* Magenta */
+  
+  --radius: 12px; /* Apple's rounded corners */
 }
 
 @theme inline {
@@ -57,34 +64,76 @@
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: var(--font-inter), 'Alliance No. 2', 'Univers', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   font-feature-settings: 'kern', 'liga', 'clig', 'calt';
-  letter-spacing: -0.003em;
+  letter-spacing: -0.011em;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Blueprint-style scrollbar */
+/* Apple-style minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--muted));
-  border-radius: 2px;
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--border));
+  background: hsl(var(--muted-foreground) / 0.3);
 }
 
-/* High contrast focus states for accessibility */
+/* Liquid Glass Material Effect */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.liquid-glass-dark {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.gradient-purple-blue {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+}
+
+.gradient-overlay {
+  background: linear-gradient(180deg, 
+    rgba(155, 135, 245, 0.05) 0%, 
+    rgba(59, 130, 246, 0.05) 100%);
+}
+
+/* Smooth focus states */
 *:focus-visible {
-  outline: 2px solid hsl(var(--primary));
+  outline: 2px solid hsl(var(--primary) / 0.5);
   outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Smooth animations */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Concentric spacing - Apple design principle */
+.concentric-card {
+  border-radius: 16px;
+}
+
+.concentric-card > * {
+  border-radius: 12px;
 }

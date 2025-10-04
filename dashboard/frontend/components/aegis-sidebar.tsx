@@ -8,18 +8,17 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
-  Shield,
-  LayoutDashboard,
-  Map,
-  BarChart3,
-  AlertCircle,
-  FileText,
+  Utensils,
+  Compass,
   Users,
+  MessageCircle,
+  User,
   Settings,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  BookHeart,
   Activity,
-  Building2,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -38,13 +37,14 @@ type NavigationItem = {
 };
 
 const navigation: NavigationItem[] = [
-  { name: 'Overview', icon: LayoutDashboard, href: '/overview' },
-  { name: 'Issues', icon: AlertCircle, href: '/issues' },
-  { name: 'Spatial View', icon: Map, href: '/spatial' },
-  { name: 'Reports', icon: FileText, href: '/reports' },
+  { name: 'Discover', icon: Compass, href: '/overview' },
+  { name: 'Friends', icon: Users, href: '/friends' },
+  { name: 'Messages', icon: MessageCircle, href: '/messages' },
+  { name: 'Favorites', icon: BookHeart, href: '/favorites' },
 ];
 
 const secondaryNav: NavigationItem[] = [
+  { name: 'Profile', icon: User, href: '/profile' },
   { name: 'Settings', icon: Settings, href: '/settings' },
 ];
 
@@ -59,7 +59,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   return (
     <aside
       className={cn(
-        'relative h-screen border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] transition-all duration-300 ease-in-out flex flex-col',
+        'relative h-screen border-r border-[hsl(var(--border))] liquid-glass transition-all duration-300 ease-in-out flex flex-col',
         isCollapsed ? 'w-[60px]' : 'w-[240px]'
       )}
       style={{
@@ -70,22 +70,22 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-between px-4">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 bg-[hsl(var(--primary))] rounded-sm">
-              <Shield className="w-5 h-5 text-white" />
+            <div className="flex items-center justify-center w-10 h-10 gradient-purple-blue rounded-2xl shadow-lg">
+              <Utensils className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold tracking-tight text-[hsl(var(--foreground))]">
-                AEGIS
+              <h1 className="text-lg font-semibold tracking-tight text-[hsl(var(--foreground))]">
+                Eats
               </h1>
-              <p className="text-[10px] text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
-                v2.1.0
+              <p className="text-[10px] text-[hsl(var(--muted-foreground))] tracking-wide">
+                Social Dining
               </p>
             </div>
           </div>
         )}
         {isCollapsed && (
-          <div className="flex items-center justify-center w-8 h-8 bg-[hsl(var(--primary))] rounded-sm mx-auto">
-            <Shield className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-center w-10 h-10 gradient-purple-blue rounded-2xl shadow-lg mx-auto">
+            <Utensils className="w-5 h-5 text-white" />
           </div>
         )}
       </div>
