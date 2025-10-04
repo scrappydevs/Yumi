@@ -365,28 +365,8 @@ export default function DiscoverPage() {
     // Check if this is a group search (has mentions)
     const isGroupSearch = mentions.length > 0;
     
-    const thinkingPhrases = isGroupSearch
-      ? [
-          `Finding restaurants for you and ${mentions.length} ${mentions.length === 1 ? 'friend' : 'friends'}`,
-          "Looking for perfect group dining spots",
-          "Searching for places you'll all love",
-        ]
-      : [
-          "Finding restaurants",
-          "Hang on tight",
-          "Looking for the perfect spot",
-          "Searching nearby",
-          "Let me check what's available",
-          "One moment please",
-          "Analyzing your options",
-        ];
-    
-    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
-    setCurrentPhrase(randomPhrase);
-    
-    if (!isMuted) {
-      await speak(randomPhrase, volume);
-    }
+    // Note: The rotating phrases with voice are handled by the useEffect hook
+    // No need to speak here to avoid voice overlap
     
     try {
       // Get coordinates for selected location
