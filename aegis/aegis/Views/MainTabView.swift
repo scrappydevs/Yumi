@@ -19,14 +19,21 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            // Tab 2: Taste Profile
+            // Tab 2: Friends
+            FriendsView()
+                .tabItem {
+                    Label("Friends", systemImage: "person.2.fill")
+                }
+                .tag(1)
+            
+            // Tab 3: Taste Profile
             NavigationView {
                 TasteProfileView()
             }
             .tabItem {
                 Label("Taste Profile", systemImage: "chart.pie")
             }
-            .tag(1)
+            .tag(2)
         }
         .accentColor(.blue)
     }
