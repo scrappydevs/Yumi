@@ -20,7 +20,7 @@ from services.restaurant_search_service import get_restaurant_search_service
 from services.restaurant_db_service import get_restaurant_db_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
-from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph
+from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph, nlp
 import asyncio
 
 # Lazy import for embedding service (heavy memory usage)
@@ -161,6 +161,9 @@ app.include_router(invites.router, prefix="/api")
 
 # Import and include friends graph router
 app.include_router(friends_graph.router, prefix="/api")
+
+# Import and include NLP router
+app.include_router(nlp.router)
 
 
 @app.get("/")

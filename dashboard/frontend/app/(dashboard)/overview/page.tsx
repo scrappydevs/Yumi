@@ -176,6 +176,7 @@ export default function DiscoverPage() {
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
   const rotationCyclesRef = useRef(0);  // Use ref for real-time access in interval
+  const friendsFetchIdRef = useRef(0);  // Track latest friends fetch to prevent race conditions
   const [location, setLocation] = useState('Boston');  // Default to Boston
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
@@ -230,10 +231,26 @@ export default function DiscoverPage() {
       console.log('[Overview] Received partial transcription:', text);
       setPrompt(text);
     },
-    onTranscriptionComplete: (text) => {
+    onTranscriptionComplete: async (text) => {
       // Final transcription (more accurate)
       console.log('[Overview] Received final transcription:', text);
       setPrompt(text);
+      
+      // Auto-detect friend mentions in the transcribed text
+      console.log('[Overview] 🤖 Auto-detecting friend mentions...');
+      const detectedMentions = await detectFriendMentions(text);
+      
+      if (detectedMentions.length > 0) {
+        console.log('[Overview] ✨ Auto-tagged friends:', detectedMentions.map(m => m.username).join(', '));
+        setMentions(detectedMentions);
+        
+        // Optional: Speak confirmation if not muted
+        if (!isMuted && detectedMentions.length > 0) {
+          const friendNames = detectedMentions.map(m => m.display_name || m.username).join(' and ');
+          const confirmationText = `Tagging ${friendNames}`;
+          speak(confirmationText).catch(err => console.error('Speak error:', err));
+        }
+      }
     },
     onError: (error) => {
       console.error('VAD Recording error:', error);
@@ -242,6 +259,70 @@ export default function DiscoverPage() {
   
   // Derived state: is this a group search?
   const isGroupSearch = mentions.length > 0;
+
+  /**
+   * Detect friend mentions in transcribed text using NLP API
+   * @param text - The transcribed text to analyze
+   * @returns Array of detected mentions
+   */
+  const detectFriendMentions = async (text: string): Promise<Mention[]> => {
+    try {
+      if (!text.trim() || friendsData.length === 0) {
+        return [];
+      }
+
+      console.log('[Overview] 🔍 Detecting friend mentions in:', text);
+      console.log('[Overview] 👥 Available friends:', friendsData.length);
+
+      // Get auth session for JWT token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.warn('[Overview] ⚠️  No session, skipping mention detection');
+        return [];
+      }
+
+      // Format friends for API
+      const friendsForApi = friendsData.map(f => ({
+        id: f.id,
+        username: f.username,
+        display_name: f.display_name || null
+      }));
+
+      // Call NLP detection API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/nlp/detect-friend-mentions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          friends: friendsForApi
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('[Overview] ❌ Mention detection API failed:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const detectedMentions: Mention[] = data.detected_mentions.map((dm: any) => ({
+        id: dm.id,
+        username: dm.username,
+        display_name: dm.display_name,
+      }));
+
+      console.log('[Overview] ✅ Detected mentions:', detectedMentions);
+      return detectedMentions;
+
+    } catch (error) {
+      console.error('[Overview] ❌ Error detecting mentions:', error);
+      return [];
+    }
+  };
 
   // Sync volume with audio output
   useEffect(() => {
@@ -330,7 +411,10 @@ export default function DiscoverPage() {
   useEffect(() => {
     if (!user || !mounted) return;
 
-    async function loadFriends() {
+      async function loadFriends() {
+      // Increment fetch ID to track this specific fetch
+      const currentFetchId = ++friendsFetchIdRef.current;
+
       try {
         const supabase = createClient();
         const { data: profile } = await supabase
@@ -339,18 +423,41 @@ export default function DiscoverPage() {
           .eq('id', user!.id)
           .single();
 
+        // Ignore stale fetch results
+        if (currentFetchId !== friendsFetchIdRef.current) {
+          console.log(`👥 Ignoring stale friends fetch #${currentFetchId}`);
+          return;
+        }
+
         if (profile?.friends && profile.friends.length > 0) {
-          // Fetch friend profiles (limit to 6 for cleaner orbit)
+          // Fetch friend profiles with explicit ordering to prevent database-level inconsistency
           const { data: friends } = await supabase
             .from('profiles')
             .select('id, username, display_name, avatar_url')
-            .in('id', profile.friends.slice(0, 6));
+            .in('id', profile.friends.slice(0, 6))
+            .order('id', { ascending: true });
+
+          // Ignore stale fetch results
+          if (currentFetchId !== friendsFetchIdRef.current) {
+            console.log(`👥 Ignoring stale friends fetch #${currentFetchId}`);
+            return;
+          }
 
           if (friends) {
-            // Sort by ID to maintain consistent positioning (prevent random swaps)
+            // Friends already ordered by DB, but sort again as defensive measure
             const sortedFriends = [...friends].sort((a, b) => a.id.localeCompare(b.id));
-            setFriendsData(sortedFriends);
-            console.log(`👥 Loaded ${sortedFriends.length} friends for orbit (sorted by ID)`);
+
+            // Only update if friend IDs/order have changed (compare exact order, not just set)
+            setFriendsData(prev => {
+              const prevIds = prev.map(f => f.id).join(',');
+              const newIds = sortedFriends.map(f => f.id).join(',');
+              if (prevIds === newIds) {
+                console.log(`👥 Friends unchanged, keeping previous array reference`);
+                return prev;
+              }
+              console.log(`👥 Loaded ${sortedFriends.length} friends for orbit (fetch #${currentFetchId})`);
+              return sortedFriends;
+            });
           }
         }
       } catch (error) {
@@ -1818,6 +1925,7 @@ export default function DiscoverPage() {
                 value={prompt}
                 onChange={setPrompt}
                 onMentionsChange={(newMentions) => setMentions(newMentions)}
+                mentions={mentions}
                 placeholder={isThinking ? "AI is thinking..." : isRecording ? "Listening..." : "Where should we eat? (Type @ to mention friends)"}
                 disabled={isThinking}
                 className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"

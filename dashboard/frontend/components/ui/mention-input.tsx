@@ -10,6 +10,7 @@ interface MentionInputProps {
   value: string;
   onChange: (value: string) => void;
   onMentionsChange: (mentions: Mention[]) => void;
+  mentions?: Mention[]; // External mentions for synchronization
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -19,6 +20,7 @@ export function MentionInput({
   value,
   onChange,
   onMentionsChange,
+  mentions: externalMentions,
   placeholder = 'Type @ to mention friends...',
   className = '',
   disabled = false,
@@ -34,6 +36,14 @@ export function MentionInput({
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const { filteredFriends, filterFriends, loading } = useFriendMentions();
+
+  // Sync internal state with external mentions prop (for auto-detection)
+  useEffect(() => {
+    if (externalMentions !== undefined) {
+      console.log('[MENTION INPUT] Syncing with external mentions:', externalMentions);
+      setSelectedMentions(externalMentions);
+    }
+  }, [externalMentions]);
 
   // Calculate dropdown position (Slack-style: above input)
   const calculateDropdownPosition = () => {
