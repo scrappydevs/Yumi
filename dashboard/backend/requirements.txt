@@ -3,4 +3,5 @@ uvicorn[standard]==0.31.0
 python-dotenv==1.0.1
 supabase==2.9.0
 pydantic==2.9.2
+infisical-python==2.1.6
 
