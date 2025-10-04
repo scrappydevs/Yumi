@@ -3,8 +3,8 @@ Grid generation and management for spatial coverage.
 """
 import math
 from typing import List, Tuple
-from models import GridCell
-from config import (
+from .models import GridCell
+from .config import (
     TOP_LEFT, BOTTOM_RIGHT, SEARCH_RADIUS_METERS,
     OVERLAP_FACTOR, PRIORITY_LOCATION, GRID_PROGRESS_FILE
 )

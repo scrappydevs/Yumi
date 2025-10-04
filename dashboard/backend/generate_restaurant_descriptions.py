@@ -1,11 +1,14 @@
 """
-Script to generate restaurant descriptions using AI analysis of images and reviews.
+Script to generate restaurant profiles using AI analysis of images and reviews.
 
 This script:
 1. Fetches all restaurants with empty descriptions
-2. Gathers associated images (with descriptions) and text reviews
-3. Uses Gemini to synthesize a compelling restaurant profile
-4. Updates the restaurant description in the database
+2. Gathers food images (with dishes), location images, and text reviews
+3. Uses Gemini to synthesize a complete restaurant profile:
+   - Cuisine (one word)
+   - Atmosphere (short phrase)
+   - Description (2-3 sentences)
+4. Updates the restaurant record in the database
 """
 from services.gemini_service import GeminiService, get_gemini_service
 import os
@@ -133,31 +136,60 @@ class RestaurantDescriptionGenerator:
             logger.error(f"Failed to fetch restaurants: {e}")
             return []
 
-    def get_restaurant_images(self, restaurant_id: str) -> List[Dict]:
+    def get_restaurant_food_images(self, restaurant_id: str) -> List[Dict]:
         """
-        Get all images associated with a restaurant.
+        Get food images with descriptions/dishes.
 
         Args:
             restaurant_id: UUID of the restaurant
 
         Returns:
-            List of image records with descriptions
+            List of food image records
         """
         try:
             response = self.client.table("images")\
-                .select("id, description, dish, cuisine, image_url")\
+                .select("id, description, dish, cuisine")\
                 .eq("restaurant_id", restaurant_id)\
-                .not_.is_("image_url", "null")\
+                .not_.is_("dish", "null")\
                 .execute()
 
             images = response.data or []
             logger.debug(
-                f"Found {len(images)} images for restaurant {restaurant_id}")
+                f"Found {len(images)} food images for restaurant {restaurant_id}")
             return images
 
         except Exception as e:
             logger.error(
-                f"Failed to fetch images for restaurant {restaurant_id}: {e}")
+                f"Failed to fetch food images for restaurant {restaurant_id}: {e}")
+            return []
+
+    def get_restaurant_location_images(self, restaurant_id: str) -> List[Dict]:
+        """
+        Get location/ambiance images (ones without dish descriptions).
+
+        Args:
+            restaurant_id: UUID of the restaurant
+
+        Returns:
+            List of location image records
+        """
+        try:
+            response = self.client.table("images")\
+                .select("id, image_url, description")\
+                .eq("restaurant_id", restaurant_id)\
+                .is_("dish", "null")\
+                .not_.is_("image_url", "null")\
+                .limit(5)\
+                .execute()
+
+            images = response.data or []
+            logger.debug(
+                f"Found {len(images)} location images for restaurant {restaurant_id}")
+            return images
+
+        except Exception as e:
+            logger.error(
+                f"Failed to fetch location images for restaurant {restaurant_id}: {e}")
             return []
 
     def get_restaurant_reviews(self, restaurant_id: str, limit: int = 20) -> List[Dict]:
@@ -195,37 +227,47 @@ class RestaurantDescriptionGenerator:
         restaurant_name: str,
         restaurant_address: Optional[str],
         rating: Optional[float],
+        user_ratings_total: Optional[int],
         price_level: Optional[int],
-        images: List[Dict],
+        food_images: List[Dict],
+        location_images: List[Dict],
         reviews: List[Dict]
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, str]]:
         """
-        Generate a restaurant description using Gemini AI.
+        Generate restaurant profile (cuisine, atmosphere, description) using Gemini AI.
 
         Args:
             restaurant_name: Name of the restaurant
             restaurant_address: Address of the restaurant
             rating: Average rating
+            user_ratings_total: Total number of ratings
             price_level: Price level (1-4)
-            images: List of image records
+            food_images: List of food image records with dishes
+            location_images: List of location/ambiance images
             reviews: List of review records
 
         Returns:
-            Generated description or None if failed
+            Dict with 'cuisine', 'atmosphere', 'description' or None if failed
         """
         try:
             import google.generativeai as genai
 
-            # Prepare context from images
-            image_context = []
-            for img in images:
+            # Prepare context from food images
+            food_context = []
+            for img in food_images:
                 if img.get('dish'):
                     dish_info = f"Dish: {img['dish']}"
                     if img.get('cuisine'):
                         dish_info += f" ({img['cuisine']} cuisine)"
-                    image_context.append(dish_info)
+                    food_context.append(dish_info)
                 if img.get('description'):
-                    image_context.append(f"Image note: {img['description']}")
+                    food_context.append(f"Note: {img['description']}")
+
+            # Prepare context from location images
+            location_context = []
+            for img in location_images:
+                if img.get('description'):
+                    location_context.append(f"Location: {img['description']}")
 
             # Prepare context from reviews
             review_context = []
@@ -234,7 +276,7 @@ class RestaurantDescriptionGenerator:
                     rating_str = f"({review.get('rating', 'N/A')}⭐)" if review.get(
                         'rating') else ""
                     review_context.append(
-                        f"Review {rating_str}: {review['description']}")
+                        f"{rating_str}: {review['description']}")
 
             # Build comprehensive prompt
             price_symbols = {
@@ -245,9 +287,9 @@ class RestaurantDescriptionGenerator:
             }
             price_str = price_symbols.get(
                 price_level, "") if price_level else ""
-            rating_str = f"{rating:.1f}⭐" if rating else ""
+            rating_str = f"{rating:.1f}⭐ ({user_ratings_total} ratings)" if rating and user_ratings_total else ""
 
-            prompt = f"""You are writing a compelling, concise restaurant description for a food discovery app.
+            prompt = f"""You are analyzing a restaurant to generate its profile for a food discovery app.
 
 RESTAURANT: {restaurant_name}
 LOCATION: {restaurant_address or 'N/A'}
@@ -255,65 +297,120 @@ RATING: {rating_str} PRICE: {price_str}
 
 AVAILABLE INFORMATION:
 
-DISHES/MENU ({len(image_context)} items):
-{chr(10).join(image_context[:15]) if image_context else 'No dish information available'}
+FOOD/DISHES ({len(food_context)} items):
+{chr(10).join(food_context[:15]) if food_context else 'No dish information available'}
+
+LOCATION/AMBIANCE ({len(location_context)} notes):
+{chr(10).join(location_context[:5]) if location_context else 'No location details available'}
 
 CUSTOMER REVIEWS ({len(review_context)} reviews):
 {chr(10).join(review_context[:10]) if review_context else 'No reviews available'}
 
 TASK:
-Write a 2-3 sentence restaurant description that captures the essence and vibe. Include:
-- Type of cuisine and signature dishes (if mentioned)
-- Atmosphere/ambiance (casual, upscale, romantic, family-friendly, etc.)
-- What makes it special or noteworthy
-- Best occasions/experiences (date night, family dinner, quick lunch, etc.)
+Generate a restaurant profile with THREE components:
 
-STYLE:
-- Conversational and engaging (as if recommending to a friend)
-- Specific and vivid (use concrete details from reviews/dishes)
-- 50-100 words maximum
-- Focus on WHAT THE EXPERIENCE IS LIKE, not just facts
+1. CUISINE: ONE WORD identifying the primary cuisine type (e.g., Italian, Mexican, American, Thai, Japanese, Chinese, etc.)
+   - Base this on the dishes served and reviews
+   - Must be a single word
 
-EXAMPLE GOOD DESCRIPTIONS:
-- "Cozy Italian spot perfect for date night, known for their house-made pasta and wood-fired pizzas. The intimate candlelit atmosphere and excellent wine selection create a romantic vibe, though it can get noisy on weekends."
-- "Casual taco joint with a lively bar scene and creative Mexican fusion. Great for groups looking for a fun night out with margaritas and shareable apps. The fish tacos and street corn are must-tries."
-- "Classic American diner serving hearty breakfast all day in a retro setting. Locals love the fluffy pancakes and generous portions. Perfect for a comfort food fix or weekend brunch with family."
+2. ATMOSPHERE: A SHORT PHRASE (2-4 words) describing the vibe (e.g., "Casual family dining", "Upscale romantic", "Lively bar scene", "Cozy neighborhood spot")
+   - Based on reviews, location images, price level, and overall feel
+   - Focus on the experience/ambiance
 
-Write ONLY the description (no labels, no JSON, just the text):"""
+3. DESCRIPTION: 2-3 sentences capturing the essence (50-100 words)
+   - Include signature dishes and what makes it special
+   - Conversational and engaging (as if recommending to a friend)
+   - Use concrete details from the data above
+
+Format your response EXACTLY as:
+CUISINE: [one word]
+ATMOSPHERE: [2-4 word phrase]
+DESCRIPTION: [2-3 sentences]
+
+EXAMPLES:
+CUISINE: Italian
+ATMOSPHERE: Romantic date night
+DESCRIPTION: Cozy Italian spot perfect for date night, known for their house-made pasta and wood-fired pizzas. The intimate candlelit atmosphere and excellent wine selection create a romantic vibe, though it can get noisy on weekends.
+
+CUISINE: Mexican
+ATMOSPHERE: Lively casual dining
+DESCRIPTION: Casual taco joint with a lively bar scene and creative Mexican fusion. Great for groups looking for a fun night out with margaritas and shareable apps. The fish tacos and street corn are must-tries.
+
+Now generate for {restaurant_name}:"""
 
             # Call Gemini API
             response = self.gemini_service.model.generate_content(prompt)
 
             if response.text:
-                description = response.text.strip()
-                # Clean up any markdown or formatting
-                description = description.replace('*', '').replace(
-                    '#', '').replace('**', '')
+                text = response.text.strip()
+
+                # Parse the structured response
+                result = {
+                    'cuisine': None,
+                    'atmosphere': None,
+                    'description': None
+                }
+
+                lines = text.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('CUISINE:'):
+                        cuisine = line.replace('CUISINE:', '').strip()
+                        # Clean up formatting
+                        cuisine = cuisine.replace('*', '').replace('#', '')
+                        result['cuisine'] = cuisine
+                    elif line.startswith('ATMOSPHERE:'):
+                        atmosphere = line.replace('ATMOSPHERE:', '').strip()
+                        # Clean up formatting
+                        atmosphere = atmosphere.replace(
+                            '*', '').replace('#', '')
+                        result['atmosphere'] = atmosphere
+                    elif line.startswith('DESCRIPTION:'):
+                        description = line.replace('DESCRIPTION:', '').strip()
+                        # Clean up formatting
+                        description = description.replace(
+                            '*', '').replace('#', '').replace('**', '')
+                        result['description'] = description
+
+                # Validation
+                if not result['cuisine'] or not result['atmosphere'] or not result['description']:
+                    logger.warning(
+                        f"Incomplete response: cuisine={result['cuisine']}, atmosphere={result['atmosphere']}, description={bool(result['description'])}")
+                    return None
+
                 logger.info(
-                    f"✅ Generated description ({len(description)} chars)")
-                return description
+                    f"✅ Generated profile: {result['cuisine']} | {result['atmosphere']} | {len(result['description'])} chars")
+                return result
             else:
                 logger.warning("Gemini returned empty response")
                 return None
 
         except Exception as e:
-            logger.error(f"Failed to generate description: {e}")
+            logger.error(f"Failed to generate profile: {e}")
             return None
 
-    def update_restaurant_description(self, restaurant_id: str, description: str) -> bool:
+    def update_restaurant_profile(self, restaurant_id: str, cuisine: str, atmosphere: str, description: str) -> bool:
         """
-        Update restaurant record with generated description.
+        Update restaurant record with generated profile.
 
         Args:
             restaurant_id: UUID of the restaurant
+            cuisine: Cuisine type (one word)
+            atmosphere: Atmosphere description (short phrase)
             description: Generated description text
 
         Returns:
             True if update succeeded, False otherwise
         """
         try:
+            update_data = {
+                "cuisine": cuisine,
+                "atmosphere": atmosphere,
+                "description": description
+            }
+
             self.client.table("restaurants")\
-                .update({"description": description})\
+                .update(update_data)\
                 .eq("id", restaurant_id)\
                 .execute()
 
@@ -343,38 +440,48 @@ Write ONLY the description (no labels, no JSON, just the text):"""
         logger.info(f"ID: {restaurant_id}")
 
         # Gather associated data
-        logger.info("Gathering images and reviews...")
-        images = self.get_restaurant_images(restaurant_id)
+        logger.info("Gathering food images, location images, and reviews...")
+        food_images = self.get_restaurant_food_images(restaurant_id)
+        location_images = self.get_restaurant_location_images(restaurant_id)
         reviews = self.get_restaurant_reviews(restaurant_id, limit=20)
 
-        logger.info(f"Found {len(images)} images, {len(reviews)} reviews")
+        logger.info(
+            f"Found {len(food_images)} food images, {len(location_images)} location images, {len(reviews)} reviews")
 
-        # Check if we have enough data to generate a meaningful description
-        if len(images) == 0 and len(reviews) == 0:
+        # Check if we have enough data to generate a meaningful profile
+        if len(food_images) == 0 and len(reviews) == 0:
             logger.warning(
-                "⏭️  No images or reviews available - skipping")
+                "⏭️  No food images or reviews available - skipping")
             return True, 'skipped'
 
-        # Generate description using Gemini
-        logger.info("Generating description with Gemini...")
-        description = self.generate_description(
+        # Generate profile using Gemini
+        logger.info("Generating restaurant profile with Gemini...")
+        profile = self.generate_description(
             restaurant_name=restaurant_name,
             restaurant_address=restaurant.get('formatted_address'),
             rating=restaurant.get('rating_avg'),
+            user_ratings_total=restaurant.get('user_ratings_total'),
             price_level=restaurant.get('price_level'),
-            images=images,
+            food_images=food_images,
+            location_images=location_images,
             reviews=reviews
         )
 
-        if not description:
-            logger.error("❌ Failed to generate description")
+        if not profile:
+            logger.error("❌ Failed to generate profile")
             return False, 'failed'
 
-        logger.info(f"Generated: \"{description[:100]}...\"")
+        logger.info(
+            f"Generated: {profile['cuisine']} | {profile['atmosphere']}")
+        logger.info(f"Description: \"{profile['description'][:100]}...\"")
 
         # Update database
-        success = self.update_restaurant_description(
-            restaurant_id, description)
+        success = self.update_restaurant_profile(
+            restaurant_id,
+            profile['cuisine'],
+            profile['atmosphere'],
+            profile['description']
+        )
 
         if success:
             logger.info(f"✅ Successfully processed {restaurant_name}")
@@ -394,7 +501,8 @@ Write ONLY the description (no labels, no JSON, just the text):"""
         import time
 
         logger.info("\n" + "="*60)
-        logger.info("Starting Restaurant Description Generation")
+        logger.info("Starting Restaurant Profile Generation")
+        logger.info("Generating: Cuisine, Atmosphere, Description")
         logger.info("="*60)
 
         # Ensure description column exists
@@ -452,7 +560,7 @@ Write ONLY the description (no labels, no JSON, just the text):"""
         logger.info("FINAL SUMMARY")
         logger.info("="*60)
         logger.info(f"Total restaurants processed: {total}")
-        logger.info(f"✅ Successful descriptions: {success_count}")
+        logger.info(f"✅ Successful profiles: {success_count}")
         logger.info(
             f"⏭️  Skipped (no data): {skipped_count}")
         logger.info(f"❌ Failed: {failure_count}")
@@ -460,6 +568,7 @@ Write ONLY the description (no labels, no JSON, just the text):"""
             logger.info(
                 f"Success rate: {(success_count/(success_count+skipped_count)*100):.1f}%")
         logger.info("="*60)
+        logger.info("Generated fields: cuisine, atmosphere, description")
 
 
 def main():
