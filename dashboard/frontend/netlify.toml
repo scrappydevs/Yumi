@@ -1,0 +1,31 @@
+[[build]]
+  base = "dashboard/frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_VERSION = "10"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Environment variables to set in Netlify Dashboard:
+# NEXT_PUBLIC_SUPABASE_URL - Your Supabase project URL
+# NEXT_PUBLIC_SUPABASE_ANON_KEY - Your Supabase anon/public key
+# NEXT_PUBLIC_API_URL - Your Render backend URL (e.g., https://yummy-backend.onrender.com)
+# NEXT_PUBLIC_GOOGLE_MAPS_API_KEY - Google Maps API key for frontend
+
