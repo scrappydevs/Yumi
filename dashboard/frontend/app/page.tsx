@@ -4,62 +4,12 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { 
-  Sparkles, 
-  Users, 
-  MapPin, 
-  MessageCircle, 
-  Calendar,
-  TrendingUp,
-  Heart,
-  Utensils,
+  Utensils, 
   ArrowRight,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
-import { MetallicSphereComponent } from '@/components/metallic-sphere';
-
-const features = [
-  {
-    icon: Sparkles,
-    title: 'Natural Language',
-    description: 'Ask "Where does Alex like to eat?" and discover instantly',
-  },
-  {
-    icon: Users,
-    title: 'Social Dining',
-    description: 'See where your friends love to eat and share experiences',
-  },
-  {
-    icon: MapPin,
-    title: 'Smart Discovery',
-    description: 'Google Maps + Reviews enhanced with friend opinions',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Coordinate Plans',
-    description: 'Message friends and book tables together',
-  },
-  {
-    icon: Calendar,
-    title: 'Easy Reservations',
-    description: 'One-tap reservations synced to your calendar',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Eats Wrapped',
-    description: 'Your year in dining with shareable stats',
-  },
-];
-
-const restaurantPhotos = [
-  'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop',
-  'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=400&fit=crop',
-];
 
 export default function Home() {
   const supabase = createClient();
@@ -105,20 +55,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-      {/* Three.js Animated Blobs - Only render on client */}
-      {mounted && (
-        <div className="absolute inset-0 pointer-events-none">
-          <LiquidGlassBlob 
-            isAnimating={true}
-            className="absolute top-20 left-20 w-[300px] h-[300px]"
-          />
-          <LiquidGlassBlob 
-            isAnimating={true}
-            className="absolute bottom-20 right-20 w-[400px] h-[400px]"
-          />
-        </div>
-      )}
-
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -168,34 +104,12 @@ export default function Home() {
               </motion.p>
             </div>
 
-            {/* Features Pills */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
-              className="flex flex-wrap justify-center gap-2"
-            >
-              {[
-                { icon: Users, text: 'Social' },
-                { icon: MapPin, text: 'Discovery' },
-                { icon: Calendar, text: 'Reservations' },
-              ].map((item) => (
-                <div
-                  key={item.text}
-                  className="glass-layer-1 px-4 py-2 rounded-full flex items-center gap-2 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-full pointer-events-none" />
-                  <item.icon className="w-4 h-4 text-purple-600" />
-                  <span className="text-sm font-medium text-[hsl(var(--foreground))]">{item.text}</span>
-                </div>
-              ))}
-            </motion.div>
 
             {/* CTA Button */}
             <motion.button
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
+              transition={{ delay: 0.7 }}
               onClick={handleGoogleSignIn}
               className="w-full gradient-purple-blue text-white rounded-2xl h-16 text-lg font-semibold shadow-lg relative overflow-hidden group"
               whileHover={{ scale: 1.02 }}
@@ -212,7 +126,7 @@ export default function Home() {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 1.1 }}
+              transition={{ delay: 0.9 }}
               className="text-xs text-[hsl(var(--muted-foreground))]"
             >
               Your social network for dining out
