@@ -203,7 +203,7 @@ export default function DiscoverPage() {
     
     // Orbit animation - faster when thinking, slower when showing results or idle
     const interval = setInterval(() => {
-      const speed = isThinking ? 1.2 : (showingResults ? 0.6 : 0.8);  // Latent state is now faster (0.8)
+      const speed = isThinking ? 2.0 : (showingResults ? 0.6 : 0.8);  // Much faster during thinking
       setRotation((prev) => (prev + speed) % 360);
     }, 50);
     
@@ -275,7 +275,7 @@ export default function DiscoverPage() {
         const numImages = allNearbyImages.length;
         return numImages > 0 ? (prev + 1) % numImages : 0;
       });
-    }, 400); // Each image swaps every 400ms (faster, more aggressive)
+    }, 250); // Each image swaps every 250ms (very fast and aggressive)
 
     return () => clearInterval(flowInterval);
   }, [isThinking, isNarrowing, allNearbyImages.length]); // Need length dependency to restart animation when images load
@@ -434,8 +434,10 @@ export default function DiscoverPage() {
         // Wait for "Finding restaurants nearby" speech to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Step 2: Analyzing your food preferences
-        const step2Text = 'Analyzing your food preferences';
+        // Step 2: Analyzing food preferences
+        const step2Text = isGroupSearch 
+          ? "Analyzing everyone's food preferences"
+          : 'Analyzing your food preferences';
         setCurrentPhrase(step2Text);
         if (!isMuted) {
           await speak(step2Text);
@@ -446,12 +448,28 @@ export default function DiscoverPage() {
         
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
+        if (isGroupSearch) {
+          console.log(`👥 Group search with ${mentions.length} friends: ${mentions.map(m => m.username).join(', ')}`);
+        }
+        
         const searchFormData = new FormData();
         searchFormData.append('query', searchQuery);  // Use saved query
         searchFormData.append('latitude', coords.lat.toString());
         searchFormData.append('longitude', coords.lng.toString());
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/search`, {
+        // Add friend IDs if this is a group search
+        if (isGroupSearch) {
+          const friendIds = mentions.map(m => m.id).join(',');
+          searchFormData.append('friend_ids', friendIds);
+          console.log(`📋 Including friend IDs: ${friendIds}`);
+        }
+        
+        // Use appropriate endpoint based on whether it's a group search
+        const searchEndpoint = isGroupSearch 
+          ? '/api/restaurants/search-group'
+          : '/api/restaurants/search';
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -577,7 +595,9 @@ export default function DiscoverPage() {
           await new Promise(resolve => setTimeout(resolve, 600));
           
           // Stop thinking and show results
-          const step3Text = `Found ${finalCount} great option${finalCount !== 1 ? 's' : ''}`;
+          const step3Text = isGroupSearch
+            ? `Found ${finalCount} great option${finalCount !== 1 ? 's' : ''} for your group`
+            : `Found ${finalCount} great option${finalCount !== 1 ? 's' : ''}`;
           setCurrentPhrase(step3Text);
           
           // Switch to results state (keep images visible, calm blob)
@@ -637,24 +657,13 @@ export default function DiscoverPage() {
       console.log(`📍 Loading nearby restaurants for ${location}...`);
       
       // Use the FAST nearby endpoint (no LLM, just Google Places)
-      // Build form data
       const formData = new FormData();
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
       formData.append('limit', '10');  // Only fetch 10 for latent state
       
-      // Determine endpoint based on mentions
-      let endpoint = '/api/restaurants/search';
-      
-      if (isGroupSearch) {
-        // Group search - add friend IDs
-        const friendIds = mentions.map(m => m.id).join(',');
-        formData.append('friend_ids', friendIds);
-        endpoint = '/api/restaurants/search-group';
-      }
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${endpoint}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -720,7 +729,7 @@ export default function DiscoverPage() {
   if (!mounted) {
   return (
       <div className="h-full flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full gradient-purple-blue animate-pulse" />
+        <div className="w-12 h-12 rounded-full bg-purple-600 animate-pulse" />
       </div>
     );
   }
@@ -737,7 +746,7 @@ export default function DiscoverPage() {
           whileTap={{ scale: 0.95 }}
         >
           <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          <div className={`w-2 h-2 rounded-full ${isThinking ? 'gradient-purple-blue animate-pulse' : 'bg-gray-400'}`} />
+          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
           <span className="text-xs font-medium">
             {isThinking ? 'Thinking...' : 'Test AI'}
           </span>
@@ -989,7 +998,7 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              const baseRadius = (isThinking || showingResults) ? 350 : 280;  // Keep large radius when showing results
+              const baseRadius = (isThinking || showingResults) ? 420 : 280;  // Larger radius when thinking/showing results
               // If swapping out, move toward center
               const radius = isSwappingOut ? baseRadius * (1 - swapProgress) : baseRadius;
               const x = 350 + Math.cos(angle) * radius;
@@ -1004,7 +1013,7 @@ export default function DiscoverPage() {
                   className="absolute"
                   initial={{ 
                     opacity: 0, 
-                    scale: 0.1,  // Start even smaller for more dramatic entrance
+                    scale: 0.3,  // Less dramatic for smoother initial load
                     left: '50%',  // Start at center (inside blob)
                     top: '50%'    // Start at center (inside blob)
                   }}
@@ -1021,11 +1030,11 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    left: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.8), ease: [0.34, 1.56, 0.64, 1] },  // Faster during thinking
-                    top: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.8), ease: [0.34, 1.56, 0.64, 1] },  // Faster during thinking
-                    opacity: { duration: isSwappingOut ? 0.25 : (isThinking ? 0.4 : 0.6), ease: isSwappingOut ? 'easeIn' : 'easeInOut' },  // Faster during thinking
-                    scale: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.4 : 0.7), ease: isSwappingOut ? 'easeIn' : [0.34, 1.56, 0.64, 1] },  // Faster during thinking
-                    delay: isSwappingOut ? swapProgress * 0.05 : (isThinking ? visibleIndex * 0.05 : visibleIndex * 0.08),  // Less delay during thinking
+                    left: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.6), ease: [0.34, 1.56, 0.64, 1] },  // Smoother initial expansion
+                    top: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.6), ease: [0.34, 1.56, 0.64, 1] },  // Smoother initial expansion
+                    opacity: { duration: isSwappingOut ? 0.25 : (isThinking ? 0.4 : 0.5), ease: isSwappingOut ? 'easeIn' : 'easeInOut' },  // Faster
+                    scale: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.4 : 0.5), ease: isSwappingOut ? 'easeIn' : [0.34, 1.56, 0.64, 1] },  // Faster
+                    delay: isSwappingOut ? swapProgress * 0.05 : (isThinking ? visibleIndex * 0.05 : visibleIndex * 0.03),  // Much less delay for initial load
                   }}
                   style={{
                     x: '-50%',
@@ -1333,7 +1342,7 @@ export default function DiscoverPage() {
               <motion.button
                 type="submit"
                 disabled={isThinking}
-                className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
                 }}
@@ -1351,74 +1360,6 @@ export default function DiscoverPage() {
         </motion.div>
       </div>
 
-      {/* Search Results Panel - Removed, now only showing modal on image click */}
-      {/* Search Results Panel */}
-      <AnimatePresence>
-        {searchResults.length > 0 && (
-          <motion.div
-            className="w-full max-w-4xl mb-8 z-10"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
-              
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-                {mentions.length > 0 
-                  ? `Top Recommendations for you & ${mentions.map(m => m.display_name || m.username).join(', ')}`
-                  : 'Top Recommendations for you'
-                }
-              </h3>
-              
-              <div className="space-y-4">
-                {searchResults.map((restaurant, index) => (
-                  <motion.div
-                    key={index}
-                    className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                    
-                    <div className="flex items-start justify-between relative">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-2xl font-bold text-purple-600">#{index + 1}</span>
-                          <div>
-                            <h4 className="text-lg font-bold">{restaurant.name}</h4>
-                            <p className="text-sm text-gray-600">{restaurant.cuisine} • {'$'.repeat(restaurant.price_level)}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 mb-2">
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                            <span className="font-semibold">{restaurant.rating}</span>
-                          </div>
-                          <div className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
-                            {Math.round(restaurant.match_score * 100)}% match
-                          </div>
-                        </div>
-                        
-                        <p className="text-sm text-gray-700 mb-2">{restaurant.reasoning}</p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {restaurant.address}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Error Message */}
       <AnimatePresence>
@@ -1460,11 +1401,11 @@ export default function DiscoverPage() {
                     alt={selectedRestaurant.name}
                     className="w-full h-56 object-cover rounded-2xl mb-5 shadow-lg"
                   />
-                <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
+                <h2 className="text-2xl font-bold mb-3 text-gray-900">
                   {selectedRestaurant.name}
                 </h2>
                 <div className="flex items-center gap-3 mb-5">
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold gradient-purple-blue text-white">
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">
                     {selectedRestaurant.cuisine}
                   </span>
                   <div className="flex items-center gap-1">
@@ -1527,7 +1468,7 @@ export default function DiscoverPage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                     <motion.div
-                      className="h-full gradient-purple-blue"
+                      className="h-full bg-purple-600"
                       initial={{ width: 0 }}
                       animate={{ width: `${selectedRestaurant.match_score * 100}%` }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
@@ -1538,7 +1479,7 @@ export default function DiscoverPage() {
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                   <motion.button 
-                    className="flex-1 gradient-purple-blue text-white rounded-2xl h-12 text-base font-semibold shadow-lg flex items-center justify-center gap-2"
+                    className="flex-1 bg-purple-600 text-white rounded-2xl h-12 text-base font-semibold shadow-lg flex items-center justify-center gap-2"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => {
