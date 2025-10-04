@@ -164,9 +164,9 @@ class ImageMetadataUpdater:
             from PIL import Image
             import io
             import google.generativeai as genai
-            
+
             image = Image.open(io.BytesIO(image_bytes))
-            
+
             # Quick check: is this food?
             food_check_prompt = """Is this image showing food or a meal? 
             
@@ -175,15 +175,17 @@ Answer with ONLY one word:
 - NO if this is not food (e.g., a person, place, object, scenery, etc.)
 
 Answer:"""
-            
-            response = self.gemini_service.model.generate_content([food_check_prompt, image])
-            
+
+            response = self.gemini_service.model.generate_content(
+                [food_check_prompt, image])
+
             if response.text:
                 answer = response.text.strip().upper()
                 if answer == "NO" or "NO" in answer:
-                    logger.info("⏭️  Image is not food - skipping without update")
+                    logger.info(
+                        "⏭️  Image is not food - skipping without update")
                     return None
-            
+
             # If it's food, proceed with detailed analysis
             result = self.gemini_service.analyze_food_image(image_bytes)
 
@@ -380,7 +382,8 @@ Answer:"""
         logger.info(f"⏭️  Skipped (non-food/already set): {skipped_count}")
         logger.info(f"❌ Failed updates: {failure_count}")
         if (success_count + skipped_count) > 0:
-            logger.info(f"Success rate: {(success_count/(success_count+skipped_count)*100):.1f}%")
+            logger.info(
+                f"Success rate: {(success_count/(success_count+skipped_count)*100):.1f}%")
         logger.info("="*60)
 
 
