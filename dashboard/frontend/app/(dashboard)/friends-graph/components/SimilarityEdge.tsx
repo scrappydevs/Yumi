@@ -8,7 +8,6 @@ import {
   EdgeProps,
 } from '@xyflow/react';
 import type { SimilarityEdgeType } from './types';
-import { TrendingUp } from 'lucide-react';
 
 export type { SimilarityEdgeType };
 
@@ -104,12 +103,11 @@ function SimilarityEdge({
                 animation: 'fadeInScale 0.2s ease',
               }}
             >
-              {/* Simple match display */}
+              {/* Simple similarity display */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <TrendingUp className="w-4 h-4" style={{ color: 'rgb(139, 92, 246)' }} />
                 <span 
                   style={{ 
-                    fontSize: '1.5rem', 
+                    fontSize: '1rem', 
                     fontWeight: 'bold',
                     background: 'linear-gradient(135deg, rgb(139, 92, 246), rgb(99, 102, 241))',
                     WebkitBackgroundClip: 'text',
@@ -119,7 +117,18 @@ function SimilarityEdge({
                 >
                   {(similarityScore * 100).toFixed(0)}%
                 </span>
-                <span style={{ fontSize: '0.875rem', color: 'rgb(100, 116, 139)' }}>match</span>
+                <span 
+                  style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: 'bold',
+                    background: 'linear-gradient(135deg, rgb(139, 92, 246), rgb(99, 102, 241))',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  Similarity
+                </span>
               </div>
 
               {/* Simple explanation */}
@@ -129,7 +138,7 @@ function SimilarityEdge({
                 lineHeight: '1.4',
                 margin: 0,
               }}>
-                {explanation || 'Friends on Yummy'}
+                {explanation || 'Friends on Yumi'}
               </p>
             </div>
           </div>

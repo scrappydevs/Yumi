@@ -150,6 +150,13 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   useEffect(() => {
     if (!apiLoaded || !mapRef.current || map) return;
 
+    // Additional safety check - ensure google.maps.Map is actually available
+    if (!window.google?.maps?.Map) {
+      console.error('❌ Google Maps API not fully loaded yet');
+      return;
+    }
+
+    console.log('🗺️ Initializing Google Map...');
     const newMap = new window.google.maps.Map(mapRef.current, {
       center: { lat: 42.3601, lng: -71.0589 }, // Boston, MA
       zoom: 15,
@@ -164,8 +171,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       // Performance optimizations
       renderingType: window.google?.maps?.RenderingType?.VECTOR, // Vector rendering for smoother performance
       controlSize: 32, // Smaller controls for better performance
-      // Smooth animation settings
-      animationDuration: 300, // Smooth pan/zoom animations (300ms)
       // Reduce map features for better performance
       mapTypeControlOptions: {
         mapTypeIds: ['roadmap', 'satellite'],
@@ -306,8 +311,13 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
     console.log('🗺️ Displaying preloaded restaurants on map');
 
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
+    // Clear existing markers (with safety check)
+    markersRef.current.forEach(item => {
+      if (item.infoWindow) item.infoWindow.close();
+      if (item.marker && typeof item.marker.setMap === 'function') {
+        item.marker.setMap(null);
+      }
+    });
     markersRef.current = [];
 
     const bounds = new window.google.maps.LatLngBounds();
@@ -349,7 +359,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           animation: window.google.maps.Animation.DROP,
         });
 
-        markersRef.current.push(marker);
+        markersRef.current.push({ marker, infoWindow: null });
         bounds.extend(position);
 
         // Create a PlaceResult object for display
@@ -401,7 +411,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 animation: window.google.maps.Animation.DROP,
               });
 
-              markersRef.current.push(marker);
+              markersRef.current.push({ marker, infoWindow: null });
               bounds.extend(position);
 
               const placeResult: PlaceResult = {

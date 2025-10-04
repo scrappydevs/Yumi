@@ -66,25 +66,40 @@ export const loadGoogleMaps = async (): Promise<void> => {
       // Check if script already exists
       const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
       if (existingScript) {
-        console.log('Google Maps script already exists, waiting for load...');
-        // Wait for existing script to load
-        if (window.google) {
+        console.log('Google Maps script already exists, checking API...');
+        // Check if API is fully available
+        if (window.google?.maps?.Map) {
+          console.log('✅ Google Maps API already available');
           isLoaded = true;
           isLoading = false;
           resolve();
           return;
         }
         
-        // Listen for the existing script to load
-        existingScript.addEventListener('load', () => {
-          isLoaded = true;
-          isLoading = false;
-          resolve();
-        });
-        existingScript.addEventListener('error', () => {
-          isLoading = false;
-          reject(new Error('Failed to load existing Google Maps script'));
-        });
+        // Poll for API to be ready (existing script might still be initializing)
+        console.log('Waiting for existing script to initialize API...');
+        const pollInterval = 100;
+        const maxAttempts = 50;
+        let attempts = 0;
+        
+        const checkExistingGoogleMaps = () => {
+          attempts++;
+          
+          if (window.google?.maps?.Map) {
+            console.log(`✅ Existing Google Maps API ready after ${attempts * pollInterval}ms`);
+            isLoaded = true;
+            isLoading = false;
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            console.error('❌ Existing Google Maps API failed to initialize');
+            isLoading = false;
+            reject(new Error('Existing Google Maps API initialization timeout'));
+          } else {
+            setTimeout(checkExistingGoogleMaps, pollInterval);
+          }
+        };
+        
+        checkExistingGoogleMaps();
         return;
       }
 
@@ -96,10 +111,31 @@ export const loadGoogleMaps = async (): Promise<void> => {
       script.crossOrigin = 'anonymous';
       
       script.onload = () => {
-        console.log('✅ Google Maps API loaded successfully');
-        isLoaded = true;
-        isLoading = false;
-        resolve();
+        console.log('✅ Google Maps script loaded, waiting for API initialization...');
+        
+        // Poll for google.maps.Map to be available (max 5 seconds)
+        const pollInterval = 100; // Check every 100ms
+        const maxAttempts = 50; // 50 * 100ms = 5 seconds
+        let attempts = 0;
+        
+        const checkGoogleMaps = () => {
+          attempts++;
+          
+          if (window.google?.maps?.Map) {
+            console.log(`✅ Google Maps API fully initialized after ${attempts * pollInterval}ms`);
+            isLoaded = true;
+            isLoading = false;
+            resolve();
+          } else if (attempts >= maxAttempts) {
+            console.error('❌ Google Maps API failed to initialize after 5 seconds');
+            isLoading = false;
+            reject(new Error('Google Maps API initialization timeout'));
+          } else {
+            setTimeout(checkGoogleMaps, pollInterval);
+          }
+        };
+        
+        checkGoogleMaps();
       };
       
       script.onerror = () => {
