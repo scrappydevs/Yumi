@@ -3,8 +3,11 @@
 -- ============================================================================
 -- Run this in your Supabase SQL Editor to enable implicit signal tracking
 
--- 1. Create user_interactions table
-CREATE TABLE IF NOT EXISTS user_interactions (
+-- 1. Drop existing table if it exists (clean slate)
+DROP TABLE IF EXISTS user_interactions CASCADE;
+
+-- 2. Create user_interactions table
+CREATE TABLE user_interactions (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   interaction_type text NOT NULL, -- 'search', 'view', 'click', 'reservation', 'maps_view'
@@ -33,37 +36,24 @@ CREATE TABLE IF NOT EXISTS user_interactions (
   metadata jsonb DEFAULT '{}'::jsonb
 );
 
--- 2. Create indexes for fast lookups
-CREATE INDEX IF NOT EXISTS idx_user_interactions_user_id 
+-- 3. Create indexes for fast lookups
+CREATE INDEX idx_user_interactions_user_id 
   ON user_interactions(user_id);
 
-CREATE INDEX IF NOT EXISTS idx_user_interactions_type 
+CREATE INDEX idx_user_interactions_type 
   ON user_interactions(interaction_type);
 
-CREATE INDEX IF NOT EXISTS idx_user_interactions_created_at 
+CREATE INDEX idx_user_interactions_created_at 
   ON user_interactions(created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_user_interactions_user_created 
+CREATE INDEX idx_user_interactions_user_created 
   ON user_interactions(user_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_user_interactions_place_id 
+CREATE INDEX idx_user_interactions_place_id 
   ON user_interactions(restaurant_place_id) 
   WHERE restaurant_place_id IS NOT NULL;
 
--- 3. Enable Row Level Security
-ALTER TABLE user_interactions ENABLE ROW LEVEL SECURITY;
-
--- 4. Create RLS policies
-CREATE POLICY "Users can view own interactions" ON user_interactions
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own interactions" ON user_interactions
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own interactions" ON user_interactions
-  FOR DELETE USING (auth.uid() = user_id);
-
--- 5. Add comment
+-- 4. Add comment
 COMMENT ON TABLE user_interactions IS 'Tracks implicit user signals (searches, clicks, reservations) for preference learning';
 
 -- ============================================================================
@@ -76,3 +66,4 @@ COMMENT ON TABLE user_interactions IS 'Tracks implicit user signals (searches, c
 -- reservation: 10.0 (highest - actual commitment)
 -- ============================================================================
 
+-- NOTE: Row Level Security is NOT enabled to allow flexible backend access
