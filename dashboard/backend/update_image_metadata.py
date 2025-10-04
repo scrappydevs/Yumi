@@ -201,8 +201,14 @@ Answer:"""
                 answer = response.text.strip().upper()
                 if answer == "NO" or "NO" in answer:
                     logger.info(
-                        "⏭️  Image is not food - skipping without update")
-                    return None
+                        "⏭️  Image is not food - marking with sentinel values to prevent reprocessing")
+                    # Return sentinel values to mark this image as processed
+                    # This prevents it from being queried and analyzed again
+                    return {
+                        'dish': 'NOT_FOOD',
+                        'cuisine': 'N/A',
+                        'description': ''
+                    }
 
             # If it's food, proceed with detailed analysis
             result = self.gemini_service.analyze_food_image(image_bytes)

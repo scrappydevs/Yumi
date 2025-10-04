@@ -12,6 +12,18 @@ import requests
 from typing import Optional, Dict, Any, Iterator
 from elevenlabs import ElevenLabs
 
+# Minimal silent MP3 file (~0.026 seconds of silence at 44.1kHz)
+# This is used as a fallback when TTS fails, to provide valid audio data
+# instead of empty bytes, preventing browser decoding errors.
+# This is a valid single-frame MP3 file that browsers can decode without errors.
+SILENT_MP3 = base64.b64decode(
+    "/+MYxAALACwAAP/AADwQKVE/SPB//+MYxBMLACwAAP/AABYQKVEwSJ//+MYxCMLACwAAP/AADY"
+    "QKVEwSJ//+MYxDMLACwAAP/AABYQKVEwSJ//+MYxEMLACwAAP/AADYQKVE/SPB//+MYxFMLACw"
+    "AAP/AABYQKVEwSJ//+MYxGMLACwAAP/AADYQKVE/SPB//+MYxHMLACwAAP/AABYQKVEwSJ//+"
+    "MYxIMLACwAAP/AADYQKVE/SPB//+MYxJMLACwAAP/AABYQKVEwSJ//+MYxKMLACwAAP/AADYQ"
+    "KVE/SPB//+MYxLMLACwAAP/AABIKVE/RPB/g=="
+)
+
 # Optional whisper import
 try:
     import whisper
@@ -49,7 +61,8 @@ class AudioService:
     def whisper_model(self):
         """Lazy load Whisper model"""
         if not WHISPER_AVAILABLE:
-            raise RuntimeError("Whisper not installed. Install with: pip install openai-whisper")
+            raise RuntimeError(
+                "Whisper not installed. Install with: pip install openai-whisper")
         if self._whisper_model is None:
             self._whisper_model = whisper.load_model(self._whisper_model_size)
         return self._whisper_model
@@ -154,15 +167,59 @@ class AudioService:
             "output_format": "mp3_44100_128"
         }
 
-        # Get COMPLETE audio buffer first, then stream it
-        r = requests.post(url, headers=headers, json=payload)
-        r.raise_for_status()
-        
-        # Yield the complete audio in chunks
-        audio_data = r.content
-        chunk_size = 4096
-        for i in range(0, len(audio_data), chunk_size):
-            yield audio_data[i:i+chunk_size]
+        try:
+            # Get COMPLETE audio buffer first, then stream it
+            r = requests.post(url, headers=headers, json=payload)
+            r.raise_for_status()
+
+            # Yield the complete audio in chunks
+            audio_data = r.content
+            chunk_size = 4096
+            for i in range(0, len(audio_data), chunk_size):
+                yield audio_data[i:i+chunk_size]
+
+        except requests.exceptions.HTTPError as e:
+            # Log detailed error information for debugging
+            status_code = e.response.status_code if e.response else "unknown"
+            error_body = ""
+            try:
+                error_body = e.response.text if e.response else ""
+            except:
+                pass
+
+            print(f"[AUDIO] ❌ ElevenLabs TTS Error {status_code}: {str(e)}")
+            print(f"[AUDIO]    Text: '{text[:50]}...'")
+            print(f"[AUDIO]    Voice ID: {vid}")
+            if error_body:
+                print(f"[AUDIO]    Response: {error_body[:200]}")
+
+            # Handle specific error cases
+            if status_code == 401:
+                print("[AUDIO]    ⚠️  Authentication failed - check API key or quota")
+            elif status_code == 429:
+                print(
+                    "[AUDIO]    ⚠️  Rate limit exceeded - please wait before retrying")
+            elif status_code in [402, 403]:
+                print("[AUDIO]    ⚠️  Quota exceeded or permission denied")
+
+            # Yield silent MP3 to prevent stream failure (graceful degradation)
+            # This provides valid audio data that browsers can decode without errors
+            print("[AUDIO]    🔇 Returning silent audio as fallback")
+            yield SILENT_MP3
+
+        except requests.exceptions.RequestException as e:
+            # Handle network errors
+            print(f"[AUDIO] ❌ Network error during TTS: {str(e)}")
+            print(f"[AUDIO]    Text: '{text[:50]}...'")
+            print("[AUDIO]    🔇 Returning silent audio as fallback")
+            yield SILENT_MP3
+
+        except Exception as e:
+            # Catch any other unexpected errors
+            print(f"[AUDIO] ❌ Unexpected error during TTS: {str(e)}")
+            print(f"[AUDIO]    Text: '{text[:50]}...'")
+            print("[AUDIO]    🔇 Returning silent audio as fallback")
+            yield SILENT_MP3
 
     # ==================== Voice Management ====================
 

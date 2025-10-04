@@ -108,10 +108,10 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
-        {/* Demo Social Network Graph Background - takes up most of the page */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-20">
-          <DemoSocialGraph className="w-full h-full" />
-        </div>
+      {/* Demo Social Network Graph Background - takes up most of the page */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-100">
+        <DemoSocialGraph className="w-full h-full" />
+      </div>
         
         {/* Central spinner */}
         <motion.div
@@ -127,7 +127,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
       {/* Demo Social Network Graph Background - takes up most of the page */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-25">
+      <div className="absolute inset-0 flex items-center justify-center opacity-60">
         <DemoSocialGraph className="w-full h-full" />
       </div>
 

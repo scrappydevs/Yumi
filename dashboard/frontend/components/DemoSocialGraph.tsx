@@ -297,7 +297,7 @@ function DemoNode({ data }: { data: any }) {
       >
         <div
           className={`w-full h-full rounded-full bg-gradient-to-br ${data.color} 
-            shadow-xl p-1 border-2 border-white/50 backdrop-blur-sm
+            shadow-xl p-1 border-2 border-white/50
             transition-transform duration-200 hover:scale-110`}
         >
           <Image
@@ -311,7 +311,7 @@ function DemoNode({ data }: { data: any }) {
         </div>
         {/* Name label below avatar */}
         <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap">
-          <span className="text-sm font-semibold text-slate-700 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md">
+          <span className="text-sm font-semibold text-slate-700 bg-white/95 px-3 py-1 rounded-full shadow-md">
             {data.name}
           </span>
         </div>
@@ -392,7 +392,7 @@ function DemoGraphInner() {
       preventScrolling={false}
       className="pointer-events-auto"
     >
-      <Background className="opacity-20" />
+      <Background className="opacity-50" />
     </ReactFlow>
   );
 }

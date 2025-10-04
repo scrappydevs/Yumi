@@ -34,20 +34,14 @@ export function useSimpleTTS() {
       
       console.log('[TTS] Speaking:', text, 'at volume:', currentVolume);
       
-      // Alexandra voice - super soft with optimal slowness settings
-      const audio = new Audio(
-        `${apiUrl}/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=kdmDKE6EkgrWrrykO9Qt&stability=0.97&similarity_boost=0.65`
-      );
-      audio.volume = currentVolume * 0.9; // Use current volume, slightly quieter for softer feel
-      audio.playbackRate = 0.94; // 10% slower for calmer, soothing delivery
-      audio.preload = 'auto';
+      // Try streaming first, then fallback to non-streaming
+      const audio = await createAudioWithFallback(apiUrl, text, currentVolume);
       
       // Store reference to current audio
       currentAudioRef.current = audio;
 
-      // Wait for it to end (with 10-second timeout)
+      // Wait for it to end (with 15-second timeout)
       await new Promise<void>((resolve) => {
-        let playPromise: Promise<void> | null = null;
         let timeoutId: NodeJS.Timeout | null = null;
         
         const cleanup = () => {
@@ -58,39 +52,69 @@ export function useSimpleTTS() {
           }
         };
         
-        // 10-second timeout to prevent infinite hangs
+        // 15-second timeout to prevent infinite hangs
         timeoutId = setTimeout(() => {
-          console.warn('[TTS] Timeout after 10 seconds for:', text);
+          console.warn('[TTS] Timeout after 15 seconds for:', text);
           cleanup();
           resolve();
-        }, 10000);
+        }, 15000);
         
         audio.onended = () => {
           console.log('[TTS] Finished:', text);
           cleanup();
           resolve();
         };
+        
         audio.onerror = (e) => {
-          console.error('[TTS] Audio error - likely rate limit or network issue. Failing silently.');
+          console.error('[TTS] Audio error:', e);
+          console.error('[TTS] Error details:', {
+            error: e,
+            networkState: audio.networkState,
+            readyState: audio.readyState,
+            src: audio.src
+          });
           cleanup();
           resolve();
         };
         
-        // Handle play promise properly
-        playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((err) => {
-            // Only log if it's not an AbortError (interrupted by pause)
-            if (err.name !== 'AbortError') {
-              console.error('[TTS] Play error:', err);
+        // Wait for audio to be ready before playing
+        const playAudio = async () => {
+          try {
+            // Wait for audio to be ready
+            if (audio.readyState < 2) { // HAVE_CURRENT_DATA
+              await new Promise<void>((resolveReady) => {
+                const onCanPlay = () => {
+                  audio.removeEventListener('canplay', onCanPlay);
+                  audio.removeEventListener('error', onError);
+                  resolveReady();
+                };
+                const onError = () => {
+                  audio.removeEventListener('canplay', onCanPlay);
+                  audio.removeEventListener('error', onError);
+                  resolveReady();
+                };
+                audio.addEventListener('canplay', onCanPlay);
+                audio.addEventListener('error', onError);
+                
+                // Timeout for loading
+                setTimeout(() => {
+                  audio.removeEventListener('canplay', onCanPlay);
+                  audio.removeEventListener('error', onError);
+                  resolveReady();
+                }, 5000);
+              });
             }
-            setIsSpeaking(false);
-            if (currentAudioRef.current === audio) {
-              currentAudioRef.current = null;
-            }
+            
+            // Play the audio
+            await audio.play();
+          } catch (playError) {
+            console.error('[TTS] Play error:', playError);
+            cleanup();
             resolve();
-          });
-        }
+          }
+        };
+        
+        playAudio();
       });
 
       return Date.now() - start;
@@ -101,6 +125,79 @@ export function useSimpleTTS() {
       return 0;
     }
   }, [currentVolume]);
+
+  // Helper function to create audio with fallback
+  const createAudioWithFallback = async (apiUrl: string, text: string, volume: number): Promise<HTMLAudioElement> => {
+    // First try streaming endpoint
+    const streamingUrl = `${apiUrl}/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=kdmDKE6EkgrWrrykO9Qt&stability=0.97&similarity_boost=0.65`;
+    
+    try {
+      const audio = new Audio(streamingUrl);
+      audio.volume = volume * 0.9;
+      audio.playbackRate = 0.94;
+      audio.preload = 'auto';
+      
+      // Test if the streaming URL works
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Streaming timeout'));
+        }, 3000);
+        
+        audio.oncanplay = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        
+        audio.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('Streaming failed'));
+        };
+        
+        // Start loading
+        audio.load();
+      });
+      
+      return audio;
+    } catch (streamingError) {
+      console.warn('[TTS] Streaming failed, trying non-streaming endpoint:', streamingError);
+      
+      // Fallback to non-streaming endpoint
+      try {
+        const response = await fetch(`${apiUrl}/api/audio/tts/convert`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: text,
+            voice_id: 'kdmDKE6EkgrWrrykO9Qt',
+            output_format: 'mp3_44100_128'
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success || !result.audio?.data) {
+          throw new Error('TTS conversion failed: ' + (result.error || 'Unknown error'));
+        }
+        
+        // Create audio from base64 data
+        const audio = new Audio(`data:audio/mp3;base64,${result.audio.data}`);
+        audio.volume = volume * 0.9;
+        audio.playbackRate = 0.94;
+        audio.preload = 'auto';
+        
+        return audio;
+      } catch (fallbackError) {
+        console.error('[TTS] Both streaming and fallback failed:', fallbackError);
+        throw new Error(`TTS failed: ${fallbackError.message}`);
+      }
+    }
+  };
 
   const stop = useCallback(() => {
     // Actually stop the audio

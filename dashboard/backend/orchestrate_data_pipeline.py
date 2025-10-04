@@ -194,6 +194,28 @@ class DataPipelineOrchestrator:
             f"  📊 Cells to Process: {num_cells if num_cells else 'Status check only'}")
         print(f"  ⏰ Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
+        # Prioritize specific coordinates before processing
+        if not status_only:
+            print(f"\n{CYAN}🎯 Prioritizing specific coordinates...{RESET}")
+            try:
+                # Import GridManager to prioritize coordinates
+                import sys
+                sys.path.insert(0, self.script_dir)
+                from places_data_script.grid_manager import GridManager
+
+                grid_manager = GridManager()
+                priority_coords = [
+                    (42.363859, -71.101230),
+                    (42.363056, -71.087005),
+                    (42.374229, -71.100899)
+                ]
+
+                grid_manager.prioritize_coordinates(priority_coords)
+            except Exception as e:
+                logger.warning(f"Failed to prioritize coordinates: {e}")
+                print(
+                    f"{YELLOW}⚠️  Could not prioritize coordinates, continuing anyway...{RESET}")
+
         # Step 1: Check status
         status_ok = self.check_status()
 

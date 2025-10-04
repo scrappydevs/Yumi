@@ -97,7 +97,7 @@ export default function WelcomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
       {/* Demo Social Network Graph Background - takes up most of the page */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-25">
+      <div className="absolute inset-0 flex items-center justify-center opacity-100">
         <DemoSocialGraph className="w-full h-full" />
       </div>
 

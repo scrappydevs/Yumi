@@ -9,6 +9,7 @@ import {
   DollarSign,
   Heart,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -114,10 +115,9 @@ export function UserDetailPanel({
       </Button>
 
       {loading || !user ? (
-        <div className="h-full flex items-center justify-center">
-          <div className="animate-pulse">
-            <User className="w-12 h-12 text-slate-400" />
-          </div>
+        <div className="h-full flex flex-col items-center justify-center gap-3">
+          <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
+          <p className="text-sm text-slate-500 font-medium">Loading profile...</p>
         </div>
       ) : (
         <div className="h-full overflow-y-auto p-6 space-y-6">
