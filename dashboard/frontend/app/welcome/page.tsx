@@ -3,10 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
-import { Phone, Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight } from 'lucide-react';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 
 export default function WelcomePage() {
@@ -16,9 +14,6 @@ export default function WelcomePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<{ display_name: string; username: string } | null>(null);
-  
-  const [phoneNumber, setPhoneNumber] = useState('');
 
   useEffect(() => {
     async function checkOnboarding() {
@@ -34,28 +29,15 @@ export default function WelcomePage() {
         // Check if user has completed onboarding
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('onboarded, display_name, username, phone')
+          .select('onboarded')
           .eq('id', user.id)
           .single();
 
-        if (profileData?.onboarded && profileData?.phone) {
+        if (profileData?.onboarded) {
           // Already onboarded, redirect to app
           router.push('/overview');
           return;
         }
-
-        setProfile({
-          display_name: profileData?.display_name || '',
-          username: profileData?.username || '',
-        });
-        
-        // Pre-fill phone if exists
-        if (profileData?.phone) {
-          setPhoneNumber(profileData.phone);
-        }
-      } catch (err) {
-        console.error('Error checking onboarding:', err);
-        setError('Failed to load profile');
       } finally {
         setLoading(false);
       }
@@ -70,34 +52,15 @@ export default function WelcomePage() {
     setError(null);
 
     try {
-      // Validate phone number (basic)
-      const cleanPhone = phoneNumber.trim();
-      if (!cleanPhone) {
-        throw new Error('Phone number is required');
-      }
-
-      // Format to E.164 if not already
-      let formattedPhone = cleanPhone;
-      if (!cleanPhone.startsWith('+')) {
-        // Assume US number
-        formattedPhone = `+1${cleanPhone.replace(/\D/g, '')}`;
-      }
-
-      // Validate E.164 format
-      if (!formattedPhone.match(/^\+[1-9]\d{1,14}$/)) {
-        throw new Error('Invalid phone number. Use format: +1234567890');
-      }
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('Not authenticated');
       }
 
-      // Update profile
+      // Update profile - mark as onboarded
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
-          phone: formattedPhone,
           onboarded: true,
         })
         .eq('id', user.id);
@@ -107,7 +70,7 @@ export default function WelcomePage() {
       }
 
       // Wait a moment for database to update
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Redirect to app
       router.push('/overview');
@@ -155,17 +118,24 @@ export default function WelcomePage() {
           {/* Specular highlight */}
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
           
-          <div className="relative space-y-6">
+          <div className="relative space-y-8">
             {/* Header */}
             <div className="text-center space-y-3">
-              
+              <motion.h1
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-3xl font-bold text-[hsl(var(--foreground))]"
+              >
+                Yummy
+              </motion.h1>
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="text-sm text-[hsl(var(--muted-foreground))]"
+                className="text-base text-[hsl(var(--muted-foreground))]"
               >
-                Enter your phone to send reservations
+                 Agentic Food Social Network
               </motion.p>
             </div>
 
@@ -178,57 +148,33 @@ export default function WelcomePage() {
                 <p className="text-sm text-red-800">{error}</p>
               </motion.div>
             )}
-
-            {/* Phone Input */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
-                <div className="relative flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-[hsl(var(--muted-foreground))] flex-shrink-0" />
-                  <Input
-                    type="tel"
-                    placeholder="+1234567890"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="flex-1 bg-transparent border-0 focus:ring-0 focus-visible:ring-0 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
-                    required
-                    disabled={submitting}
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <motion.button
-                type="submit"
-                disabled={submitting || !phoneNumber.trim()}
-                className="w-full gradient-purple-blue text-white rounded-2xl h-14 text-base font-semibold shadow-lg relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
-                whileHover={{ scale: submitting ? 1 : 1.02 }}
-                whileTap={{ scale: submitting ? 1 : 0.98 }}
-              >
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                <div className="relative z-10 flex items-center justify-center gap-2">
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Setting up...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Continue</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </div>
-              </motion.button>
-            </form>
-
-            {/* Helper text */}
-            <p className="text-xs text-center text-[hsl(var(--muted-foreground))]">
-              Used for reservation invitations only
-            </p>
           </div>
+
+          
         </div>
+
+        {/* Submit Button */}
+        <form onSubmit={handleSubmit} className="mt-6">
+          <motion.button
+            type="submit"
+            disabled={submitting}
+            className="glass-btn-inline w-full h-14 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            whileHover={{ scale: submitting ? 1 : 1.02 }}
+            whileTap={{ scale: submitting ? 1 : 0.98 }}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span>Setting up...</span>
+              </>
+            ) : (
+              <>
+                <span>Get Started</span>
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </>
+            )}
+          </motion.button>
+        </form>
       </motion.div>
     </div>
   );

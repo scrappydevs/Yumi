@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { apiRequest, API_CONFIG } from '@/lib/api-config'
 import { format, parseISO } from 'date-fns'
 import { OpenIMessageCard } from './open-imessage-card'
+import { PhoneCollectionModal } from './phone-collection-modal'
 
 interface ReservationModalProps {
   isOpen: boolean
@@ -92,6 +93,7 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const [step, setStep] = useState<'intro' | 'form'>(showIntro ? 'intro' : 'form')
   const [loading, setLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const [userPhone, setUserPhone] = useState<string | null>(null)
   
   // Create mode state
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
@@ -104,6 +106,9 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const [inviteMessage, setInviteMessage] = useState('')
   const [invitePhone, setInvitePhone] = useState('')
   const [copied, setCopied] = useState(false)
+  
+  // Phone collection modal state
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
   
   // View mode state
   const [reservation, setReservation] = useState<ReservationData | null>(null)
@@ -149,6 +154,15 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setCurrentUser(user.id)
+      
+      // Check if user has a phone number
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', user.id)
+        .single()
+      
+      setUserPhone(profile?.phone || null)
     }
 
     console.log('🍽️ Loading create data with prefillRestaurant:', prefillRestaurant)
@@ -261,6 +275,13 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     e.preventDefault()
     if (!currentUser) return
 
+    // Check if user has phone number
+    if (!userPhone) {
+      // Show phone collection modal
+      setShowPhoneModal(true)
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -305,6 +326,17 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     } finally {
       setLoading(false)
     }
+  }
+
+  const handlePhoneSuccess = (phone: string) => {
+    setUserPhone(phone)
+    // Automatically retry submission after phone is collected
+    setTimeout(() => {
+      const form = document.querySelector('form')
+      if (form) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      }
+    }, 100)
   }
 
   const resetForm = () => {
@@ -717,6 +749,13 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
           )}
         </motion.div>
       </motion.div>
+
+      {/* Phone Collection Modal */}
+      <PhoneCollectionModal
+        isOpen={showPhoneModal}
+        onClose={() => setShowPhoneModal(false)}
+        onSuccess={handlePhoneSuccess}
+      />
     </AnimatePresence>
   )
 }

@@ -87,10 +87,14 @@ async def send_reservation(request: SendReservationRequest):
         if not app_base_url:
             raise HTTPException(status_code=500, detail="APP_BASE_URL not configured")
         
-        # Validate organizer exists
-        organizer_result = supabase.table("profiles").select("id").eq("id", request.organizer_id).limit(1).execute()
+        # Validate organizer exists and has phone number
+        organizer_result = supabase.table("profiles").select("id, phone").eq("id", request.organizer_id).limit(1).execute()
         if not organizer_result.data:
             raise HTTPException(status_code=404, detail="Organizer not found")
+        
+        organizer = organizer_result.data[0]
+        if not organizer.get("phone"):
+            raise HTTPException(status_code=400, detail="Phone number required. Please update your profile with a phone number to create reservations.")
         
         # Validate restaurant exists
         print(f"🔍 Looking for restaurant with ID: {request.restaurant_id}")
