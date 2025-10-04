@@ -143,7 +143,11 @@ async def send_reservation(request: SendReservationRequest):
         supabase.table("reservation_invites").insert(invites_data).execute()
         
         # Send SMS to each invitee
-        status_callback_url = f"{app_base_url}/api/twilio/status"
+        # Only use status callback if not localhost (Twilio can't reach localhost)
+        status_callback_url = None
+        if "localhost" not in app_base_url and "127.0.0.1" not in app_base_url:
+            status_callback_url = f"{app_base_url}/api/twilio/status"
+        
         time_str = format_time_for_sms(starts_at)
         sent_count = 0
         
@@ -309,6 +313,88 @@ async def owner_cancel_reservation(request: CancelReservationRequest):
         raise
     except Exception as e:
         print(f"Error canceling reservation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/user/{user_id}")
+async def get_user_reservations(user_id: str, status: str = None):
+    """
+    Get all reservations for a user (as organizer or invitee)
+    """
+    try:
+        supabase = get_supabase()
+        
+        # Get reservations where user is organizer
+        organizer_query = supabase.table("reservations")\
+            .select("*, reservation_invites(*)")\
+            .eq("organizerId", user_id)\
+            .order("startsAt", desc=False)
+        
+        if status:
+            organizer_query = organizer_query.eq("status", status)
+        
+        organizer_reservations = organizer_query.execute()
+        
+        # Get reservations where user is invitee
+        invitee_reservations_result = supabase.table("reservation_invites")\
+            .select("*, reservations(*)")\
+            .eq("inviteeProfileId", user_id)\
+            .execute()
+        
+        # Combine and format
+        all_reservations = []
+        
+        # Add organizer reservations
+        for resv in organizer_reservations.data:
+            restaurant = supabase.table("restaurants").select("name, formatted_address").eq("id", resv["restaurantId"]).limit(1).execute()
+            restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
+            restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
+            
+            all_reservations.append({
+                "id": resv["id"],
+                "organizer_id": resv["organizerId"],
+                "restaurant_id": resv["restaurantId"],
+                "restaurant_name": restaurant_name,
+                "restaurant_address": restaurant_address,
+                "starts_at": resv["startsAt"],
+                "party_size": resv["partySize"],
+                "status": resv["status"],
+                "created_at": resv["createdAt"],
+                "is_organizer": True,
+                "invite_count": len(resv.get("reservation_invites", []))
+            })
+        
+        # Add invitee reservations
+        for invite in invitee_reservations_result.data:
+            resv = invite["reservations"]
+            if status and resv["status"] != status:
+                continue
+                
+            restaurant = supabase.table("restaurants").select("name, formatted_address").eq("id", resv["restaurantId"]).limit(1).execute()
+            restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
+            restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
+            
+            all_reservations.append({
+                "id": resv["id"],
+                "organizer_id": resv["organizerId"],
+                "restaurant_id": resv["restaurantId"],
+                "restaurant_name": restaurant_name,
+                "restaurant_address": restaurant_address,
+                "starts_at": resv["startsAt"],
+                "party_size": resv["partySize"],
+                "status": resv["status"],
+                "created_at": resv["createdAt"],
+                "is_organizer": False,
+                "rsvp_status": invite["rsvpStatus"]
+            })
+        
+        # Sort by start time
+        all_reservations.sort(key=lambda x: x["starts_at"])
+        
+        return {"reservations": all_reservations}
+    
+    except Exception as e:
+        print(f"Error fetching user reservations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

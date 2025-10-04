@@ -17,7 +17,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
-import { YummyLogo } from '@/components/yummy-logo';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -193,6 +192,7 @@ export default function DiscoverPage() {
   const [isThinking, setIsThinking] = useState(false);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
+  const [flowingIndex, setFlowingIndex] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -213,35 +213,42 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
-  // Cycle images into the glob and bring new ones out
+  // Continuous flowing animation - images constantly flow in and out
   useEffect(() => {
     if (!isThinking) {
       setAbsorbedIndices([]);
+      setFlowingIndex(0);
       return;
     }
 
-    // Sequentially absorb 2-3 images at a time, then release them
-    const cycleInterval = setInterval(() => {
-      setAbsorbedIndices((prev) => {
-        // If we have absorbed images, release them and absorb new ones
-        if (prev.length > 0) {
-          return [];
-        }
-        // Absorb 2-3 random images from the visible set
-        const numToAbsorb = Math.floor(Math.random() * 2) + 2; // 2 or 3 images
-        const availableIndices = Array.from({ length: 10 }, (_, i) => i);
-        const selected: number[] = [];
-        for (let i = 0; i < numToAbsorb && availableIndices.length > 0; i++) {
-          const randomIdx = Math.floor(Math.random() * availableIndices.length);
-          selected.push(availableIndices[randomIdx]);
-          availableIndices.splice(randomIdx, 1);
-        }
-        return selected;
-      });
-    }, 1800); // Cycle every 1.8 seconds
+    // Continuously cycle through images - always have 2-3 images flowing through
+    const flowInterval = setInterval(() => {
+      setFlowingIndex((prev) => (prev + 1) % 10);
+    }, 600); // Each image flows for 600ms
 
-    return () => clearInterval(cycleInterval);
+    return () => clearInterval(flowInterval);
   }, [isThinking]);
+
+  // Calculate which images are currently being absorbed based on flowing index
+  useEffect(() => {
+    if (!isThinking) return;
+
+    // Always have 2-3 images in various stages of absorption
+    const currentAbsorbed: number[] = [];
+    
+    // Current image flowing in
+    currentAbsorbed.push(flowingIndex);
+    
+    // Next image starting to flow
+    currentAbsorbed.push((flowingIndex + 1) % 10);
+    
+    // Sometimes include a third for variety
+    if (flowingIndex % 3 === 0) {
+      currentAbsorbed.push((flowingIndex + 2) % 10);
+    }
+
+    setAbsorbedIndices(currentAbsorbed);
+  }, [flowingIndex, isThinking]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -259,35 +266,6 @@ export default function DiscoverPage() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
-      
-      {/* Yummy Logo - Top Center */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-        <motion.div
-          className="glass-layer-1 rounded-3xl shadow-strong relative overflow-hidden"
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ 
-            y: 0, 
-            opacity: 1,
-          }}
-          transition={{ 
-            delay: 0.05,
-            duration: 0.8,
-            ease: "easeOut"
-          }}
-          style={{
-            width: '140px',
-            height: '80px',
-          }}
-        >
-          {/* Specular highlight */}
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
-          
-          {/* Three.js Logo */}
-          <div className="w-full h-full relative">
-            <YummyLogo isAnimating={isThinking} />
-          </div>
-        </motion.div>
-      </div>
       
       {/* Test Button - Top Left */}
       <div className="absolute top-6 left-6 z-10">
@@ -562,14 +540,19 @@ export default function DiscoverPage() {
               // Check if this image is being absorbed into the glob
               const isAbsorbed = isThinking && isCore && absorbedIndices.includes(index);
               
+              // Calculate absorption progress for staggered animation (0 to 1)
+              const absorbedPosition = absorbedIndices.indexOf(index);
+              const absorptionProgress = absorbedPosition >= 0 ? absorbedPosition / absorbedIndices.length : 0;
+              
               // For core images: use their index (0-9)
               // For new images: interleave between core images (0.5, 1.5, 2.5, etc.)
               const effectiveIndex = isCore ? index : (index - 10) + 0.5;
               const totalSlots = isThinking ? 20 : 10;
               
               const angle = ((effectiveIndex / 10) * 360 + rotation) * (Math.PI / 180);
-              // If absorbed, move towards center (smaller radius), otherwise normal radius
-              const targetRadius = isAbsorbed ? 60 : (isThinking ? 350 : 200);
+              // If absorbed, interpolate radius based on absorption progress for staggered effect
+              const normalRadius = isThinking ? 350 : 200;
+              const targetRadius = isAbsorbed ? 0 : normalRadius;
               const radius = targetRadius;
               const x = 350 + Math.cos(angle) * radius;
               const y = 350 + Math.sin(angle) * radius;
@@ -584,8 +567,8 @@ export default function DiscoverPage() {
                 animate={{
                   left: x,
                   top: y,
-                  opacity: isAbsorbed ? 0.3 : 1,
-                  scale: isAbsorbed ? 0.6 : 1,
+                  opacity: isAbsorbed ? 0 : 1,
+                  scale: isAbsorbed ? 0.2 : 1,
                 }}
                 exit={{
                   opacity: 0,
@@ -593,8 +576,9 @@ export default function DiscoverPage() {
                   transition: { duration: 0.00 }
                 }}
                 transition={{
-                  duration: isAbsorbed ? 0.6 : 0.00,
+                  duration: isAbsorbed ? 0.5 : 0.00,
                   ease: isAbsorbed ? [0.4, 0.0, 0.2, 1] : [0.22, 1, 0.36, 1],
+                  delay: isAbsorbed ? absorptionProgress * 0.1 : 0,
                 }}
                 style={{
                   x: '-50%',
@@ -609,7 +593,7 @@ export default function DiscoverPage() {
                     backdropFilter: 'blur(30px) saturate(180%)',
                     border: '0.25px solid rgba(0, 0, 0, 0.08)',
                     boxShadow: isAbsorbed 
-                      ? 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 0 40px rgba(139, 92, 246, 0.6), 0 0 60px rgba(59, 130, 246, 0.4)'
+                      ? 'inset 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.9), 0 0 80px rgba(59, 130, 246, 0.7), 0 0 100px rgba(96, 165, 250, 0.5)'
                       : 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                     transformStyle: 'preserve-3d',
                   }}
