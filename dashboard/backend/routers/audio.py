@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 from audio_service import get_audio_service
+from services.vad_service import get_vad_service
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
@@ -70,6 +71,24 @@ class VoicesResponse(BaseModel):
     voices: List[Voice]
     count: int
     service: str
+    error: Optional[str] = None
+
+
+class VADRequest(BaseModel):
+    """Request model for VAD analysis"""
+    audio_b64: str = Field(..., description="Base64-encoded audio data")
+    audio_format: str = Field("webm", description="Audio format (webm, mp3, wav)")
+    reset_state: bool = Field(False, description="Reset VAD state before analysis")
+
+
+class VADResponse(BaseModel):
+    """Response model for VAD analysis"""
+    success: bool
+    vad_score: float = Field(..., description="Current VAD score (0.0-1.0)")
+    average_score: float = Field(..., description="Rolling average VAD score")
+    is_speech: bool = Field(..., description="Whether speech is detected")
+    buffer_size: Optional[int] = None
+    audio_duration_ms: Optional[int] = None
     error: Optional[str] = None
 
 
@@ -266,6 +285,69 @@ async def list_voices():
             status_code=500, detail=f"Failed to list voices: {str(e)}")
 
 
+# ==================== VAD Endpoints ====================
+
+@router.post("/vad/analyze", response_model=VADResponse)
+async def vad_analyze(request: VADRequest):
+    """
+    Analyze audio chunk for voice activity detection
+    
+    Uses Silero VAD model to detect speech vs silence in real-time.
+    Useful for automatic silence detection in voice recording applications.
+    
+    - **audio_b64**: Base64-encoded audio data (chunk or complete recording)
+    - **audio_format**: Audio format (webm, mp3, wav, etc.)
+    - **reset_state**: Reset VAD state before analysis (use True for first chunk)
+    
+    Returns: VAD score and speech detection status
+    
+    Example:
+    ```json
+    {
+      "audio_b64": "base64_audio_data...",
+      "audio_format": "webm",
+      "reset_state": false
+    }
+    ```
+    
+    Response:
+    - vad_score: Current frame score (0.0 = silence, 1.0 = strong speech)
+    - average_score: Rolling average over recent chunks
+    - is_speech: True if vad_score > 0.5
+    """
+    try:
+        vad_service = get_vad_service()
+        result = vad_service.analyze_audio_base64(
+            audio_b64=request.audio_b64,
+            audio_format=request.audio_format,
+            reset_state=request.reset_state
+        )
+        return VADResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"VAD analysis failed: {str(e)}")
+
+
+@router.post("/vad/reset")
+async def vad_reset():
+    """
+    Reset VAD state and buffer
+    
+    Call this endpoint to reset the VAD model state.
+    Useful when starting a new recording session.
+    """
+    try:
+        vad_service = get_vad_service()
+        vad_service.reset()
+        return {
+            "success": True,
+            "message": "VAD state reset successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"VAD reset failed: {str(e)}")
+
+
 # ==================== Health Check ====================
 
 @router.get("/health")
@@ -273,11 +355,13 @@ async def audio_health_check():
     """Check if audio services are properly configured"""
     try:
         audio_service = get_audio_service()
+        vad_service = get_vad_service()
         return {
             "status": "healthy",
             "services": {
                 "elevenlabs": "configured",
-                "whisper": "ready"
+                "whisper": "ready",
+                "vad": "ready"
             },
             "default_voice": audio_service.default_voice_id,
             "whisper_model": audio_service._whisper_model_size
