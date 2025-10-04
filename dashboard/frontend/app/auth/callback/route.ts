@@ -10,6 +10,22 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createClient()
     await supabase.auth.exchangeCodeForSession(code)
+    
+    // Check if user has completed onboarding
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarded, phone')
+        .eq('id', user.id)
+        .single()
+      
+      // If no phone or not onboarded, send to welcome page
+      if (!profile?.phone || !profile?.onboarded) {
+        return NextResponse.redirect(`${origin}/welcome`)
+      }
+    }
   }
 
   // URL to redirect to after sign in process completes

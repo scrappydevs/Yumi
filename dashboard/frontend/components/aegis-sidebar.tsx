@@ -41,7 +41,6 @@ const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
   { name: 'Explore', icon: MapPin, href: '/spatial' },
   { name: 'Friends', icon: Users, href: '/friends' },
-  { name: 'Messages', icon: MessageCircle, href: '/messages' },
   { name: 'Favorites', icon: BookHeart, href: '/favorites' },
 ];
 

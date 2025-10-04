@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
-import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft,
   UserPlus, 
@@ -18,9 +17,11 @@ import {
   Settings,
   Clock,
   TrendingUp,
+  MessageCircle,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useParams } from 'next/navigation';
+import { SendReservationCard } from '@/components/send-reservation-card';
 
 type Profile = {
   id: string;
@@ -55,6 +56,7 @@ export default function UserProfilePage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [showMessageCard, setShowMessageCard] = useState(false);
   const supabase = createClient();
   const { user: currentUser } = useAuth();
   const router = useRouter();
@@ -149,7 +151,7 @@ export default function UserProfilePage() {
 
       if (isFollowing) {
         // Unfollow
-        updatedFriends = currentFriends.filter(id => id !== userId);
+        updatedFriends = currentFriends.filter((id: string) => id !== userId);
       } else {
         // Follow
         updatedFriends = [...currentFriends, userId];
@@ -181,7 +183,7 @@ export default function UserProfilePage() {
 
   if (loading) {
     return (
-      <div className="h-full liquid-glass flex items-center justify-center">
+      <div className="h-full bg-white flex items-center justify-center">
         <div className="w-12 h-12 rounded-full gradient-purple-blue animate-pulse" />
       </div>
     );
@@ -189,18 +191,20 @@ export default function UserProfilePage() {
 
   if (!profile) {
     return (
-      <div className="h-full liquid-glass flex items-center justify-center">
-        <div className="glass-panel p-8 text-center max-w-md">
+      <div className="h-full bg-white flex items-center justify-center">
+        <div className="glass-layer-1 rounded-3xl p-8 text-center max-w-md shadow-strong">
           <h2 className="text-xl font-bold mb-2">Profile not found</h2>
           <p className="text-[hsl(var(--muted-foreground))] mb-4">
             This user profile doesn't exist or has been removed.
           </p>
-          <Button 
+          <motion.button 
             onClick={() => router.back()}
-            className="glass-btn-inline"
+            className="glass-layer-1 px-6 py-3 rounded-2xl font-semibold shadow-soft hover:shadow-medium transition-all"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             Go Back
-          </Button>
+          </motion.button>
         </div>
       </div>
     );
@@ -209,223 +213,229 @@ export default function UserProfilePage() {
   const preferences = parsePreferences(profile.preferences || '{}');
 
   return (
-    <div className="h-full liquid-glass overflow-hidden relative">
-      {/* Back Button - Top Left */}
-      <div className="absolute top-6 left-6 z-10">
-        <button
-          onClick={() => router.back()}
-          className="glass-btn-sm"
-          title="Go Back"
-        >
-          <ArrowLeft className="w-4 h-4 text-slate-600" />
-        </button>
-      </div>
-
-      {/* Action Buttons - Top Right */}
-      <div className="absolute top-6 right-6 z-10">
-        <div className="glass-panel p-2 flex gap-2">
-          <button className="glass-btn-sm" title="Share Profile">
-            <Share2 className="w-4 h-4 text-slate-600" />
-          </button>
-          {currentUser && currentUser.id !== userId && (
-            <button
-              onClick={toggleFollow}
-              className={`glass-btn-sm ${
-                isFollowing 
-                  ? 'text-red-600 hover:text-red-700' 
-                  : 'text-slate-600'
-              }`}
-              title={isFollowing ? 'Unfollow' : 'Follow'}
-            >
-              {isFollowing ? (
-                <UserMinus className="w-4 h-4" />
-              ) : (
-                <UserPlus className="w-4 h-4" />
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content - Centered */}
-      <div className="h-full flex items-center justify-center p-8">
-        <div className="max-w-4xl w-full space-y-8">
-          {/* Profile Header */}
-          <div className="glass-panel p-8 text-center">
-            <div className="glass-highlight" />
-            <div className="flex flex-col items-center mb-6">
-              <img
-                src={profile.avatar_url || '/default-avatar.png'}
-                alt={profile.display_name || profile.username}
-                className="w-24 h-24 rounded-full object-cover mb-4 ring-4 ring-slate-100"
-              />
-              <h1 className="text-3xl font-bold mb-2">
-                {profile.display_name || profile.username}
-              </h1>
-              <p className="text-lg text-[hsl(var(--muted-foreground))] mb-4">
-                @{profile.username}
+    <div className="h-full overflow-y-auto bg-white">
+      <div className="max-w-5xl mx-auto p-8 space-y-12">
+        {/* Profile Header */}
+        <div className="grid grid-cols-[auto_1fr_auto] gap-8 items-start pb-12 border-b border-slate-200/60">
+          <img
+            src={profile.avatar_url || '/default-avatar.png'}
+            alt={profile.display_name || profile.username}
+            className="w-24 h-24 rounded-2xl object-cover ring-1 ring-slate-200/60"
+          />
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">
+              {profile.display_name || profile.username}
+            </h1>
+            <p className="text-base text-slate-500">
+              @{profile.username}
+            </p>
+            {profile.bio && (
+              <p className="text-sm text-slate-600 leading-relaxed pt-2 max-w-2xl">
+                {profile.bio}
               </p>
-              {profile.bio && (
-                <p className="text-lg text-[hsl(var(--muted-foreground))] leading-relaxed max-w-2xl">
-                  {profile.bio}
-                </p>
-              )}
-            </div>
-
-            {/* Follow Button */}
-            {currentUser && currentUser.id !== userId && (
-              <button
-                onClick={toggleFollow}
-                className={`glass-btn-inline px-8 py-3 rounded-2xl font-semibold ${
-                  isFollowing
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : 'bg-slate-900 hover:bg-slate-800 text-white'
-                }`}
-              >
-                {isFollowing ? (
-                  <>
-                    <UserMinus className="w-5 h-5 mr-2" />
-                    Unfollow
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-5 h-5 mr-2" />
-                    Follow
-                  </>
-                )}
-              </button>
             )}
           </div>
+          <div className="flex gap-2">
+            <motion.button 
+              onClick={() => router.back()}
+              className="glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              title="Go Back"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+              <ArrowLeft className="w-4 h-4 text-[hsl(var(--foreground))]" />
+            </motion.button>
+            {currentUser && currentUser.id !== userId && (
+              <motion.button
+                onClick={() => setShowMessageCard(true)}
+                className="glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                title="Send Reservation"
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                <MessageCircle className="w-4 h-4 text-[hsl(var(--foreground))]" />
+              </motion.button>
+            )}
+            <motion.button
+              className="glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              title="Share Profile"
+            >
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+              <Share2 className="w-4 h-4 text-[hsl(var(--foreground))]" />
+            </motion.button>
+            {currentUser && currentUser.id !== userId && (
+              <motion.button
+                onClick={toggleFollow}
+                className={`glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden ${
+                  isFollowing ? 'text-red-600' : 'text-[hsl(var(--foreground))]'
+                }`}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                title={isFollowing ? 'Unfollow' : 'Follow'}
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                {isFollowing ? (
+                  <UserMinus className="w-4 h-4" />
+                ) : (
+                  <UserPlus className="w-4 h-4" />
+                )}
+              </motion.button>
+            )}
+          </div>
+        </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-4 gap-4">
-            {[
-              { label: 'Visits', value: visits.length, icon: MapPin },
-              { label: 'Restaurants', value: new Set(visits.map(v => v.restaurant_name)).size, icon: Utensils },
-              { label: 'Following', value: profile.friends?.length || 0, icon: Users },
-              { label: 'Photos', value: photos.length, icon: Heart },
-            ].map((stat) => (
-              <div key={stat.label} className="glass-panel p-6 text-center">
-                <div className="glass-highlight" />
-                <stat.icon className="w-6 h-6 mx-auto mb-3 text-[hsl(var(--primary))]" />
-                <div className="text-3xl font-bold mb-1">{stat.value}</div>
-                <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider">{stat.label}</div>
-              </div>
-            ))}
+        {/* Stats Section */}
+        <div className="grid grid-cols-2 gap-x-16 gap-y-6 pb-12 border-b border-slate-200/60">
+          <div>
+            <div className="text-sm font-medium text-slate-500 mb-4">Activity</div>
+            <div className="grid grid-cols-2 gap-6">
+              {[
+                { label: 'Visits', value: visits.length, icon: MapPin },
+                { label: 'Restaurants', value: new Set(visits.map(v => v.restaurant_name)).size, icon: Utensils },
+              ].map((stat) => (
+                <div key={stat.label} className="space-y-1">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <stat.icon className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">{stat.label}</span>
+                  </div>
+                  <div className="text-3xl font-bold">{stat.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-slate-500 mb-4">Social</div>
+            <div className="grid grid-cols-2 gap-6">
+              {[
+                { label: 'Following', value: profile.friends?.length || 0, icon: Users },
+                { label: 'Photos', value: photos.length, icon: Heart },
+              ].map((stat) => (
+                <div key={stat.label} className="space-y-1">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <stat.icon className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">{stat.label}</span>
+                  </div>
+                  <div className="text-3xl font-bold">{stat.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Content Grid */}
+        <div className="grid grid-cols-2 gap-x-16 gap-y-12">
+          {/* Recent Visits */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-sm font-medium text-slate-500">Recent Visits</h2>
+              <button className="text-xs text-slate-500 hover:text-slate-900 transition-colors">
+                View all →
+              </button>
+            </div>
+            <div className="space-y-3">
+              {visits.length > 0 ? (
+                visits.map((visit) => (
+                  <div
+                    key={visit.id}
+                    className="flex items-center gap-3 py-2 hover:translate-x-1 transition-transform cursor-pointer"
+                  >
+                    <img
+                      src={visit.restaurant_image || '/default-restaurant.png'}
+                      alt={visit.restaurant_name}
+                      className="w-10 h-10 rounded-lg object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate">{visit.restaurant_name}</div>
+                      <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+                        <Clock className="w-3 h-3" />
+                        {new Date(visit.visit_date).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      <span className="text-xs font-bold">{visit.rating}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                  <Utensils className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No visits yet</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Content Grid */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Recent Visits */}
-            <div className="glass-panel p-6">
-              <div className="glass-highlight" />
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">Recent Visits</h2>
-                <button className="glass-btn-inline text-xs">
-                  View all →
-                </button>
-              </div>
-              <div className="space-y-3">
-                {visits.length > 0 ? (
-                  visits.map((visit) => (
-                    <div
-                      key={visit.id}
-                      className="flex items-center gap-3 py-2 hover:translate-x-1 transition-transform cursor-pointer"
-                    >
-                      <img
-                        src={visit.restaurant_image || '/default-restaurant.png'}
-                        alt={visit.restaurant_name}
-                        className="w-10 h-10 rounded-lg object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{visit.restaurant_name}</div>
-                        <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
-                          <Clock className="w-3 h-3" />
-                          {new Date(visit.visit_date).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-0.5">
-                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                        <span className="text-xs font-bold">{visit.rating}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                    <Utensils className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No visits yet</p>
-                  </div>
-                )}
-              </div>
+          {/* Preferences */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-sm font-medium text-slate-500">Preferences</h2>
             </div>
-
-            {/* Preferences */}
-            <div className="glass-panel p-6">
-              <div className="glass-highlight" />
-              <h2 className="text-lg font-bold mb-4">Preferences</h2>
-              
-              <div className="space-y-4">
-                {preferences.cuisines && preferences.cuisines.length > 0 && (
-                  <div>
-                    <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
-                      Favorite Cuisines
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {preferences.cuisines.map((cuisine: string) => (
-                        <span
-                          key={cuisine}
-                          className="glass-btn-inline text-xs px-3 py-1"
-                        >
-                          {cuisine}
-                        </span>
-                      ))}
-                    </div>
+            
+            <div className="space-y-4">
+              {preferences.cuisines && preferences.cuisines.length > 0 && (
+                <div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
+                    Favorite Cuisines
                   </div>
-                )}
-
-                {preferences.priceRange && (
-                  <div>
-                    <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
-                      Price Range
-                    </div>
-                    <div className="text-sm font-semibold">{preferences.priceRange}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {preferences.cuisines.map((cuisine: string) => (
+                      <span
+                        key={cuisine}
+                        className="glass-layer-1 text-xs px-3 py-1 rounded-xl shadow-soft"
+                      >
+                        {cuisine}
+                      </span>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {preferences.atmosphere && preferences.atmosphere.length > 0 && (
-                  <div>
-                    <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
-                      Atmosphere
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {preferences.atmosphere.map((vibe: string) => (
-                        <span
-                          key={vibe}
-                          className="glass-btn-inline text-xs px-3 py-1"
-                        >
-                          {vibe}
-                        </span>
-                      ))}
-                    </div>
+              {preferences.priceRange && (
+                <div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
+                    Price Range
                   </div>
-                )}
+                  <div className="text-sm font-semibold">{preferences.priceRange}</div>
+                </div>
+              )}
 
-                {(!preferences.cuisines && !preferences.priceRange && !preferences.atmosphere) && (
-                  <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                    <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No preferences set</p>
+              {preferences.atmosphere && preferences.atmosphere.length > 0 && (
+                <div>
+                  <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
+                    Atmosphere
                   </div>
-                )}
-              </div>
+                  <div className="flex flex-wrap gap-2">
+                    {preferences.atmosphere.map((vibe: string) => (
+                      <span
+                        key={vibe}
+                        className="glass-layer-1 text-xs px-3 py-1 rounded-xl shadow-soft"
+                      >
+                        {vibe}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(!preferences.cuisines && !preferences.priceRange && !preferences.atmosphere) && (
+                <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                  <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No preferences set</p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Photos */}
-          <div className="glass-panel p-6">
-            <div className="glass-highlight" />
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Photos</h2>
-              <button className="glass-btn-inline text-xs">
+          <div className="col-span-2">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-sm font-medium text-slate-500">Photos</h2>
+              <button className="text-xs text-slate-500 hover:text-slate-900 transition-colors">
                 View all →
               </button>
             </div>
@@ -456,6 +466,45 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Message Modal */}
+      <AnimatePresence>
+        {showMessageCard && profile && currentUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/10 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setShowMessageCard(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SendReservationCard
+                friendId={profile.id}
+                friendName={profile.display_name || profile.username}
+                friendPhone="+17149410453"
+              />
+              
+              {/* Close button */}
+              <motion.button
+                onClick={() => setShowMessageCard(false)}
+                className="mt-4 w-full glass-layer-1 rounded-2xl h-12 text-sm font-semibold shadow-soft relative overflow-hidden"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                <span className="relative z-10">Close</span>
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
