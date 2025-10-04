@@ -13,10 +13,13 @@ import {
   ChevronDown,
   MessageSquare,
   Mic,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
+import { useVoiceOutput } from '@/hooks/use-voice-output';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -191,6 +194,11 @@ export default function DiscoverPage() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [expandedOnce, setExpandedOnce] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
+  const { speak, isSpeaking, stop } = useVoiceOutput();
 
   useEffect(() => {
     setMounted(true);
@@ -211,10 +219,74 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Initialize Web Speech API
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) return;
+    
+    const recognitionInstance = new SpeechRecognition();
+    recognitionInstance.continuous = true;
+    recognitionInstance.interimResults = true;
+    recognitionInstance.lang = 'en-US';
+    
+    recognitionInstance.onresult = (event: any) => {
+      let transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setPrompt(transcript);
+    };
+    
+    recognitionInstance.onerror = () => setIsRecording(false);
+    recognitionInstance.onend = () => setIsRecording(false);
+    
+    setRecognition(recognitionInstance);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Prompt:', prompt);
-    // TODO: Implement natural language search
+    if (!prompt.trim()) return;
+    
+    setIsThinking(true);
+    
+    const thinkingPhrases = [
+      "Finding restaurants",
+      "Hang on tight",
+      "Looking for the perfect spot",
+      "Searching nearby",
+      "Let me check what's available",
+      "One moment please",
+      "Analyzing your options",
+    ];
+    
+    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
+    setCurrentPhrase(randomPhrase);
+    
+    if (!isMuted) {
+      await speak(randomPhrase);
+    }
+    
+    setTimeout(() => {
+      setIsThinking(false);
+    }, 2000);
+  };
+
+  const toggleVoiceRecording = () => {
+    if (!recognition) return;
+    if (isRecording) {
+      recognition.stop();
+      setIsRecording(false);
+    } else {
+      setPrompt('');
+      try {
+        recognition.start();
+        setIsRecording(true);
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+      }
+    }
   };
 
   if (!mounted) {
@@ -228,8 +300,8 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
       
-      {/* Test Button - Top Left */}
-      <div className="absolute top-6 left-6 z-10">
+      {/* Test Button & Mute - Top Left */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
         <motion.button
           onClick={() => setIsThinking(!isThinking)}
           className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
@@ -241,6 +313,23 @@ export default function DiscoverPage() {
           <span className="text-xs font-medium">
             {isThinking ? 'Thinking...' : 'Test AI'}
           </span>
+        </motion.button>
+
+        <motion.button
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (!isMuted && isSpeaking) stop();
+          }}
+          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          {isMuted ? (
+            <VolumeX className="w-5 h-5 text-red-500" />
+          ) : (
+            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+          )}
         </motion.button>
       </div>
 
@@ -396,7 +485,7 @@ export default function DiscoverPage() {
                 ease: [0.25, 0.46, 0.45, 0.94]
               }}
             >
-              Finding Restaurants
+              {currentPhrase}
             </motion.p>
           </div>
           
@@ -650,6 +739,38 @@ export default function DiscoverPage() {
               
               <motion.button
                 type="button"
+                onClick={toggleVoiceRecording}
+                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
+                style={{
+                  background: isRecording 
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.7), rgba(220, 38, 38, 0.6))'
+                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.6))',
+                  backdropFilter: 'blur(12px)',
+                  border: '0.5px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.05)',
+                }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                animate={isRecording ? {
+                  boxShadow: [
+                    'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(239, 68, 68, 0.3)',
+                    'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 16px rgba(239, 68, 68, 0.6)',
+                  ]
+                } : {}}
+                transition={isRecording ? { duration: 1.5, repeat: Infinity } : {}}
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                {isRecording ? (
+                  <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                    <Mic className="w-4 h-4 text-white" />
+                  </motion.div>
+                ) : (
+                  <Mic className="w-4 h-4 text-[hsl(var(--foreground))]" />
+                )}
+              </motion.button>
+              
+              <motion.button
+                type="submit"
                 className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden"
                 style={{
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
@@ -661,7 +782,7 @@ export default function DiscoverPage() {
                 whileTap={{ scale: 0.95 }}
               >
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
-                <Mic className="w-4 h-4 text-white" />
+                <Send className="w-4 h-4 text-white" />
               </motion.button>
               </div>
           </form>

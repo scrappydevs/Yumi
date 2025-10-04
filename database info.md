@@ -4,10 +4,11 @@ create table public.images (
   image_url text null,
   timestamp timestamp with time zone null,
   geolocation text null,
+  dish text null,
+  cuisine text null,
   constraint photos_pkey primary key (id)
 ) TABLESPACE pg_default;
 
-description is about contents about image, food, cuisine, etc.
 
 create table public.profiles (
   id uuid not null,
@@ -32,10 +33,32 @@ create table public.reviews (
   description text null,
   uid uuid null,
   overall_rating smallint null,
-  restaraunt_name text null,
+  restaurant_name text null,
   constraint reviews_pkey primary key (id),
   constraint reviews_image_id_fkey foreign KEY (image_id) references images (id),
   constraint reviews_uid_fkey foreign KEY (uid) references auth.users (id)
 ) TABLESPACE pg_default;
 
-description is from user, (review about the food). 
+description is from user (review about the food).
+restaurant_name is where the food was from (AI-suggested, user can override).
+
+create table public.restaurants (
+  id uuid not null default gen_random_uuid (),
+  place_id text not null,
+  name text not null,
+  formatted_address text not null,
+  phone_number text null,
+  website text null,
+  google_maps_url text null,
+  location geography not null,
+  price_level smallint null,
+  rating_avg numeric(3, 2) null,
+  user_ratings_total integer not null default 0,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint restaurants_pkey primary key (id),
+  constraint restaurants_place_id_key unique (place_id)
+) TABLESPACE pg_default;
+
+create index IF not exists restaurants_location_gix on public.restaurants using gist (location) TABLESPACE pg_default;
+create index IF not exists restaurants_name_trgm_idx on public.restaurants using gin (name gin_trgm_ops) TABLESPACE pg_default;
