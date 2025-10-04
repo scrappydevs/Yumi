@@ -15,6 +15,8 @@ import {
   Mic,
   Volume2,
   VolumeX,
+  Locate,
+  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
@@ -22,6 +24,7 @@ import { MetallicSphereComponent } from '@/components/metallic-sphere';
 import { MentionInput } from '@/components/ui/mention-input';
 import { Mention } from '@/hooks/use-friend-mentions';
 import { useSimpleTTS } from '@/hooks/use-simple-tts';
+import { useGeolocation } from '@/hooks/use-geolocation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 
@@ -186,6 +189,7 @@ export default function DiscoverPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
 
   // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
   const loadingPhrases = useMemo(() => [
@@ -205,6 +209,7 @@ export default function DiscoverPage() {
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const [volume, setVolume] = useState(0.8); // 80% default volume
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
+  const { coords: detectedCoords, isLoading: isDetectingLocation, error: locationError, getCurrentLocation } = useGeolocation(false); // Don't auto-fetch - only on user action
   const { user } = useAuth();
   
   // Derived state: is this a group search?
@@ -217,6 +222,29 @@ export default function DiscoverPage() {
     }
   }, [volume, setAudioVolume]);
 
+  // Update userCoords when geolocation hook detects location
+  useEffect(() => {
+    if (detectedCoords) {
+      setUserCoords(detectedCoords);
+      setIsUsingCurrentLocation(true);
+      
+      // Auto-detect closest city
+      const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
+        const distance = Math.sqrt(
+          Math.pow(detectedCoords.lat - cityCoords.lat, 2) + 
+          Math.pow(detectedCoords.lng - cityCoords.lng, 2)
+        );
+        return { city, distance };
+      });
+      
+      const closest = distances.sort((a, b) => a.distance - b.distance)[0];
+      if (closest) {
+        console.log(`🎯 Closest city to current location: ${closest.city}`);
+        setLocation(closest.city);
+      }
+    }
+  }, [detectedCoords]);
+
   useEffect(() => {
     setMounted(true);
     
@@ -225,38 +253,6 @@ export default function DiscoverPage() {
       const speed = isThinking ? 1.2 : (showingResults ? 0.6 : 0.8);  // Slightly faster during thinking, but smooth
       setRotation((prev) => (prev + speed) % 360);
     }, 50);
-    
-    // Get user's actual geolocation
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserCoords(coords);
-          console.log(`📍 Detected location: ${coords.lat}, ${coords.lng}`);
-          
-          // Auto-detect closest city
-          const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
-            const distance = Math.sqrt(
-              Math.pow(coords.lat - cityCoords.lat, 2) + 
-              Math.pow(coords.lng - cityCoords.lng, 2)
-            );
-            return { city, distance };
-          });
-          
-          const closest = distances.sort((a, b) => a.distance - b.distance)[0];
-          if (closest) {
-            console.log(`🎯 Closest city: ${closest.city}`);
-            setLocation(closest.city);
-          }
-        },
-        (error) => {
-          console.warn('Geolocation error:', error.message);
-        }
-      );
-    }
     
     return () => {
       clearInterval(interval);
@@ -837,8 +833,28 @@ export default function DiscoverPage() {
                   repeat: Infinity,
                   ease: "linear"
                 }}
+                className="relative"
               >
-                <Navigation className="w-3.5 h-3.5 text-[hsl(var(--primary))]" />
+                {isUsingCurrentLocation ? (
+                  <Locate className="w-3.5 h-3.5 text-green-600" />
+                ) : (
+                  <Navigation className="w-3.5 h-3.5 text-[hsl(var(--primary))]" />
+                )}
+                {/* Green pulse indicator for current location */}
+                {isUsingCurrentLocation && (
+                  <motion.div
+                    className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full"
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [1, 0.7, 1],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                )}
               </motion.div>
               <span className="text-sm font-semibold">{location}</span>
               <ChevronDown className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
@@ -854,23 +870,88 @@ export default function DiscoverPage() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: dropdownPositionAbove ? 10 : -10, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                style={{ width: '110px' }}
+                style={{ width: '200px' }}
               >
                 {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                 
                 <div className="relative py-2">
+                  {/* Use Current Location Button */}
+                  <div className="border-b border-gray-200/30 mb-1">
+                    <motion.button
+                      className="w-full px-3 py-2.5 text-left text-xs font-semibold hover:bg-white/40 transition-colors flex items-center gap-2"
+                      onClick={async () => {
+                        try {
+                          const coords = await getCurrentLocation();
+                          setUserCoords(coords);
+                          setIsUsingCurrentLocation(true);
+                          
+                          // Auto-detect closest city
+                          const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
+                            const distance = Math.sqrt(
+                              Math.pow(coords.lat - cityCoords.lat, 2) + 
+                              Math.pow(coords.lng - cityCoords.lng, 2)
+                            );
+                            return { city, distance };
+                          });
+                          
+                          const closest = distances.sort((a, b) => a.distance - b.distance)[0];
+                          if (closest) {
+                            setLocation(closest.city);
+                          }
+                          
+                          setShowLocationPicker(false);
+                        } catch (error) {
+                          console.error('Failed to get location:', error);
+                        }
+                      }}
+                      whileHover={{ x: 2 }}
+                      disabled={isDetectingLocation}
+                      style={{
+                        background: isUsingCurrentLocation 
+                          ? 'linear-gradient(90deg, rgba(34, 197, 94, 0.15), transparent)' 
+                          : 'transparent',
+                      }}
+                    >
+                      {isDetectingLocation ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                      ) : (
+                        <Locate className="w-3.5 h-3.5 text-purple-600" />
+                      )}
+                      <span className={isUsingCurrentLocation ? 'text-green-700' : ''}>
+                        {isDetectingLocation ? 'Locating...' : 'Use Current Location'}
+                      </span>
+                    </motion.button>
+                    {!isUsingCurrentLocation && !isDetectingLocation && (
+                      <div className="px-3 pb-2 text-[9px] text-gray-500 leading-tight">
+                        We'll ask for location permission
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Error message if location detection failed */}
+                  {locationError && (
+                    <div className="px-3 py-2 text-[10px] text-red-600 bg-red-50/50 mb-1">
+                      {locationError}
+                    </div>
+                  )}
+                  
+                  {/* City list */}
                   {['Boston', 'New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
                     <motion.button
                       key={loc}
-                      className="w-full px-2 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
+                      className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
                       onClick={() => {
                         setLocation(loc);
+                        setUserCoords(CITY_COORDINATES[loc]);
+                        setIsUsingCurrentLocation(false);
                         setShowLocationPicker(false);
                       }}
                       whileHover={{ x: 2 }}
                       style={{
-                        background: location === loc ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' : 'transparent',
+                        background: location === loc && !isUsingCurrentLocation
+                          ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' 
+                          : 'transparent',
                       }}
                     >
                       {loc}
