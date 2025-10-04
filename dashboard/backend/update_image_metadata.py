@@ -4,8 +4,10 @@ Script to analyze images and populate missing dish/cuisine metadata using Gemini
 This script:
 1. Fetches all images from the database that are missing dish or cuisine
 2. Downloads each image from its URL
-3. Uses Gemini Flash to analyze the image and extract dish/cuisine
+3. Uses Gemini 2.5 Flash Lite to analyze the image and extract dish/cuisine
 4. Updates the database with the new metadata
+
+Model: gemini-2.5-flash-lite - optimized for speed and cost efficiency
 """
 from services.gemini_service import GeminiService, get_gemini_service
 import os
@@ -101,9 +103,11 @@ class ImageMetadataUpdater:
                 "SUPABASE_SERVICE_KEY or NEXT_PUBLIC_SUPABASE_SERVICE_KEY environment variable must be set")
 
         self.client: Client = create_client(supabase_url, supabase_key)
-        self.gemini_service = get_gemini_service()
+        # Use Gemini 2.5 Flash Lite - faster and cheaper for simple classification
+        self.gemini_service = get_gemini_service(
+            model_name='gemini-2.5-flash-lite')
 
-        logger.info("✅ Initialized ImageMetadataUpdater")
+        logger.info("✅ Initialized ImageMetadataUpdater with Gemini Lite")
 
     def get_images_missing_metadata(self) -> List[Dict]:
         """
@@ -167,12 +171,23 @@ class ImageMetadataUpdater:
 
             image = Image.open(io.BytesIO(image_bytes))
 
-            # Quick check: is this food?
-            food_check_prompt = """Is this image showing food or a meal? 
-            
+            # Quick check: is this actual food (not just text/names)?
+            food_check_prompt = """Is this image showing ACTUAL FOOD that can be labeled?
+
+IMPORTANT CRITERIA:
+- Must show the ACTUAL FOOD/DISH itself (not just a menu, sign, or text with food names)
+- The food must be VISIBLE and clearly identifiable
+- The image should be CENTERED on an actual dish, plate, or food item
+- Must be a photo of real food (not illustrations, drawings, or text descriptions)
+
 Answer with ONLY one word:
-- YES if this is food, a meal, a dish, a drink, or any edible item
-- NO if this is not food (e.g., a person, place, object, scenery, etc.)
+- YES if this shows actual, visible food centered in the image
+- NO if this is:
+  * Just a menu or food names/text
+  * A person, place, or object without food
+  * A restaurant exterior/interior without visible food
+  * A sign or advertisement (even if food-related)
+  * Any image where actual food is NOT the main subject
 
 Answer:"""
 
@@ -288,7 +303,7 @@ Answer:"""
         logger.info(f"Downloaded {len(image_bytes)} bytes")
 
         # Analyze with Gemini
-        logger.info("Analyzing with Gemini Flash...")
+        logger.info("Analyzing with Gemini 2.5 Flash Lite...")
         analysis = self.analyze_image(image_bytes)
 
         if not analysis:
