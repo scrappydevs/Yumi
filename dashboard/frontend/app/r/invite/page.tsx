@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { format } from 'date-fns'
 import { Calendar, Users, MapPin, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export default function InvitePage() {
+function InvitePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const supabase = createClient()
@@ -311,6 +311,23 @@ export default function InvitePage() {
         </div>
       </Card>
     </div>
+  )
+}
+
+export default function InvitePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="p-6 max-w-md w-full">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin mx-auto text-gray-400" />
+            <p className="mt-4 text-gray-600">Loading invitation...</p>
+          </div>
+        </Card>
+      </div>
+    }>
+      <InvitePageContent />
+    </Suspense>
   )
 }
 
