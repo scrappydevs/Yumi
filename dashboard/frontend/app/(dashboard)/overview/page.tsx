@@ -191,6 +191,7 @@ const SAMPLE_RESTAURANTS = [
 
 // City coordinates mapping
 const CITY_COORDINATES: { [key: string]: { lat: number; lng: number } } = {
+  'Boston': { lat: 42.3601, lng: -71.0589 },
   'New York City': { lat: 40.7580, lng: -73.9855 },
   'San Francisco': { lat: 37.7749, lng: -122.4194 },
   'Los Angeles': { lat: 34.0522, lng: -118.2437 },
@@ -215,7 +216,7 @@ export default function DiscoverPage() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const [location, setLocation] = useState('New York City');
+  const [location, setLocation] = useState('Boston');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -349,7 +350,7 @@ export default function DiscoverPage() {
     
     try {
       // Get coordinates for selected location
-      const coords = CITY_COORDINATES[location] || CITY_COORDINATES['New York City'];
+      const coords = CITY_COORDINATES[location] || CITY_COORDINATES['Boston'];
       
       // Get auth session for JWT token
       const supabase = createClient();
