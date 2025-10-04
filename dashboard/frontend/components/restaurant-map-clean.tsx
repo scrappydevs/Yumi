@@ -79,15 +79,22 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   const markersRef = useRef<any[]>([]);
   const [preloadedRestaurants, setPreloadedRestaurants] = useState<PreloadedRestaurant[]>([]);
   const [averageDistances, setAverageDistances] = useState<{ walking: string; driving: string } | null>(null);
+  const [routeList, setRouteList] = useState<PreloadedRestaurant[]>([]);
+  const [showRouteSidebar, setShowRouteSidebar] = useState(false);
+  const [routeDirections, setRouteDirections] = useState<any>(null);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // Load preloaded restaurants from sessionStorage (if redirected from overview)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('view') === 'results') {
+    const viewParam = urlParams.get('view');
+    
+    if (viewParam === 'results' || viewParam === 'route') {
       const restaurantsData = sessionStorage.getItem('selectedRestaurants');
       const userLocationData = sessionStorage.getItem('userLocation');
+      const showAsRoute = sessionStorage.getItem('showAsRoute') === 'true';
       
       if (restaurantsData) {
         try {
@@ -95,8 +102,16 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           console.log('📍 Loaded preselected restaurants:', restaurants);
           setPreloadedRestaurants(restaurants);
           
+          // If this is a route view, initialize route list and show sidebar
+          if (showAsRoute && viewParam === 'route') {
+            console.log('🗺️ Initializing route mode with', restaurants.length, 'restaurants');
+            setRouteList(restaurants);
+            setShowRouteSidebar(true);
+          }
+          
           // Clear sessionStorage after loading
           sessionStorage.removeItem('selectedRestaurants');
+          sessionStorage.removeItem('showAsRoute');
         } catch (error) {
           console.error('Error parsing restaurant data:', error);
         }
@@ -142,7 +157,10 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       disableDefaultUI: true,
       zoomControl: true,
       rotateControl: true,
-      gestureHandling: 'greedy',
+      gestureHandling: 'greedy', // Allows smooth scrolling without Ctrl/Cmd key
+      scrollwheel: true, // Enable scroll zoom
+      clickableIcons: false, // Disable default POI clicks for better performance
+      isFractionalZoomEnabled: true, // Smoother zoom transitions
     });
 
     setMap(newMap);
@@ -617,6 +635,64 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   }, [placesService, map, searchQuery]);
 
   // Change map type
+  // Calculate route with Google Maps Directions API
+  const calculateRoute = useCallback(async () => {
+    if (!map || !userLocation || routeList.length === 0) return;
+    
+    setIsCalculatingRoute(true);
+    
+    try {
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      // Create waypoints from route list
+      const waypoints = routeList.map(restaurant => ({
+        location: new window.google.maps.LatLng(restaurant.latitude!, restaurant.longitude!),
+        stopover: true,
+      }));
+      
+      // Request directions
+      const request: google.maps.DirectionsRequest = {
+        origin: new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
+        destination: waypoints[waypoints.length - 1].location,
+        waypoints: waypoints.slice(0, -1),
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: true, // Optimize the route order
+      };
+      
+      directionsService.route(request, (result, status) => {
+        if (status === 'OK' && result) {
+          console.log('🗺️ Route calculated successfully');
+          setRouteDirections(result);
+          
+          // Display route on map
+          const directionsRenderer = new window.google.maps.DirectionsRenderer({
+            map,
+            directions: result,
+            suppressMarkers: false, // Show default markers
+            polylineOptions: {
+              strokeColor: '#9B87F5',
+              strokeWeight: 5,
+              strokeOpacity: 0.8,
+            },
+          });
+        } else {
+          console.error('❌ Directions request failed:', status);
+        }
+        setIsCalculatingRoute(false);
+      });
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      setIsCalculatingRoute(false);
+    }
+  }, [map, userLocation, routeList]);
+  
+  // Calculate route when route list changes
+  useEffect(() => {
+    if (routeList.length > 0 && map && userLocation) {
+      calculateRoute();
+    }
+  }, [routeList, map, userLocation, calculateRoute]);
+
   const changeMapType = useCallback((type: '3d' | 'roadmap' | 'satellite') => {
     if (!map) return;
     
@@ -670,7 +746,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   if (!apiLoaded) {
     return (
       <div className={className}>
-        <div className="h-[calc(100vh-80px)] flex items-center justify-center bg-white">
+        <div className="h-full flex items-center justify-center bg-white">
           <div className="text-center">
             <motion.div 
               className="w-12 h-12 rounded-full bg-purple-600 mx-auto mb-4"
@@ -686,15 +762,185 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
   return (
     <div className={className}>
-      <div className="relative h-[calc(100vh-80px)] overflow-hidden">
+      <div className="relative h-full overflow-hidden">
         {/* Map Container */}
         <div className="absolute inset-0">
-          <div ref={mapRef} className="absolute inset-0" />
+          <div 
+            ref={mapRef} 
+            className="absolute inset-0" 
+            style={{ 
+              touchAction: 'pan-x pan-y',
+              willChange: 'transform',
+            }} 
+          />
         </div>
+
+        {/* Route Sidebar - Collapsible Left Panel */}
+        <AnimatePresence>
+          {showRouteSidebar && routeList.length > 0 && (
+            <motion.div
+              initial={{ x: -400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -400, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="absolute left-0 top-0 bottom-0 w-96 z-30 pointer-events-none"
+            >
+              <div className="h-full flex flex-col pointer-events-auto">
+                {/* Glass background */}
+                <div className="h-full bg-white/95 backdrop-blur-md shadow-2xl border-r border-gray-200 flex flex-col">
+                  {/* Header */}
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-purple-600" />
+                      <h3 className="font-bold text-lg">Your Route</h3>
+                      <Badge variant="secondary">{routeList.length}</Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowRouteSidebar(false)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Route Summary */}
+                  {routeDirections && (
+                    <div className="p-4 bg-purple-50 border-b border-purple-100">
+                      <div className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="text-gray-600">Total Distance:</span>
+                          <span className="ml-2 font-semibold">{routeDirections.routes[0].legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0) / 1000} km</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Total Time:</span>
+                          <span className="ml-2 font-semibold">{Math.ceil(routeDirections.routes[0].legs.reduce((sum: number, leg: any) => sum + leg.duration.value, 0) / 60)} min</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Route List */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {isCalculatingRoute ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+                        <span className="ml-2 text-sm text-gray-600">Calculating route...</span>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Starting Point */}
+                        <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
+                            Start
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold">Your Location</p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Getting location...'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Route Stops */}
+                        {routeList.map((restaurant, index) => {
+                          const leg = routeDirections?.routes[0]?.legs[index];
+                          return (
+                            <div key={restaurant.place_id} className="relative">
+                              {/* Connecting Line */}
+                              {index < routeList.length && (
+                                <div className="absolute left-4 top-10 bottom-[-12px] w-0.5 bg-gradient-to-b from-purple-300 to-purple-200" />
+                              )}
+                              
+                              <div className="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative">
+                                <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm z-10">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold truncate">{restaurant.name}</p>
+                                  {restaurant.rating && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                      <span className="text-xs text-gray-600">{restaurant.rating}</span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Travel info */}
+                                  {leg && (
+                                    <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+                                      <div className="flex items-center gap-3 text-xs">
+                                        <div className="flex items-center gap-1">
+                                          <Navigation className="w-3 h-3 text-gray-500" />
+                                          <span className="text-gray-700">{leg.distance.text}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <Clock className="w-3 h-3 text-gray-500" />
+                                          <span className="text-gray-700">{leg.duration.text}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Remove button */}
+                                <button
+                                  onClick={() => {
+                                    const newRouteList = routeList.filter(r => r.place_id !== restaurant.place_id);
+                                    setRouteList(newRouteList);
+                                  }}
+                                  className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors"
+                                >
+                                  <X className="w-4 h-4 text-gray-400 hover:text-red-600" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Footer Actions */}
+                  {routeList.length > 0 && (
+                    <div className="p-4 border-t border-gray-200 space-y-2">
+                      <Button
+                        onClick={() => {
+                          // Clear route
+                          setRouteList([]);
+                          setRouteDirections(null);
+                        }}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        Clear Route
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Toggle Route Sidebar Button - Only show if route exists but sidebar hidden */}
+        {routeList.length > 0 && !showRouteSidebar && (
+          <motion.button
+            initial={{ x: -50, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            onClick={() => setShowRouteSidebar(true)}
+            className="absolute left-4 top-4 z-20 bg-white rounded-full shadow-lg p-3 hover:shadow-xl transition-shadow border border-gray-200"
+          >
+            <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-purple-600" />
+              <span className="text-sm font-semibold">{routeList.length} stops</span>
+            </div>
+          </motion.button>
+        )}
 
         {/* Average Distance Info - Top Left */}
         <AnimatePresence>
-          {averageDistances && (
+          {averageDistances && !showRouteSidebar && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}

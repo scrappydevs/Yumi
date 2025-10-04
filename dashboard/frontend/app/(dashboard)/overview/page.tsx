@@ -451,6 +451,18 @@ export default function DiscoverPage() {
     // Note: The rotating phrases with voice are handled by the useEffect hook
     // No need to speak here to avoid voice overlap
     
+    // Set up 30-second timeout
+    const timeoutId = setTimeout(() => {
+      const timeoutText = 'No results found';
+      setCurrentPhrase(timeoutText);
+      setSearchError(timeoutText);
+      setIsThinking(false);
+      setShowingResults(false);
+      if (!isMuted) {
+        speak(timeoutText);
+      }
+    }, 30000); // 30 seconds
+    
     try {
       // Get coordinates - use actual user location if available, otherwise use selected city
       const coords = userCoords || CITY_COORDINATES[location] || CITY_COORDINATES['Boston'];
@@ -693,22 +705,35 @@ export default function DiscoverPage() {
           // Use the processed restaurants (with fallback images)
           setSearchResults(restaurantsWithIds.slice(0, finalCount));
           
-          // Speak result if not muted
+          // Speak result if not muted - ensure TTS matches displayed text
           if (!isMuted) {
             await speak(step3Text);
           }
         } else {
           // No recommendations from LLM
-          setSearchError('No restaurants found. Try a different query or location.');
+          const noResultsText = 'No restaurants found. Try a different query or location.';
+          setSearchError(noResultsText);
+          setCurrentPhrase(noResultsText);
           setIsThinking(false);
           setShowingResults(false);
+          if (!isMuted) {
+            await speak(noResultsText);
+          }
         }
       }
       
+      // Clear timeout on successful completion
+      clearTimeout(timeoutId);
+      
     } catch (error) {
       console.error('Search error:', error);
-      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
+      const errorText = error instanceof Error ? error.message : 'Failed to search restaurants';
+      setSearchError(errorText);
+      setCurrentPhrase('Sorry, something went wrong');
       setIsThinking(false);
+      
+      // Clear timeout on error
+      clearTimeout(timeoutId);
       
       if (!isMuted) {
         await speak('Sorry, something went wrong');
@@ -1710,14 +1735,15 @@ export default function DiscoverPage() {
                         match_score: r.match_score
                       }));
                       
-                      // Store data in sessionStorage
+                      // Store data in sessionStorage with route flag
                       sessionStorage.setItem('selectedRestaurants', JSON.stringify(restaurantData));
+                      sessionStorage.setItem('showAsRoute', 'true'); // Flag to show as route
                       if (userCoords) {
                         sessionStorage.setItem('userLocation', JSON.stringify(userCoords));
                       }
                       
                       // Navigate to spatial page
-                      window.location.href = '/spatial?view=results';
+                      window.location.href = '/spatial?view=route';
                     }}
                     initial={{ opacity: 0, scale: 0.8, width: 36 }}
                     animate={{ opacity: 1, scale: 1, width: 'auto' }}
@@ -1735,7 +1761,7 @@ export default function DiscoverPage() {
                   >
                     <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
                     <MapPin className="w-4 h-4 text-white" />
-                    <span className="text-sm font-semibold text-white">View on Map</span>
+                    <span className="text-sm font-semibold text-white">Plan Route</span>
                   </motion.button>
                 )}
               </AnimatePresence>
