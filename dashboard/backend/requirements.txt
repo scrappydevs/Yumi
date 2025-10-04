@@ -5,15 +5,13 @@ gunicorn==23.0.0
 python-dotenv==1.0.1
 supabase==2.9.0
 pydantic==2.9.2
-google-generativeai
+google-generativeai==0.8.3
 google-genai==0.2.2
 Pillow==11.0.0
 elevenlabs==2.16.0
-openai-whisper==20231117
 requests==2.32.3
 anthropic==0.39.0
 pyjwt==2.8.0
 twilio==9.3.7
 ics==0.7.2
 python-dateutil==2.9.0
-setuptools>=65.5.1
