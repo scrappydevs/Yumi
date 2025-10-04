@@ -226,6 +226,45 @@ async def stt_transcribe(request: STTRequest):
             status_code=500, detail=f"STT transcription failed: {str(e)}")
 
 
+@router.post("/stt/transcribe-chunk", response_model=STTResponse)
+async def stt_transcribe_chunk(request: STTRequest):
+    """
+    Transcribe a small audio chunk for streaming transcription
+
+    This endpoint is optimized for processing small audio chunks in real-time.
+    Use this for live transcription where audio is sent in chunks as it's recorded.
+
+    - **audio_b64**: Base64-encoded audio chunk
+    - **audio_format**: Audio format (mp3, wav, m4a, webm, etc.)
+    - **language**: Optional language code for better accuracy
+    - **task**: "transcribe" (maintain language) or "translate" (to English)
+
+    Returns: Partial transcription for the chunk
+
+    Example:
+    ```json
+    {
+      "audio_b64": "base64_audio_chunk...",
+      "audio_format": "webm",
+      "language": "en",
+      "task": "transcribe"
+    }
+    ```
+    """
+    try:
+        audio_service = get_audio_service()
+        result = audio_service.speech_to_text_from_base64(
+            audio_b64=request.audio_b64,
+            audio_format=request.audio_format,
+            language=request.language,
+            task=request.task
+        )
+        return STTResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Chunk transcription failed: {str(e)}")
+
+
 @router.post("/stt/transcribe-file")
 async def stt_transcribe_file(
     file: UploadFile = File(...),
