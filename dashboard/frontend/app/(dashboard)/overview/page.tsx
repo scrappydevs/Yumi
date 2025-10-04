@@ -255,6 +255,22 @@ export default function DiscoverPage() {
     };
   }, [isThinking]);
 
+  // Rotate phrases while thinking/loading
+  useEffect(() => {
+    if (!isThinking) {
+      setCurrentPhrase(loadingPhrases[0]); // Reset to first phrase
+      return;
+    }
+
+    let phraseIndex = 0;
+    const interval = setInterval(() => {
+      phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+      setCurrentPhrase(loadingPhrases[phraseIndex]);
+    }, 3000); // Change phrase every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [isThinking, loadingPhrases]);
+
   useEffect(() => {
     if (isThinking) {
       setExpandedOnce(true);
