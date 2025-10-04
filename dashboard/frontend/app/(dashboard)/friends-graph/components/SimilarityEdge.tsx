@@ -61,26 +61,32 @@ function SimilarityEdge({
 
   return (
     <>
-      {/* Invisible wide path for easier hovering */}
+      {/* Visible edge with hover detection */}
       <path
-        id={`${id}-hitbox`}
+        d={edgePath}
+        fill="none"
+        stroke={edgeColor}
+        strokeWidth={isHovered ? 3 : strokeWidth}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          cursor: 'pointer',
+          transition: 'all 0.2s ease-in-out',
+          pointerEvents: 'stroke',
+        }}
+      />
+      
+      {/* Invisible wide hitbox for easier hovering */}
+      <path
         d={edgePath}
         fill="none"
         stroke="transparent"
         strokeWidth={20}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{ cursor: 'pointer' }}
-      />
-
-      {/* Visible edge - like auctor-1's BaseEdge */}
-      <BaseEdge
-        id={id}
-        path={edgePath}
         style={{
-          stroke: edgeColor,
-          strokeWidth: isHovered ? 3 : strokeWidth,
-          transition: 'all 0.2s ease-in-out',
+          cursor: 'pointer',
+          pointerEvents: 'stroke',
         }}
       />
 
