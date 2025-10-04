@@ -13,13 +13,10 @@ import {
   ChevronDown,
   MessageSquare,
   Mic,
-  Volume2,
-  VolumeX,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
-import { useVoiceOutput } from '@/hooks/use-voice-output';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -194,11 +191,6 @@ export default function DiscoverPage() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [expandedOnce, setExpandedOnce] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recognition, setRecognition] = useState<any>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
-  const { speak, isSpeaking, stop } = useVoiceOutput();
 
   useEffect(() => {
     setMounted(true);
@@ -219,74 +211,10 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
-  // Initialize Web Speech API
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SpeechRecognition) return;
-    
-    const recognitionInstance = new SpeechRecognition();
-    recognitionInstance.continuous = true;
-    recognitionInstance.interimResults = true;
-    recognitionInstance.lang = 'en-US';
-    
-    recognitionInstance.onresult = (event: any) => {
-      let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setPrompt(transcript);
-    };
-    
-    recognitionInstance.onerror = () => setIsRecording(false);
-    recognitionInstance.onend = () => setIsRecording(false);
-    
-    setRecognition(recognitionInstance);
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
-    
-    setIsThinking(true);
-    
-    const thinkingPhrases = [
-      "Finding restaurants",
-      "Hang on tight",
-      "Looking for the perfect spot",
-      "Searching nearby",
-      "Let me check what's available",
-      "One moment please",
-      "Analyzing your options",
-    ];
-    
-    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
-    setCurrentPhrase(randomPhrase);
-    
-    if (!isMuted) {
-      await speak(randomPhrase);
-    }
-    
-    setTimeout(() => {
-      setIsThinking(false);
-    }, 2000);
-  };
-
-  const toggleVoiceRecording = () => {
-    if (!recognition) return;
-    if (isRecording) {
-      recognition.stop();
-      setIsRecording(false);
-    } else {
-      setPrompt('');
-      try {
-        recognition.start();
-        setIsRecording(true);
-      } catch (error) {
-        console.error('Failed to start recognition:', error);
-      }
-    }
+    console.log('Prompt:', prompt);
+    // TODO: Implement natural language search
   };
 
   if (!mounted) {
@@ -300,8 +228,8 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
       
-      {/* Test Button & Mute - Top Left */}
-      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
+      {/* Test Button - Top Left */}
+      <div className="absolute top-6 left-6 z-10">
         <motion.button
           onClick={() => setIsThinking(!isThinking)}
           className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
@@ -313,23 +241,6 @@ export default function DiscoverPage() {
           <span className="text-xs font-medium">
             {isThinking ? 'Thinking...' : 'Test AI'}
           </span>
-        </motion.button>
-
-        <motion.button
-          onClick={() => {
-            setIsMuted(!isMuted);
-            if (!isMuted && isSpeaking) stop();
-          }}
-          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          {isMuted ? (
-            <VolumeX className="w-5 h-5 text-red-500" />
-          ) : (
-            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
-          )}
         </motion.button>
       </div>
 
@@ -430,12 +341,12 @@ export default function DiscoverPage() {
               zIndex: isThinking ? 10 : -1,
             }}
           >
-            {/* Apple-style pink and blue glow effect */}
+            {/* Vibrant purple-blue glow effect */}
             <motion.div
               className="absolute inset-0 rounded-full pointer-events-none"
               animate={{
-                scale: isThinking ? [1, 1.3, 1] : 1,
-                opacity: isThinking ? [0.4, 0.6, 0.4] : 0,
+                scale: isThinking ? [1, 1.4, 1] : 1,
+                opacity: isThinking ? [0.6, 0.8, 0.6] : 0,
                 rotate: isThinking ? [0, 180, 360] : 0,
               }}
               transition={{
@@ -444,17 +355,17 @@ export default function DiscoverPage() {
                 ease: "easeInOut"
               }}
               style={{
-                background: 'radial-gradient(circle at 30% 40%, rgba(255, 107, 157, 0.5), rgba(0, 122, 255, 0.4), transparent 70%)',
-                filter: 'blur(60px)',
+                background: 'radial-gradient(circle at 30% 40%, rgba(139, 92, 246, 0.7), rgba(59, 130, 246, 0.6), transparent 70%)',
+                filter: 'blur(80px)',
               }}
             />
             
-            {/* Secondary glow - blue to pink */}
+            {/* Secondary glow - blue to purple */}
             <motion.div
               className="absolute inset-0 rounded-full pointer-events-none"
               animate={{
-                scale: isThinking ? [1.1, 1.4, 1.1] : 1,
-                opacity: isThinking ? [0.3, 0.5, 0.3] : 0,
+                scale: isThinking ? [1.2, 1.5, 1.2] : 1,
+                opacity: isThinking ? [0.5, 0.7, 0.5] : 0,
                 rotate: isThinking ? [360, 180, 0] : 0,
               }}
               transition={{
@@ -464,8 +375,27 @@ export default function DiscoverPage() {
                 delay: 0.5
               }}
               style={{
-                background: 'radial-gradient(circle at 70% 60%, rgba(90, 200, 250, 0.4), rgba(255, 55, 95, 0.3), transparent 70%)',
-                filter: 'blur(70px)',
+                background: 'radial-gradient(circle at 70% 60%, rgba(96, 165, 250, 0.6), rgba(167, 139, 250, 0.5), transparent 70%)',
+                filter: 'blur(90px)',
+              }}
+            />
+            
+            {/* Inner glow - directly behind blob */}
+            <motion.div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              animate={{
+                scale: isThinking ? [0.9, 1.1, 0.9] : 1,
+                opacity: isThinking ? [0.8, 1, 0.8] : 0,
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.2
+              }}
+              style={{
+                background: 'radial-gradient(circle at center, rgba(196, 181, 253, 0.8), rgba(147, 197, 253, 0.7), transparent 60%)',
+                filter: 'blur(40px)',
               }}
             />
             
@@ -485,7 +415,7 @@ export default function DiscoverPage() {
                 ease: [0.25, 0.46, 0.45, 0.94]
               }}
             >
-              {currentPhrase}
+              Finding Restaurants
             </motion.p>
           </div>
           
@@ -498,21 +428,59 @@ export default function DiscoverPage() {
               zIndex: 5,
             }}
           >
-            {/* Subtle glow */}
+            {/* Primary glow - purple */}
             <motion.div
               className="absolute inset-0 rounded-full"
               animate={{
-                opacity: [0.15, 0.25, 0.15],
-                scale: [1, 1.1, 1],
+                opacity: [0.4, 0.6, 0.4],
+                scale: [1, 1.3, 1],
               }}
               transition={{
-                duration: 3,
+                duration: 4,
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
               style={{
-                background: 'radial-gradient(circle at center, rgba(200, 200, 220, 0.2), transparent 70%)',
-                filter: 'blur(20px)',
+                background: 'radial-gradient(circle at center, rgba(167, 139, 250, 0.5), rgba(139, 92, 246, 0.4), transparent 70%)',
+                filter: 'blur(50px)',
+              }}
+            />
+            
+            {/* Secondary glow - blue */}
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              animate={{
+                opacity: [0.3, 0.5, 0.3],
+                scale: [1.1, 1.4, 1.1],
+              }}
+              transition={{
+                duration: 5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.5
+              }}
+              style={{
+                background: 'radial-gradient(circle at center, rgba(96, 165, 250, 0.4), rgba(59, 130, 246, 0.3), transparent 70%)',
+                filter: 'blur(60px)',
+              }}
+            />
+            
+            {/* Inner glow - directly behind sphere */}
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              animate={{
+                opacity: [0.5, 0.7, 0.5],
+                scale: [0.8, 1, 0.8],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.2
+              }}
+              style={{
+                background: 'radial-gradient(circle at center, rgba(196, 181, 253, 0.6), rgba(147, 197, 253, 0.5), transparent 60%)',
+                filter: 'blur(30px)',
               }}
             />
             
@@ -739,38 +707,6 @@ export default function DiscoverPage() {
               
               <motion.button
                 type="button"
-                onClick={toggleVoiceRecording}
-                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
-                style={{
-                  background: isRecording 
-                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.7), rgba(220, 38, 38, 0.6))'
-                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.6))',
-                  backdropFilter: 'blur(12px)',
-                  border: '0.5px solid rgba(255, 255, 255, 0.3)',
-                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.05)',
-                }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                animate={isRecording ? {
-                  boxShadow: [
-                    'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(239, 68, 68, 0.3)',
-                    'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 16px rgba(239, 68, 68, 0.6)',
-                  ]
-                } : {}}
-                transition={isRecording ? { duration: 1.5, repeat: Infinity } : {}}
-              >
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
-                {isRecording ? (
-                  <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-                    <Mic className="w-4 h-4 text-white" />
-                  </motion.div>
-                ) : (
-                  <Mic className="w-4 h-4 text-[hsl(var(--foreground))]" />
-                )}
-              </motion.button>
-              
-              <motion.button
-                type="submit"
                 className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden"
                 style={{
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
@@ -782,7 +718,7 @@ export default function DiscoverPage() {
                 whileTap={{ scale: 0.95 }}
               >
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
-                <Send className="w-4 h-4 text-white" />
+                <Mic className="w-4 h-4 text-white" />
               </motion.button>
               </div>
           </form>

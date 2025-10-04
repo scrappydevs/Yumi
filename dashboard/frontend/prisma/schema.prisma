@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// EXISTING TABLES (DO NOT MODIFY - Generated from introspection)
+// These are placeholders - will be replaced by `prisma db pull`
+// ============================================================================
+
+// model profiles {
+//   id           String    @id @db.Uuid
+//   username     String    @unique
+//   display_name String
+//   avatar_url   String?
+//   bio          String?
+//   friends      String[]  @db.Uuid
+//   preferences  String?   @default("{}")
+//   created_at   DateTime? @default(now()) @db.Timestamptz(6)
+//   updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+// }
+
+// model restaurants {
+//   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+//   place_id           String?   @unique
+//   name               String
+//   formatted_address  String?
+//   location           Unsupported("geography(Point,4326)")?
+//   created_at         DateTime? @default(now()) @db.Timestamptz(6)
+//   updated_at         DateTime? @default(now()) @db.Timestamptz(6)
+// }
+
+// ============================================================================
+// NEW RESERVATION FEATURE MODELS (ADDITIVE ONLY)
+// ============================================================================
+
+enum ReservationStatus {
+  pending
+  confirmed
+  canceled
+  expired
+}
+
+enum RsvpStatus {
+  pending
+  yes
+  no
+  canceled
+}
+
+model Reservation {
+  id            String            @id @default(uuid()) @db.Uuid
+  organizerId   String            @db.Uuid
+  restaurantId  String            @db.Uuid
+  startsAt      DateTime          @db.Timestamptz(6)
+  partySize     Int
+  status        ReservationStatus @default(pending)
+  holdExpiresAt DateTime          @db.Timestamptz(6)
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime          @updatedAt @db.Timestamptz(6)
+
+  invites       ReservationInvite[]
+  calendarEvent CalendarEvent?
+  messages      OutboundMessage[]
+
+  @@map("reservations")
+}
+
+model ReservationInvite {
+  id               String     @id @default(uuid()) @db.Uuid
+  reservationId    String     @db.Uuid
+  inviteeProfileId String?    @db.Uuid
+  inviteePhoneE164 String
+  rsvpStatus       RsvpStatus @default(pending)
+  respondedAt      DateTime?  @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @db.Timestamptz(6)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+  @@index([inviteePhoneE164])
+  @@map("reservation_invites")
+}
+
+model CalendarEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  reservationId String   @unique @db.Uuid
+  userId        String   @db.Uuid
+  title         String
+  startsAt      DateTime @db.Timestamptz(6)
+  endsAt        DateTime @db.Timestamptz(6)
+  notes         String?
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_events")
+}
+
+model OutboundMessage {
+  id            String   @id @default(uuid()) @db.Uuid
+  reservationId String   @db.Uuid
+  toE164        String
+  messageSid    String?  @unique
+  status        String?
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+  @@map("outbound_messages")
+}
+
+model UsedJti {
+  id     String   @id @default(uuid()) @db.Uuid
+  jti    String   @unique
+  resvId String
+  usedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([jti])
+  @@map("used_jtis")
+}
+

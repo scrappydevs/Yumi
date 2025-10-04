@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { MeshTransmissionMaterial, Environment } from '@react-three/drei';
+import { Environment, MeshTransmissionMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface BlobProps {
@@ -78,21 +78,21 @@ function Blob({ isAnimating }: BlobProps) {
         backsideThickness={0.5}
         samples={10}
         resolution={512}
-        transmission={1}
-        roughness={0}
-        thickness={1.8}
+        transmission={0.85}
+        roughness={0.05}
+        thickness={2.5}
         ior={1.5}
-        chromaticAberration={isAnimating ? 0.2 : 0.06}
-        anisotropy={0.3}
-        distortion={isAnimating ? 0.4 : 0.12}
-        distortionScale={isAnimating ? 0.8 : 0.25}
-        temporalDistortion={isAnimating ? 0.3 : 0.08}
+        chromaticAberration={isAnimating ? 0.25 : 0.08}
+        anisotropy={0.4}
+        distortion={isAnimating ? 0.5 : 0.15}
+        distortionScale={isAnimating ? 1 : 0.3}
+        temporalDistortion={isAnimating ? 0.4 : 0.1}
         clearcoat={1}
         clearcoatRoughness={0}
-        attenuationDistance={1}
-        attenuationColor="#FFE5F5"
-        color="#FFF0FA"
-        envMapIntensity={2.5}
+        attenuationDistance={0.8}
+        attenuationColor="#D4C5F9"
+        color="#E9D5FF"
+        envMapIntensity={3}
         metalness={0}
         reflectivity={1}
       />
@@ -124,26 +124,58 @@ export function LiquidGlassBlob({ isAnimating = false, className = '' }: LiquidG
         frameloop="always"
       >
         <Suspense fallback={null}>
-          {/* Apple-style lighting - pink and blue */}
-          <ambientLight intensity={0.8} color="#FFF5FA" />
+          {/* Bright ambient light */}
+          <ambientLight intensity={1.5} color="#F8FAFC" />
           
-          {/* Key light - soft pink */}
-          <directionalLight position={[5, 5, 5]} intensity={2.5} color="#FF6B9D" />
+          {/* Key light - intense purple */}
+          <directionalLight position={[5, 5, 5]} intensity={5} color="#8B5CF6" />
           
-          {/* Fill light - Apple blue */}
-          <directionalLight position={[-5, -3, -5]} intensity={2} color="#007AFF" />
+          {/* Fill light - intense blue */}
+          <directionalLight position={[-5, -3, -5]} intensity={4.5} color="#3B82F6" />
           
-          {/* Rim light - bright blue accent */}
-          <directionalLight position={[0, 10, -5]} intensity={2} color="#5AC8FA" />
+          {/* Rim light - bright cyan accent */}
+          <directionalLight position={[0, 10, -5]} intensity={4} color="#06B6D4" />
           
-          {/* Accent point lights - pink and blue gradient */}
-          <pointLight position={[4, 2, 4]} intensity={2} color="#FF375F" />
-          <pointLight position={[-4, -2, -4]} intensity={1.8} color="#0A84FF" />
-          <pointLight position={[0, -4, 2]} intensity={1.5} color="#FF9ECD" />
-          <pointLight position={[2, 4, -2]} intensity={1.5} color="#64D2FF" />
+          {/* Accent point lights - vibrant purple and blue gradient */}
+          <pointLight position={[4, 2, 4]} intensity={5} color="#A78BFA" />
+          <pointLight position={[-4, -2, -4]} intensity={4.5} color="#60A5FA" />
+          <pointLight position={[0, -4, 2]} intensity={4} color="#C084FC" />
+          <pointLight position={[2, 4, -2]} intensity={4} color="#38BDF8" />
+          <pointLight position={[-2, 3, 3]} intensity={3.5} color="#DDD6FE" />
+          <pointLight position={[3, -3, -2]} intensity={3.5} color="#BFDBFE" />
           
-          {/* Environment for realistic glass reflections */}
-          <Environment preset="sunset" background={false} />
+          {/* Apple-style white environment with purple-blue gradient hints */}
+          <Environment resolution={256} background={false}>
+            <mesh scale={100}>
+              <sphereGeometry args={[1, 64, 64]} />
+              <meshBasicMaterial side={THREE.BackSide}>
+                <primitive
+                  attach="map"
+                  object={(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 512;
+                    canvas.height = 512;
+                    const ctx = canvas.getContext('2d')!;
+                    
+                    // Create vibrant gradient: purple-blue with high contrast
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+                    gradient.addColorStop(0, '#F5F3FF');    // Light purple top
+                    gradient.addColorStop(0.25, '#DDD6FE'); // Vibrant purple
+                    gradient.addColorStop(0.5, '#C4B5FD');  // Strong purple
+                    gradient.addColorStop(0.75, '#93C5FD'); // Strong blue
+                    gradient.addColorStop(1, '#EFF6FF');    // Light blue bottom
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, 512, 512);
+                    
+                    const texture = new THREE.CanvasTexture(canvas);
+                    texture.needsUpdate = true;
+                    return texture;
+                  })()}
+                />
+              </meshBasicMaterial>
+            </mesh>
+          </Environment>
           
           {/* The Blob */}
           <Blob isAnimating={isAnimating} />
