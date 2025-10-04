@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadGoogleMaps } from '@/lib/google-maps-loader';
+import { trackClick, trackView, trackMapsView } from '@/lib/track-interaction';
 
 declare global {
   interface Window {
@@ -450,6 +451,16 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   // Optimized with fewer fields to reduce API quota usage and latency
   const handleSelectPlace = useCallback((place: PlaceResult) => {
     if (!placesService) return;
+
+    // Track the click interaction
+    trackClick({
+      place_id: place.place_id,
+      name: place.name || 'Unknown',
+      address: place.formatted_address,
+      latitude: place.geometry?.location?.lat(),
+      longitude: place.geometry?.location?.lng(),
+      cuisine: place.types?.[0] || undefined,
+    });
 
     const request: google.maps.places.PlaceDetailsRequest = {
       placeId: place.place_id,
@@ -1447,6 +1458,16 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     <Button
                       className="flex-1 bg-purple-600 text-white hover:bg-purple-700"
                       onClick={() => {
+                        // Track maps view (high intent signal)
+                        trackMapsView({
+                          place_id: selectedPlace.place_id,
+                          name: selectedPlace.name || 'Unknown',
+                          address: selectedPlace.formatted_address,
+                          latitude: selectedPlace.geometry?.location?.lat(),
+                          longitude: selectedPlace.geometry?.location?.lng(),
+                          cuisine: selectedPlace.types?.[0] || undefined,
+                        });
+
                         if (selectedPlace.url) {
                           window.open(selectedPlace.url, '_blank');
                         } else {

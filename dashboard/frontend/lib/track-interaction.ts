@@ -45,7 +45,7 @@ export async function trackInteraction(params: TrackInteractionParams): Promise<
     if (params.longitude !== undefined) formData.append('longitude', params.longitude.toString());
 
     // Fire-and-forget - don't wait for response
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/interactions/track`, {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/track-interaction`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${await getAccessToken()}`,
