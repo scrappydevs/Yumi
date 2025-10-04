@@ -194,7 +194,8 @@ export function useSimpleTTS() {
         return audio;
       } catch (fallbackError) {
         console.error('[TTS] Both streaming and fallback failed:', fallbackError);
-        throw new Error(`TTS failed: ${fallbackError.message}`);
+        const errorMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown error';
+        throw new Error(`TTS failed: ${errorMessage}`);
       }
     }
   };

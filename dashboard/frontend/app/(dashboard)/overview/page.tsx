@@ -498,8 +498,18 @@ export default function DiscoverPage() {
     
     const searchQuery = prompt;  // Save the query before clearing
     const searchMentions = [...mentions];  // Save mentions before clearing
+    const searchMentionedFriends = [...mentionedFriendsData];  // Save mentioned friends to keep them visible
     setPrompt('');  // Clear the input immediately
-    setMentions([]);  // Clear mentions (but keep mentionedFriendsData to show in orbit)
+    setMentions([]);  // Clear mentions from input
+    
+    // Keep mentioned friends visible during search - restore immediately after useEffect clears it
+    // Use setTimeout to restore after the useEffect has run
+    setTimeout(() => {
+      if (searchMentionedFriends.length > 0) {
+        setMentionedFriendsData(searchMentionedFriends);
+      }
+    }, 0);
+    
     setIsThinking(true);
     setShowingResults(false);  // Reset results state
     setIsNarrowing(false);  // Reset narrowing state
@@ -687,7 +697,7 @@ export default function DiscoverPage() {
             setCurrentPhrase(noResultsText);
             setIsThinking(false);
             setShowingResults(false);
-            setMentionedFriendsData([]);  // Clear mentioned friends
+            // Keep mentioned friends visible even when no results
             if (!isMuted) {
               await speak(noResultsText);
             }
@@ -813,8 +823,8 @@ export default function DiscoverPage() {
           // Use the processed restaurants (with fallback images)
           setSearchResults(restaurantsWithIds.slice(0, finalCount));
           
-          // Clear mentioned friends data after results are shown
-          setMentionedFriendsData([]);
+          // Keep mentioned friends visible after results are shown
+          // setMentionedFriendsData([]); // REMOVED - keep friends visible
           
           // Speak result if not muted - ensure TTS matches displayed text
           if (!isMuted) {
@@ -832,7 +842,7 @@ export default function DiscoverPage() {
           setCurrentPhrase(noResultsText);
           setIsThinking(false);
           setShowingResults(false);
-          setMentionedFriendsData([]);  // Clear mentioned friends
+          // Keep mentioned friends visible even when no results
           if (!isMuted) {
             await speak(noResultsText);
           }
@@ -848,7 +858,7 @@ export default function DiscoverPage() {
         setCurrentPhrase(noImagesText);
         setIsThinking(false);
         setShowingResults(false);
-        setMentionedFriendsData([]);
+        // Keep mentioned friends visible even when no images
         if (!isMuted) {
           await speak(noImagesText);
         }
@@ -869,7 +879,7 @@ export default function DiscoverPage() {
       setSearchError(errorText);
       setCurrentPhrase('Sorry, something went wrong');
       setIsThinking(false);
-      setMentionedFriendsData([]);  // Clear mentioned friends on error
+      // Keep mentioned friends visible even on error
       
       // Clear timeout on error
       clearTimeout(timeoutId);
@@ -1220,11 +1230,11 @@ export default function DiscoverPage() {
               zIndex: 5,
             }}
           >
-            {/* Subtle glow */}
+            {/* Subtle purple glow */}
             <motion.div
               className="absolute inset-0 rounded-full"
               animate={{
-                opacity: [0.15, 0.25, 0.15],
+                opacity: [0.5, 0.25, 0.5],
                 scale: [1, 1.1, 1],
               }}
               transition={{
@@ -1233,7 +1243,7 @@ export default function DiscoverPage() {
                 ease: "easeInOut"
               }}
               style={{
-                background: 'radial-gradient(circle at center, rgba(200, 200, 220, 0.2), transparent 70%)',
+                background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0.3), rgba(168, 85, 247, 0.2), transparent 0%)',
                 filter: 'blur(20px)',
               }}
             />
@@ -1276,8 +1286,8 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              // Different radius for each state: thinking (420), results (200), latent (300)
-              const baseRadius = isThinking ? 380 : showingResults ? 300 : 300;
+              // Different radius for each state: thinking (larger), results (medium), latent (medium)
+              const baseRadius = isThinking ? 440 : showingResults ? 360 : 360;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1429,9 +1439,11 @@ export default function DiscoverPage() {
             // Hide non-mentioned friends during thinking/results
             if (!isMentioned && (isThinking || showingResults)) return null;
             
-            // Calculate position on inner circle (radius 150)
-            const angle = ((index / friendsData.length) * 360 + rotation * 0.7) * (Math.PI / 180); // Slower rotation
-            const friendRadius = 150;
+            // Calculate position - mentioned friends go to middle orbit and rotate with images when thinking
+            // When thinking: rotate with food images (same speed), otherwise: slower independent rotation
+            const rotationSpeed = (isThinking || showingResults) && isMentioned ? rotation : rotation * 0.7;
+            const angle = ((index / friendsData.length) * 360 + rotationSpeed) * (Math.PI / 180);
+            const friendRadius = isMentioned ? 230 : 150; // Middle orbit for mentioned, inner for others
             const x = 350 + Math.cos(angle) * friendRadius;
             const y = 350 + Math.sin(angle) * friendRadius;
             
@@ -1490,11 +1502,33 @@ export default function DiscoverPage() {
                   }
                 }}
                 onMouseLeave={() => setHoveredFriend(null)}
+                onClick={() => {
+                  // Toggle mention when clicking on friend avatar
+                  if (isMentioned) {
+                    // Remove mention
+                    setMentions(mentions.filter(m => m.id !== friend.id));
+                    // Remove from prompt text
+                    const mentionText = `@${friend.username}`;
+                    setPrompt(prompt.replace(mentionText, '').trim());
+                    console.log(`❌ Removed mention: ${friend.username}`);
+                  } else {
+                    // Add mention
+                    const newMention: Mention = {
+                      id: friend.id,
+                      username: friend.username,
+                      display_name: friend.display_name || null
+                    };
+                    setMentions([...mentions, newMention]);
+                    // Add to prompt text
+                    setPrompt(prompt ? `${prompt} @${friend.username}` : `@${friend.username}`);
+                    console.log(`✅ Added mention: ${friend.username}`);
+                  }
+                }}
               >
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full transition-transform hover:scale-105">
                   {/* Liquid glass container with gradient border - enhanced for mentioned friends */}
                   <div 
-                    className="absolute inset-0 rounded-full"
+                    className="absolute inset-0 rounded-full transition-all"
                     style={{
                       background: isMentioned 
                         ? 'linear-gradient(135deg, rgba(155, 135, 245, 0.9), rgba(99, 102, 241, 0.9))'
@@ -1519,21 +1553,19 @@ export default function DiscoverPage() {
                     </div>
                   </div>
                   
-                  {/* "Searching for" indicator for mentioned friends */}
-                  {isMentioned && (
-                    <motion.div
-                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap"
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      style={{
-                        background: 'rgba(155, 135, 245, 0.95)',
-                        color: 'white',
-                        boxShadow: '0 2px 8px rgba(155, 135, 245, 0.4)',
-                      }}
-                    >
-                      Included
-                    </motion.div>
-                  )}
+                  {/* Click indicator badge */}
+                  <motion.div
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap pointer-events-none"
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      background: isMentioned ? 'rgba(155, 135, 245, 0.95)' : 'rgba(100, 100, 120, 0.8)',
+                      color: 'white',
+                      boxShadow: isMentioned ? '0 2px 8px rgba(155, 135, 245, 0.4)' : '0 2px 6px rgba(0, 0, 0, 0.2)',
+                    }}
+                  >
+                    {isMentioned ? 'Included' : 'Click to add'}
+                  </motion.div>
 
                   {/* Small name label on hover */}
                   {hoveredFriend?.id === friend.id && (

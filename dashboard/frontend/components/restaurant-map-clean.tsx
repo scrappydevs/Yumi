@@ -19,6 +19,7 @@ import {
   Loader2,
   ImageIcon,
   ChevronDown,
+  Calendar,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { loadGoogleMaps } from '@/lib/google-maps-loader';
@@ -103,12 +104,12 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           console.log('📍 Loaded preselected restaurants:', restaurants);
           setPreloadedRestaurants(restaurants);
           
-          // If this is a route view, initialize route list and show sidebar
-          if (showAsRoute && viewParam === 'route') {
-            console.log('🗺️ Initializing route mode with', restaurants.length, 'restaurants');
-            setRouteList(restaurants);
-            setShowRouteSidebar(true);
-          }
+          // Route sidebar disabled - just show restaurants on map
+          // if (showAsRoute && viewParam === 'route') {
+          //   console.log('🗺️ Initializing route mode with', restaurants.length, 'restaurants');
+          //   setRouteList(restaurants);
+          //   setShowRouteSidebar(true);
+          // }
           
           // Clear sessionStorage after loading
           sessionStorage.removeItem('selectedRestaurants');
@@ -222,19 +223,19 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             fillOpacity: 0.2,
             map: newMap,
             center: userPos,
-            radius: 50,
+            radius: 25,
           });
 
           // Animate pulse
-          let radius = 50;
+          let radius = 25;
           let growing = true;
           setInterval(() => {
             if (growing) {
-              radius += 3;
-              if (radius >= 100) growing = false;
+              radius += 2;
+              if (radius >= 50) growing = false;
             } else {
-              radius -= 3;
-              if (radius <= 50) growing = true;
+              radius -= 2;
+              if (radius <= 25) growing = true;
             }
             pulseCircle.setRadius(radius);
           }, 50);
@@ -822,9 +823,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           />
         </div>
 
-        {/* Route Sidebar - Collapsible Left Panel */}
+        {/* Route Sidebar - Disabled */}
         <AnimatePresence>
-          {showRouteSidebar && routeList.length > 0 && (
+          {false && showRouteSidebar && routeList.length > 0 && (
             <motion.div
               initial={{ x: -400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -970,8 +971,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           )}
         </AnimatePresence>
         
-        {/* Toggle Route Sidebar Button - Only show if route exists but sidebar hidden */}
-        {routeList.length > 0 && !showRouteSidebar && (
+        {/* Toggle Route Sidebar Button - Disabled */}
+        {false && routeList.length > 0 && !showRouteSidebar && (
           <motion.button
             initial={{ x: -50, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -985,14 +986,14 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           </motion.button>
         )}
 
-        {/* Average Distance Info - Top Left */}
+        {/* Average Distance Info - Below Quick Search */}
         <AnimatePresence>
           {averageDistances && !showRouteSidebar && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="absolute top-4 left-4 z-20 w-48"
+              className="absolute top-40 left-4 z-20 w-48"
             >
               <div className="bg-white rounded-2xl shadow-lg p-4 relative overflow-hidden border border-gray-200">
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
@@ -1020,8 +1021,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           )}
         </AnimatePresence>
 
-        {/* Quick Search - Top Left (below distance info) */}
-        <div className={`absolute ${averageDistances ? 'top-32' : 'top-4'} left-4 z-20 w-32 transition-all duration-300`}>
+        {/* Quick Search - Top Left */}
+        <div className="absolute top-4 left-4 z-20 w-32">
           <div className="bg-white rounded-2xl shadow-lg p-3 relative overflow-hidden border border-gray-200">
             {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
@@ -1155,63 +1156,88 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                   {visibleResults.map((place) => (
-                    <button
+                    <div
                       key={place.place_id}
-                      onClick={() => {
-                        handleSelectPlace(place);
-                        setCurrentPhotoIndex(0);
-                      }}
-                      className="w-full p-3 rounded-xl transition-all text-left relative overflow-hidden"
+                      className="w-full p-3 rounded-xl transition-all relative overflow-hidden"
                       style={{
                         background: '#ffffff',
                         border: '1px solid rgba(0, 0, 0, 0.1)',
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
                       }}
                     >
-                      <div className="flex gap-3">
-                        {place.photos && place.photos.length > 0 && place.photos[0] ? (
-                          <img
-                            src={place.photos[0].getUrl({ maxWidth: 120, maxHeight: 120 })}
-                            alt={place.name}
-                            className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                            loading="lazy"
-                            decoding="async"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <div className={`w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg ${place.photos?.[0] ? 'hidden' : ''}`}>
-                          🍽️
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-semibold text-[hsl(var(--foreground))] mb-1 truncate">
-                            {place.name}
-                          </h4>
-                          <div className="flex items-center justify-between">
-                            {place.rating && (
-                              <div className="flex items-center gap-1">
-                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                <span className="text-xs font-medium">{place.rating.toFixed(1)}</span>
-                              </div>
-                            )}
-                            {userLocation && place.geometry?.location && (
-                              <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                                {estimateTravelTime(
-                                  calculateDistance(
-                                    userLocation.lat,
-                                    userLocation.lng,
-                                    place.geometry.location.lat(),
-                                    place.geometry.location.lng()
-                                  )
-                                )}
-                              </span>
-                            )}
+                      <button
+                        onClick={() => {
+                          handleSelectPlace(place);
+                          setCurrentPhotoIndex(0);
+                        }}
+                        className="w-full text-left"
+                      >
+                        <div className="flex gap-3 mb-2">
+                          {place.photos && place.photos.length > 0 && place.photos[0] ? (
+                            <img
+                              src={place.photos[0].getUrl({ maxWidth: 120, maxHeight: 120 })}
+                              alt={place.name}
+                              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                              loading="lazy"
+                              decoding="async"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <div className={`w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg ${place.photos?.[0] ? 'hidden' : ''}`}>
+                            🍽️
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-semibold text-[hsl(var(--foreground))] mb-1 truncate">
+                              {place.name}
+                            </h4>
+                            <div className="flex items-center justify-between">
+                              {place.rating && (
+                                <div className="flex items-center gap-1">
+                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-xs font-medium">{place.rating.toFixed(1)}</span>
+                                </div>
+                              )}
+                              {userLocation && place.geometry?.location && (
+                                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                                  {estimateTravelTime(
+                                    calculateDistance(
+                                      userLocation.lat,
+                                      userLocation.lng,
+                                      place.geometry.location.lat(),
+                                      place.geometry.location.lng()
+                                    )
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Navigate to reservations page with restaurant details and auto-open modal
+                          const params = new URLSearchParams({
+                            restaurant_name: place.name,
+                            restaurant_address: place.formatted_address || '',
+                            place_id: place.place_id || '',
+                            autoOpen: 'true'  // Signal to auto-open the reservation modal
+                          });
+                          window.location.href = `/reservations?${params.toString()}`;
+                        }}
+                        className="w-full text-white text-xs hover:opacity-90 transition-opacity"
+                        style={{
+                          background: 'rgb(155, 135, 245)',
+                        }}
+                      >
+                        <Calendar className="w-3 h-3 mr-1" />
+                        Make Reservation
+                      </Button>
+                    </div>
                   ))}
                 </div>
               </div>
