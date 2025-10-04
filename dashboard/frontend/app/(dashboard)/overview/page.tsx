@@ -21,7 +21,7 @@ import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
 import { MentionInput } from '@/components/ui/mention-input';
 import { Mention } from '@/hooks/use-friend-mentions';
-import { useVoiceOutput } from '@/hooks/use-voice-output';
+import { useSimpleTTS } from '@/hooks/use-simple-tts';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 
@@ -225,10 +225,21 @@ export default function DiscoverPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
+  const [currentPhrase, setCurrentPhrase] = useState('Finding restaurants near you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+
+  // Rotating loading phrases
+  const loadingPhrases = [
+    'Finding restaurants near you',
+    'Analyzing your preferences',
+    'Discovering hidden gems',
+    'Matching your taste profile',
+    'Exploring local favorites',
+    'Curating perfect matches',
+  ];
   const [searchError, setSearchError] = useState<string | null>(null);
-  const { speak, isSpeaking, stop } = useVoiceOutput();
+  const [volume, setVolume] = useState(0.8); // 80% default volume
+  const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -344,7 +355,7 @@ export default function DiscoverPage() {
     setCurrentPhrase(randomPhrase);
     
     if (!isMuted) {
-      await speak(randomPhrase);
+      await speak(randomPhrase, volume);
     }
     
     try {
@@ -399,7 +410,7 @@ export default function DiscoverPage() {
           const resultPhrase = isGroupSearch
             ? `Found ${data.top_restaurants.length} great options for your group`
             : `Found ${data.top_restaurants.length} great options for you`;
-          await speak(resultPhrase);
+          await speak(resultPhrase, volume);
         }
       } else {
         setSearchError('No restaurants found. Try a different query or location.');
@@ -410,7 +421,7 @@ export default function DiscoverPage() {
       setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
       
       if (!isMuted) {
-        await speak('Sorry, something went wrong');
+        await speak('Sorry, something went wrong', volume);
       }
     } finally {
       setIsThinking(false);
@@ -459,22 +470,45 @@ export default function DiscoverPage() {
           </span>
         </motion.button>
 
-        <motion.button
-          onClick={() => {
-            setIsMuted(!isMuted);
-            if (!isMuted && isSpeaking) stop();
-          }}
-          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          {isMuted ? (
-            <VolumeX className="w-5 h-5 text-red-500" />
-          ) : (
-            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+        <div className="flex items-center gap-2">
+          <motion.button
+            onClick={() => {
+              setIsMuted(!isMuted);
+              if (!isMuted && isSpeaking) stop();
+            }}
+            className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-red-500" />
+            ) : (
+              <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+            )}
+          </motion.button>
+
+          {!isMuted && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 100, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              className="glass-layer-1 px-3 py-2 rounded-full shadow-soft"
+            >
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={volume * 100}
+                onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
+                className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+                }}
+              />
+            </motion.div>
           )}
-        </motion.button>
+        </div>
       </div>
 
       {/* Location Tagger - Top Right */}
