@@ -8,9 +8,11 @@ services:
     startCommand: cd dashboard/backend && gunicorn -c gunicorn.conf.py main:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.5
+        value: 3.11.9
       - key: PORT
         value: 8000
+      - key: PIP_NO_BUILD_ISOLATION
+        value: false
       # Add these environment variables in Render Dashboard:
       # - SUPABASE_URL (your Supabase project URL)
       # - SUPABASE_SERVICE_KEY (your Supabase service role key)

@@ -1,4 +1,4 @@
-[[build]]
+[build]
   base = "dashboard/frontend"
   command = "npm run build"
   publish = ".next"
