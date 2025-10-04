@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -87,11 +88,17 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       />
       
       {/* Header */}
-      <div className="relative h-16 flex items-center justify-center px-4" style={{
-        borderBottom: '0.5px solid rgba(148, 163, 184, 0.15)',
-      }}>
-        <div className="flex items-center justify-center">
-          <Utensils className="w-7 h-7" style={{
+      <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-center px-4">
+        <div className="flex items-center justify-center mt-3">
+          {/* Yummy Logo */}
+          {!isCollapsed && (
+            <img 
+              src="/assets/yummylogo.png"
+              alt="Yummy Logo" 
+              className="h-36 w-36 object-contain"
+            />
+          )}
+          <Utensils className="w-7 h-7 mb-2 -ml-5 mr-4" style={{
             background: 'linear-gradient(135deg, #9B87F5 0%, #7B61FF 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',

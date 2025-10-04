@@ -207,7 +207,7 @@ export default function DiscoverPage() {
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
   
-  // VAD Recording hook for auto-stop on silence
+  // VAD Recording hook for auto-stop on silence with streaming transcription
   const {
     isRecording,
     isTranscribing,
@@ -217,7 +217,16 @@ export default function DiscoverPage() {
   } = useVADRecording({
     silenceThreshold: 2500, // 2.5 seconds of silence
     speechThreshold: 0.5,
+    enableStreaming: true, // Enable real-time streaming transcription
+    streamingInterval: 2000, // Send chunks every 2 seconds
+    onPartialTranscription: (text) => {
+      // Update prompt with streaming text in real-time
+      console.log('[Overview] Received partial transcription:', text);
+      setPrompt(text);
+    },
     onTranscriptionComplete: (text) => {
+      // Final transcription (more accurate)
+      console.log('[Overview] Received final transcription:', text);
       setPrompt(text);
     },
     onError: (error) => {
@@ -741,24 +750,10 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
+    <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-white">
       
-      {/* Test Button & Mute - Top Left */}
-      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
-        <motion.button
-          onClick={() => setIsThinking(!isThinking)}
-          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-xs font-medium">
-            {isThinking ? 'Thinking...' : 'Test AI'}
-          </span>
-        </motion.button>
-
-        <div className="flex items-center gap-2">
+      {/* Sound Controls - Top Left */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
         <motion.button
           onClick={() => {
             setIsMuted(!isMuted);
@@ -776,27 +771,42 @@ export default function DiscoverPage() {
           )}
         </motion.button>
 
-          {!isMuted && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 100, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="glass-layer-1 px-3 py-2 rounded-full shadow-soft"
-            >
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume * 100}
-                onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
-                className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
-                }}
-              />
-            </motion.div>
-          )}
-        </div>
+        {!isMuted && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 100, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="glass-layer-1 px-3 py-2.5 rounded-full shadow-soft flex items-center"
+          >
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume * 100}
+              onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
+              className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+              }}
+            />
+          </motion.div>
+        )}
+      </div>
+
+      {/* Test AI Button - Bottom Left */}
+      <div className="absolute bottom-6 left-6 z-10">
+        <motion.button
+          onClick={() => setIsThinking(!isThinking)}
+          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
+          <span className="text-xs font-medium">
+            {isThinking ? 'Thinking...' : 'Test AI'}
+          </span>
+        </motion.button>
       </div>
 
       {/* Location Tagger - Top Right */}
@@ -1271,7 +1281,7 @@ export default function DiscoverPage() {
       </AnimatePresence>
                 
       {/* Compact Search Bar - Minimal */}
-      <div className="w-full max-w-3xl mb-8 z-10">
+      <div className="w-full max-w-3xl mb-6 z-10">
         <motion.div
           className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative flex items-center gap-3"
           initial={{ y: 20, opacity: 0 }}
@@ -1302,14 +1312,41 @@ export default function DiscoverPage() {
           />
           
           <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative z-10">
-            <MentionInput
-              value={prompt}
-              onChange={setPrompt}
-              onMentionsChange={(newMentions) => setMentions(newMentions)}
-              placeholder={isThinking ? "AI is thinking..." : "Where should we eat? (Type @ to mention friends)"}
-              disabled={isThinking}
-              className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
-            />
+            <div className="flex-1 relative">
+              <MentionInput
+                value={prompt}
+                onChange={setPrompt}
+                onMentionsChange={(newMentions) => setMentions(newMentions)}
+                placeholder={isThinking ? "AI is thinking..." : isRecording ? "Listening..." : "Where should we eat? (Type @ to mention friends)"}
+                disabled={isThinking}
+                className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
+              />
+              {/* Streaming transcription indicator */}
+              {isRecording && prompt && (
+                <motion.div
+                  className="absolute -right-2 top-1/2 -translate-y-1/2 flex gap-1"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <motion.div
+                    className="w-1 h-1 rounded-full bg-purple-500"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+                  />
+                  <motion.div
+                    className="w-1 h-1 rounded-full bg-purple-500"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                  />
+                  <motion.div
+                    className="w-1 h-1 rounded-full bg-purple-500"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                  />
+                </motion.div>
+              )}
+            </div>
             
             <div className="flex items-center gap-2">
               <motion.button

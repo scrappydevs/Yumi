@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { motion } from 'framer-motion';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
+import Image from 'next/image';
 
 export default function WelcomePage() {
   const router = useRouter();
@@ -118,17 +119,21 @@ export default function WelcomePage() {
           {/* Specular highlight */}
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
           
-          <div className="relative space-y-8">
+          <div className="relative space-y-6">
             {/* Header */}
-            <div className="text-center space-y-3">
-              <motion.h1
+            <div className="text-center space-y-1">
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="text-3xl font-bold text-[hsl(var(--foreground))]"
+                className="flex justify-center -mb-2"
               >
-                Yummy
-              </motion.h1>
+                <img 
+                  src="/assets/yummylogo.png"
+                  alt="Yummy Logo" 
+                  className="h-40 w-auto object-contain"
+                />
+              </motion.div>
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
