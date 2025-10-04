@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface Message {
   id: string;
@@ -111,10 +112,20 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
 
   return (
     <div
-      className="h-full flex flex-col liquid-glass border-l border-[hsl(var(--border))]"
+      className="h-full flex flex-col"
+      style={{
+        background: 'rgba(250, 250, 252, 0.4)',
+        backdropFilter: 'blur(40px) saturate(180%)',
+        borderLeft: '0.25px solid rgba(0, 0, 0, 0.08)',
+        boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.85)',
+      }}
     >
       {/* Header */}
-      <div className="h-16 px-4 py-2 border-b border-[hsl(var(--border))] flex items-center justify-between text-sm">
+      <div className="h-16 px-4 py-2 flex items-center justify-between text-sm"
+        style={{
+          borderBottom: '0.25px solid rgba(0, 0, 0, 0.08)',
+        }}
+      >
         <div className="flex items-center gap-3">
           <h2 className="font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
             AI Assistant
@@ -122,16 +133,26 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
         </div>
         <div className="flex items-center gap-1">
           {onClose && (
-            <Button
+            <motion.button
               onClick={onClose}
-              variant="ghost"
-              size="icon"
-              className="flex-shrink-0 h-8 w-8 rounded-xl hover:bg-[hsl(var(--muted))]"
+              className="flex-shrink-0 h-8 w-8 rounded-xl flex items-center justify-center relative overflow-hidden"
+              style={{
+                background: 'rgba(255, 255, 255, 0.4)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                border: '0.25px solid rgba(0, 0, 0, 0.08)',
+                boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 4px 12px rgba(0, 0, 0, 0.06)',
+              }}
+              whileHover={{ 
+                scale: 1.1,
+                boxShadow: 'inset 0 0 35px -8px rgba(255, 255, 255, 0.95), 0 6px 16px rgba(0, 0, 0, 0.08)',
+              }}
+              whileTap={{ scale: 0.95 }}
               title="Close Chat"
               aria-label="Close Chat"
             >
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl" />
               <X className="h-4 w-4" />
-            </Button>
+            </motion.button>
           )}
         </div>
       </div>
@@ -141,20 +162,26 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6">
             <p className="text-sm text-[hsl(var(--muted-foreground))] max-w-[280px]">
-              Ask questions about infrastructure data, get insights, or request analysis.
+              Ask about restaurants, cuisines, or get personalized recommendations.
             </p>
           </div>
         ) : (
           <div className="p-4 space-y-4">
             {messages.map((message) => (
-              <div key={message.id} className="space-y-2">
+              <motion.div 
+                key={message.id} 
+                className="space-y-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 200 }}
+              >
                 <div className="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wide">
                   {message.role === 'user' ? 'You' : 'Assistant'}
                 </div>
                 <div className="text-sm whitespace-pre-wrap leading-relaxed">
                   {message.content}
                 </div>
-              </div>
+              </motion.div>
             ))}
             {isLoading && (
               <div className="space-y-2">
@@ -173,7 +200,18 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
 
       {/* Input */}
       <div className="px-4 pb-4">
-        <div className="liquid-glass-dark rounded-2xl focus-within:ring-2 focus-within:ring-[hsl(var(--primary))]/30 transition-all">
+        <div 
+          className="rounded-2xl focus-within:ring-2 focus-within:ring-[hsl(var(--primary))]/20 transition-all relative overflow-hidden"
+          style={{
+            background: 'rgba(255, 255, 255, 0.45)',
+            backdropFilter: 'blur(40px) saturate(180%)',
+            border: '0.25px solid rgba(0, 0, 0, 0.08)',
+            boxShadow: 'inset 0 0 35px -10px rgba(255, 255, 255, 0.95), 0 6px 16px rgba(0, 0, 0, 0.06)',
+          }}
+        >
+          {/* Specular highlight */}
+          <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/50 to-transparent pointer-events-none rounded-t-2xl" />
+          
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -197,7 +235,7 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
                 w-full px-4 py-3 outline-none focus:outline-none focus-visible:outline-none
                 resize-none max-h-48 overflow-y-auto text-sm leading-relaxed
                 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]
-                bg-transparent border-0 shadow-none focus:ring-0 focus:border-0
+                bg-transparent border-0 shadow-none focus:ring-0 focus:border-0 relative
                 ${isLoading ? 'cursor-not-allowed' : ''}
               `}
             />

@@ -20,6 +20,7 @@ import {
   BookHeart,
   Activity,
   LogOut,
+  Palette,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -40,7 +41,9 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
   { name: 'Friends', icon: Users, href: '/friends' },
+  { name: 'Memories', icon: Sparkles, href: '/memories' },
   { name: 'Favorites', icon: BookHeart, href: '/favorites' },
+  { name: 'Glass Examples', icon: Palette, href: '/glass-examples' },
 ];
 
 const secondaryNav: NavigationItem[] = [
@@ -73,26 +76,18 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
         width: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED,
       }}
     >
-      {/* Header */}
-      <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-between px-4">
+      {/* Header - Seamless */}
+      <div className="h-16 border-b border-[hsl(var(--border))] flex items-center px-4">
         {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 gradient-purple-blue rounded-2xl shadow-lg">
-              <Utensils className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-[hsl(var(--foreground))]">
-                Eats
-              </h1>
-              <p className="text-[10px] text-[hsl(var(--muted-foreground))] tracking-wide">
-                Social Dining
-              </p>
-            </div>
+          <div className="flex items-center gap-2 w-full">
+            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
+              Yummy
+            </h1>
           </div>
         )}
         {isCollapsed && (
-          <div className="flex items-center justify-center w-10 h-10 gradient-purple-blue rounded-2xl shadow-lg mx-auto">
-            <Utensils className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-center w-full">
+            <div className="w-2 h-2 rounded-full gradient-purple-blue" />
           </div>
         )}
       </div>

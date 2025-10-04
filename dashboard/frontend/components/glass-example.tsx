@@ -9,7 +9,7 @@ import { Search, Heart, Share2 } from 'lucide-react';
 
 export function GlassExamples() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100 p-8 space-y-8">
+    <div className="min-h-screen liquid-glass p-8 space-y-8">
       
       {/* Example 1: Glass Card */}
       <div className="panel-glass p-6 space-y-4 max-w-md">
@@ -24,7 +24,7 @@ export function GlassExamples() {
       </div>
 
       {/* Example 2: Glass Search Bar */}
-      <div className="glass-backdrop-xl bg-white/60 rounded-2xl p-3 flex items-center gap-3 shadow-panel max-w-md">
+      <div className="liquid-glass-dark rounded-2xl p-3 flex items-center gap-3 shadow-panel max-w-md">
         <Search className="w-5 h-5 text-slate-400" />
         <input
           type="text"
@@ -64,8 +64,8 @@ export function GlassExamples() {
       </div>
 
       {/* Example 5: Layered Glass */}
-      <div className="glass-backdrop-2xl bg-white/40 rounded-3xl p-8 max-w-md">
-        <div className="glass-backdrop bg-white/70 rounded-2xl p-6">
+      <div className="liquid-glass rounded-3xl p-8 max-w-md">
+        <div className="liquid-glass-dark rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-2">
             Layered Glass
           </h3>

@@ -8,18 +8,20 @@ import {
   Users,
   Sparkles,
   Send,
-  TrendingUp,
-  Calendar,
   Star,
+  Navigation,
+  ChevronDown,
+  MessageSquare,
+  Mic,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Mock restaurant data with photos
+// Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
   {
     id: 1,
     name: 'Nobu Downtown',
-    image: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=200&h=200&fit=crop',
     cuisine: 'Japanese',
     rating: 4.8,
     location: 'Downtown NYC',
@@ -27,7 +29,7 @@ const SAMPLE_RESTAURANTS = [
   {
     id: 2,
     name: 'Le Bernardin',
-    image: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200&h=200&fit=crop',
     cuisine: 'French',
     rating: 4.9,
     location: 'Midtown',
@@ -35,7 +37,7 @@ const SAMPLE_RESTAURANTS = [
   {
     id: 3,
     name: 'Carbone',
-    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&h=200&fit=crop',
     cuisine: 'Italian',
     rating: 4.7,
     location: 'Greenwich Village',
@@ -43,7 +45,7 @@ const SAMPLE_RESTAURANTS = [
   {
     id: 4,
     name: 'Momofuku Ko',
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=200&h=200&fit=crop',
     cuisine: 'Asian Fusion',
     rating: 4.6,
     location: 'East Village',
@@ -51,7 +53,7 @@ const SAMPLE_RESTAURANTS = [
   {
     id: 5,
     name: 'Eleven Madison Park',
-    image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=200&h=200&fit=crop',
     cuisine: 'American',
     rating: 4.9,
     location: 'Flatiron',
@@ -59,27 +61,114 @@ const SAMPLE_RESTAURANTS = [
   {
     id: 6,
     name: 'Cosme',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
     cuisine: 'Mexican',
     rating: 4.7,
     location: 'Flatiron',
+  },
+  {
+    id: 7,
+    name: 'Peter Luger',
+    image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=200&h=200&fit=crop',
+    cuisine: 'Steakhouse',
+    rating: 4.8,
+    location: 'Brooklyn',
+  },
+  {
+    id: 8,
+    name: 'Blue Hill',
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&h=200&fit=crop',
+    cuisine: 'American',
+    rating: 4.7,
+    location: 'Greenwich Village',
+  },
+  {
+    id: 9,
+    name: 'Gramercy Tavern',
+    image: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=200&h=200&fit=crop',
+    cuisine: 'American',
+    rating: 4.6,
+    location: 'Gramercy',
+  },
+  {
+    id: 10,
+    name: 'Masa',
+    image: 'https://images.unsplash.com/photo-1563612116625-3012372fccce?w=200&h=200&fit=crop',
+    cuisine: 'Japanese',
+    rating: 4.9,
+    location: 'Midtown',
+  },
+  {
+    id: 11,
+    name: 'Del Posto',
+    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&h=200&fit=crop',
+    cuisine: 'Italian',
+    rating: 4.5,
+    location: 'Chelsea',
+  },
+  {
+    id: 12,
+    name: 'Lilia',
+    image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=200&h=200&fit=crop',
+    cuisine: 'Italian',
+    rating: 4.8,
+    location: 'Williamsburg',
+  },
+  {
+    id: 13,
+    name: 'Ippudo',
+    image: 'https://images.unsplash.com/photo-1617093727343-374698b1b08d?w=200&h=200&fit=crop',
+    cuisine: 'Ramen',
+    rating: 4.5,
+    location: 'Hell\'s Kitchen',
+  },
+  {
+    id: 14,
+    name: 'Daniel',
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&h=200&fit=crop',
+    cuisine: 'French',
+    rating: 4.8,
+    location: 'Upper East Side',
+  },
+  {
+    id: 15,
+    name: 'Marea',
+    image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=200&h=200&fit=crop',
+    cuisine: 'Seafood',
+    rating: 4.7,
+    location: 'Midtown',
+  },
+  {
+    id: 16,
+    name: 'Contra',
+    image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=200&h=200&fit=crop',
+    cuisine: 'American',
+    rating: 4.6,
+    location: 'Lower East Side',
   },
 ];
 
 export default function DiscoverPage() {
   const [prompt, setPrompt] = useState('');
-  const [rotation, setRotation] = useState(0);
   const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [location, setLocation] = useState('New York City');
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
 
-  // Only start rotation after mount to avoid hydration errors
   useEffect(() => {
     setMounted(true);
+    
+    // Orbit animation - faster when thinking
     const interval = setInterval(() => {
-      setRotation((prev) => (prev + 0.3) % 360);
-    }, 30);
-    return () => clearInterval(interval);
-  }, []);
+      setRotation((prev) => (prev + (isThinking ? 0.8 : 0.3)) % 360);
+    }, 50);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isThinking]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,12 +176,8 @@ export default function DiscoverPage() {
     // TODO: Implement natural language search
   };
 
-  const radius = 240;
-  const centerX = 0;
-  const centerY = 0;
-
   if (!mounted) {
-    return (
+  return (
       <div className="h-full flex items-center justify-center">
         <div className="w-12 h-12 rounded-full gradient-purple-blue animate-pulse" />
       </div>
@@ -100,167 +185,468 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background gradient - more prominent */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 pointer-events-none" />
+    <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
       
-      {/* Simplified top badge */}
-      <div className="absolute top-6 flex items-center justify-center w-full z-10">
-        <div className="liquid-glass-dark px-5 py-2 rounded-full shadow-lg">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] animate-pulse" />
-            <span className="text-xs font-semibold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
-              12 friends dining nearby
-            </span>
-          </div>
-        </div>
+      {/* Test Button - Top Left */}
+      <div className="absolute top-6 left-6 z-10">
+        <motion.button
+          onClick={() => setIsThinking(!isThinking)}
+          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          <div className={`w-2 h-2 rounded-full ${isThinking ? 'gradient-purple-blue animate-pulse' : 'bg-gray-400'}`} />
+          <span className="text-xs font-medium">
+            {isThinking ? 'Thinking...' : 'Test AI'}
+          </span>
+        </motion.button>
       </div>
 
-      {/* Main Content - Photo Wheel */}
-      <div className="flex-1 flex items-center justify-center relative">
-        {/* Center Element - Minimalist Gradient Circle */}
+      {/* Location Tagger - Top Right */}
+      <div className="absolute top-6 right-6 z-10">
         <motion.div
-          className="absolute rounded-full w-32 h-32 flex flex-col items-center justify-center z-20 shadow-xl"
-          style={{
-            background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%)',
+          className="relative"
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ 
+            y: 0, 
+            opacity: 1,
           }}
-          animate={{
-            scale: [1, 1.08, 1],
-            rotate: [0, 360],
-          }}
-          transition={{
-            scale: { duration: 4, repeat: Infinity, ease: "easeInOut" },
-            rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+          transition={{ 
+            delay: 0.1,
+            duration: 0.6,
+            ease: "easeOut"
           }}
         >
-          <Sparkles className="w-8 h-8 text-white mb-1" />
-          <span className="text-sm font-bold text-white">
-            {SAMPLE_RESTAURANTS.length}
-          </span>
-          <span className="text-[10px] text-white/80 uppercase tracking-wider">
-            spots
-          </span>
-        </motion.div>
+          <motion.button
+            className="glass-layer-1 pl-4 pr-5 py-3 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2.5"
+            onClick={() => setShowLocationPicker(!showLocationPicker)}
+            whileHover={{
+              scale: 1.05,
+              boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)',
+              transition: { duration: 0.2 }
+            }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {/* Specular highlight */}
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-full" />
+            
+            <div className="flex items-center gap-2 relative">
+              <motion.div
+                animate={{
+                  rotate: [0, 360],
+                }}
+                transition={{
+                  duration: 8,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+              >
+                <Navigation className="w-3.5 h-3.5 text-[hsl(var(--primary))]" />
+              </motion.div>
+              <span className="text-sm font-semibold">{location}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
+        </div>
+          </motion.button>
 
-        {/* Rotating Photos - Smaller & More Animated */}
-        <div className="relative w-[550px] h-[550px]">
+          {/* Location Picker Dropdown */}
+          <AnimatePresence>
+            {showLocationPicker && (
+              <motion.div
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-layer-1 rounded-2xl shadow-strong overflow-hidden"
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                style={{ minWidth: '200px' }}
+              >
+                {/* Specular highlight */}
+                <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+                
+                <div className="relative py-2">
+                  {['New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
+                    <motion.button
+                      key={loc}
+                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-white/40 transition-colors"
+                      onClick={() => {
+                        setLocation(loc);
+                        setShowLocationPicker(false);
+                      }}
+                      whileHover={{ x: 4 }}
+                      style={{
+                        background: location === loc ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' : 'transparent',
+                      }}
+                    >
+                      {loc}
+                    </motion.button>
+                  ))}
+        </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {/* Main Content - Orbiting Photos with Center Dot */}
+      <div className="flex-1 flex items-center justify-center relative">
+        <div className="relative w-[700px] h-[700px]">
+          {/* Center Content - Dynamic */}
+          <AnimatePresence mode="wait">
+            {!isThinking ? (
+              <motion.div 
+                key="default"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none"
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ 
+                  opacity: 1, 
+                  scale: 1,
+                  y: 0,
+                }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{
+                  duration: 0.5,
+                  ease: "easeOut"
+                }}
+              >
+                {/* Glow effect behind text */}
+                <motion.div
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-40 rounded-full -z-10"
+                  animate={{
+                    scale: [1, 1.15, 1],
+                    opacity: [0.2, 0.4, 0.2],
+                  }}
+                  transition={{
+                    duration: 5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  style={{
+                    background: 'radial-gradient(circle at center, rgba(155, 135, 245, 0.25), rgba(59, 130, 246, 0.18), transparent)',
+                    filter: 'blur(50px)',
+                  }}
+                />
+                
+                <h2 className="text-4xl font-bold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent mb-3">
+                  Yummy
+                </h2>
+                <p className="text-sm text-[hsl(var(--muted-foreground))] mb-2 font-medium">
+                  Food Social Network
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="thinking"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ 
+                  opacity: 1, 
+                  scale: 1,
+                }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.4 }}
+              >
+                {/* Pulsing animated blob */}
+                <motion.div
+                  className="relative w-56 h-56"
+                  animate={{
+                    rotate: [0, 360],
+                  }}
+                  transition={{
+                    duration: 15,
+                    repeat: Infinity,
+                    ease: "linear"
+                  }}
+                >
+                  {/* Outer blob layer - most dramatic */}
+                  <motion.div
+                    className="absolute inset-0 rounded-full"
+                    animate={{
+                      scale: [1, 1.5, 1.2, 1.6, 1.3, 1],
+                      opacity: [0.3, 0.6, 0.4, 0.7, 0.5, 0.3],
+                    }}
+                    transition={{
+                      duration: 2.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    style={{
+                      background: 'radial-gradient(circle at 30% 40%, rgba(155, 135, 245, 0.5), rgba(59, 130, 246, 0.4), rgba(99, 179, 237, 0.3), transparent)',
+                      filter: 'blur(45px)',
+                    }}
+                  />
+                  
+                  {/* Middle blob layer */}
+                  <motion.div
+                    className="absolute inset-8 rounded-full"
+                    animate={{
+                      scale: [1.3, 0.9, 1.4, 1, 1.5, 1.3],
+                      opacity: [0.5, 0.8, 0.6, 0.9, 0.7, 0.5],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: 0.2
+                    }}
+                    style={{
+                      background: 'radial-gradient(circle at 60% 50%, rgba(155, 135, 245, 0.6), rgba(59, 130, 246, 0.5), transparent)',
+                      filter: 'blur(28px)',
+                    }}
+                  />
+                  
+                  {/* Inner core blob - fastest */}
+                  <motion.div
+                    className="absolute inset-16 rounded-full"
+                    animate={{
+                      scale: [1, 1.6, 1.3, 1.7, 1.4, 1],
+                      opacity: [0.7, 1, 0.8, 1, 0.9, 0.7],
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: 0.4
+                    }}
+                    style={{
+                      background: 'radial-gradient(circle at center, rgba(155, 135, 245, 0.7), rgba(59, 130, 246, 0.6), transparent)',
+                      filter: 'blur(18px)',
+                    }}
+                  />
+                  
+                  {/* Glass center - pulsating */}
+                  <motion.div
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full relative overflow-hidden"
+                    animate={{
+                      scale: [1, 1.2, 1.1, 1.3, 1.15, 1],
+                    }}
+                    transition={{
+                      duration: 1.8,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.5)',
+                      backdropFilter: 'blur(50px) saturate(200%)',
+                      border: '0.25px solid rgba(0, 0, 0, 0.08)',
+                      boxShadow: 'inset 0 0 50px -12px rgba(255, 255, 255, 0.98), 0 12px 50px rgba(155, 135, 245, 0.4)',
+                    }}
+                  >
+                    <div 
+                      className="absolute top-0 left-0 right-0 h-1/2 rounded-t-full"
+                      style={{
+                        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, transparent 100%)',
+                      }}
+                    />
+                  </motion.div>
+                </motion.div>
+                
+                {/* Thinking text - positioned below blob */}
+                <motion.p
+                  className="absolute left-1/2 top-full -translate-x-1/2 mt-6 text-sm font-medium bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent whitespace-nowrap"
+                  animate={{
+                    opacity: [0.5, 1, 0.5],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  Finding Restaurants
+                </motion.p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Orbiting Restaurant Photos - Larger Circle */}
           {SAMPLE_RESTAURANTS.map((restaurant, index) => {
-            const angle = (index * (360 / SAMPLE_RESTAURANTS.length) + rotation) * (Math.PI / 180);
-            const x = centerX + radius * Math.cos(angle);
-            const y = centerY + radius * Math.sin(angle);
-            const scale = 0.9 + 0.1 * Math.sin(rotation * Math.PI / 180 + index);
+            const angle = ((index / SAMPLE_RESTAURANTS.length) * 360 + rotation) * (Math.PI / 180);
+            const radius = 270;
+            const x = 350 + Math.cos(angle) * radius;
+            const y = 350 + Math.sin(angle) * radius;
             
             return (
               <motion.div
                 key={restaurant.id}
-                className="absolute cursor-pointer"
+                className="absolute"
                 style={{
-                  left: '50%',
-                  top: '50%',
-                  transform: `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale})`,
+                  left: x,
+                  top: y,
+                  x: '-50%',
+                  y: '-50%',
                 }}
-                whileHover={{ 
-                  scale: 1.2, 
-                  zIndex: 30,
-                  rotate: [0, -5, 5, 0],
-                }}
-                transition={{
-                  rotate: { duration: 0.3 }
-                }}
-                onClick={() => setSelectedRestaurant(restaurant.id)}
               >
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-400/20 to-blue-400/20 blur-xl" />
-                  <img
-                    src={restaurant.image}
-                    alt={restaurant.name}
-                    className="w-20 h-20 object-cover rounded-2xl shadow-2xl relative border-2 border-white/50"
+                <motion.div
+                  className="rounded-2xl p-2.5 shadow-medium cursor-pointer relative overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.35)',
+                    backdropFilter: 'blur(30px) saturate(180%)',
+                    border: '0.25px solid rgba(0, 0, 0, 0.08)',
+                    boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ 
+                    opacity: 1,
+                    ...(isThinking && {
+                      scale: [1, 0.95, 1.05, 1],
+                      rotate: [0, -3, 3, 0],
+                    }),
+                  }}
+                  transition={{
+                    delay: 0.2 + index * 0.05,
+                    duration: 0.6,
+                    ease: "easeOut",
+                    ...(isThinking && {
+                      scale: {
+                        duration: 1.5 + index * 0.2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      },
+                      rotate: {
+                        duration: 2 + index * 0.3,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }
+                    }),
+                  }}
+                  whileHover={{ 
+                    zIndex: 50,
+                    boxShadow: 'inset 0 0 35px -8px rgba(255, 255, 255, 0.95), 0 16px 48px rgba(0, 0, 0, 0.2)',
+                    transition: { duration: 0.3 }
+                  }}
+                  onClick={() => setSelectedRestaurant(restaurant.id)}
+                >
+                  {/* Inner specular highlight */}
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-2xl"
+                    style={{
+                      background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%)',
+                    }}
                   />
-                  <motion.div 
-                    className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full gradient-purple-blue flex items-center justify-center shadow-lg"
-                    whileHover={{ scale: 1.2 }}
-                  >
-                    <Star className="w-4 h-4 fill-white text-white" />
-                  </motion.div>
+                  
+                  <div className="relative group">
+                    <img
+                      src={restaurant.image}
+                      alt={restaurant.name}
+                      className="object-cover rounded-xl"
+                      style={{
+                        width: '112px',
+                        height: '112px',
+                        minWidth: '112px',
+                        minHeight: '112px',
+                        maxWidth: '112px',
+                        maxHeight: '112px',
+                        boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                      }}
+                    />
+                    {/* Info overlay */}
+                    <motion.div 
+                      className="absolute inset-0 rounded-xl flex items-center justify-center"
+                      initial={{ opacity: 0 }}
+                      whileHover={{ 
+                        opacity: 1,
+                        transition: { duration: 0.2 }
+                      }}
+                      style={{
+                        background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3), transparent)',
+                        backdropFilter: 'blur(4px)',
+                      }}
+                    >
+                      <div className="absolute bottom-2 left-2 right-2">
+                        <div className="text-white text-[10px] font-bold truncate mb-0.5">
+                          {restaurant.name}
+              </div>
+                        <div className="flex items-center gap-0.5">
+                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                          <span className="text-white text-[9px] font-semibold">{restaurant.rating}</span>
+                  </div>
                 </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
               </motion.div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Bottom Prompt Panel - Minimalist Gradient */}
-      <div className="w-full max-w-2xl mb-6 z-10">
+                  </div>
+                </div>
+                
+      {/* Compact Search Bar - Minimal */}
+      <div className="w-full max-w-3xl mb-8 z-10">
         <motion.div
-          className="relative rounded-[32px] p-[1px] shadow-2xl overflow-hidden"
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 100 }}
+          className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative overflow-hidden flex items-center gap-3"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ 
+            y: 0, 
+            opacity: 1,
+          }}
+          transition={{ 
+            delay: 0.15,
+            duration: 0.8,
+            ease: "easeOut"
+          }}
         >
-          {/* Gradient border */}
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 opacity-60" />
+          {/* Animated specular highlight */}
+          <motion.div 
+            className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-full"
+            style={{
+              background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%)',
+            }}
+            animate={{
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
           
-          <div className="relative bg-white/90 backdrop-blur-2xl rounded-[31px] p-6">
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="relative">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Where should we eat? Try natural language..."
-                  className="w-full px-5 py-4 bg-gradient-to-br from-purple-50/50 to-blue-50/50 border-0 rounded-2xl 
-                            resize-none text-sm leading-relaxed
-                            text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]
-                            focus:outline-none focus:ring-2 focus:ring-purple-400/40
-                            transition-all"
-                  rows={2}
-                />
-                <motion.button
-                  type="submit"
-                  disabled={!prompt.trim()}
-                  className="absolute right-2 bottom-2 rounded-xl gradient-purple-blue text-white h-9 px-5 
-                            shadow-lg disabled:opacity-40 font-medium text-sm"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Send className="w-4 h-4" />
-                </motion.button>
+          <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative">
+            <input
+              type="text"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Where should we eat tonight?"
+              className="flex-1 bg-transparent border-0 outline-none focus:outline-none text-sm placeholder:text-[hsl(var(--muted-foreground))]"
+            />
+            
+            <div className="flex items-center gap-2">
+              <motion.button
+                type="button"
+                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.6))',
+                  backdropFilter: 'blur(12px)',
+                  border: '0.5px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.05)',
+                }}
+                whileHover={{ 
+                  scale: 1.1,
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                <MessageSquare className="w-4 h-4 text-[hsl(var(--foreground))]" />
+              </motion.button>
+              
+              <motion.button
+                type="button"
+                className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden"
+                style={{
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
+                }}
+                whileHover={{ 
+                  scale: 1.1,
+                  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 20px rgba(0, 0, 0, 0.2)',
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                <Mic className="w-4 h-4 text-white" />
+              </motion.button>
               </div>
-
-              {/* Quick Action Chips - Gradient style */}
-              <div className="flex flex-wrap gap-2">
-                <motion.button
-                  type="button"
-                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 text-xs font-medium transition-all"
-                  onClick={() => setPrompt('Show me trendy spots my friends have been to')}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Users className="w-3 h-3 inline mr-1" />
-                  Friends
-                </motion.button>
-                <motion.button
-                  type="button"
-                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 hover:from-blue-200 hover:to-indigo-200 text-xs font-medium transition-all"
-                  onClick={() => setPrompt('Find restaurants open now near me')}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <MapPin className="w-3 h-3 inline mr-1" />
-                  Nearby
-                </motion.button>
-                <motion.button
-                  type="button"
-                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 hover:from-indigo-200 hover:to-purple-200 text-xs font-medium transition-all"
-                  onClick={() => setPrompt('Surprise me with something new')}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Sparkles className="w-3 h-3 inline mr-1" />
-                  Surprise
-                </motion.button>
-              </div>
-            </form>
-          </div>
+          </form>
         </motion.div>
       </div>
 
@@ -275,15 +661,13 @@ export default function DiscoverPage() {
             onClick={() => setSelectedRestaurant(null)}
           >
             <motion.div
-              className="relative bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 max-w-lg w-full shadow-2xl"
-              initial={{ scale: 0.8, opacity: 0 }}
+              className="glass-card rounded-[32px] p-8 max-w-lg w-full shadow-strong"
+              initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: "spring", damping: 25 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 20 }}
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-              {/* Gradient border effect */}
-              <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-purple-400 via-blue-400 to-indigo-400 opacity-20 blur-xl" />
               
               {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant) && (
                 <div className="relative">
@@ -302,12 +686,12 @@ export default function DiscoverPage() {
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                       <span className="font-bold">{SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.rating}</span>
-                    </div>
+          </div>
                     <div className="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
                       <MapPin className="w-3.5 h-3.5" />
                       <span>{SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.location}</span>
-                    </div>
-                  </div>
+          </div>
+          </div>
                   <motion.button 
                     className="w-full gradient-purple-blue text-white rounded-2xl h-12 text-base font-semibold shadow-lg"
                     whileHover={{ scale: 1.02 }}
@@ -315,7 +699,7 @@ export default function DiscoverPage() {
                   >
                     Reserve Table
                   </motion.button>
-                </div>
+      </div>
               )}
             </motion.div>
           </motion.div>
