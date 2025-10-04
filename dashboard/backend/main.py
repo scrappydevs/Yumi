@@ -17,14 +17,7 @@ from services.taste_profile_service import get_taste_profile_service
 from services.restaurant_search_service import get_restaurant_search_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
-from routers import issues, ai, config, reservations, twilio_webhooks, friends_graph
-# Audio router temporarily disabled due to vad_service/pydub/audioop Python 3.13 compatibility
-try:
-    from routers import audio
-    AUDIO_ROUTER_AVAILABLE = True
-except Exception as e:
-    print(f"[WARNING] Audio router disabled: {e}")
-    AUDIO_ROUTER_AVAILABLE = False
+from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph
 import asyncio
 
 # Lazy import for embedding service (heavy memory usage)
@@ -143,11 +136,7 @@ app.add_middleware(
 # Include routers for dashboard/civic infrastructure features AND Twilio/reservations
 app.include_router(issues.router)
 app.include_router(ai.router)
-if AUDIO_ROUTER_AVAILABLE:
-    app.include_router(audio.router)
-    print("✅ Audio router enabled")
-else:
-    print("⚠️  Audio router disabled (vad_service compatibility issue)")
+app.include_router(audio.router)
 app.include_router(config.router)
 app.include_router(reservations.router, prefix="/api")
 app.include_router(twilio_webhooks.router, prefix="/api")

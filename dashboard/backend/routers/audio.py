@@ -13,13 +13,8 @@ from typing import Optional, List
 
 from audio_service import get_audio_service
 
-# Optional VAD service (requires pydub which has Python 3.13 issues)
-try:
-    from services.vad_service import get_vad_service
-    VAD_AVAILABLE = True
-except ImportError:
-    VAD_AVAILABLE = False
-    print("[AUDIO] Warning: VAD service not available (pydub/audioop issues)")
+# VAD service - will gracefully handle missing pydub internally
+from services.vad_service import get_vad_service, PYDUB_AVAILABLE as VAD_AVAILABLE
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
