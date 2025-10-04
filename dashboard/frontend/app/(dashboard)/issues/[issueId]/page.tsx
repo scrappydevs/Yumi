@@ -391,10 +391,10 @@ export default function IssueDetailPage({
                 <div className="space-y-2">
                   <Button 
                     variant="outline" 
-                    className={`w-full justify-start border-white/10 hover:bg-white/10 ${
+                    className={`w-full justify-start ${
                       issue.status === 'complete' 
-                        ? 'hover:border-[hsl(var(--warning))] hover:text-[hsl(var(--warning))]' 
-                        : 'hover:border-[hsl(var(--success))] hover:text-[hsl(var(--success))]'
+                        ? 'border-[hsl(var(--warning))] bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning))]/20' 
+                        : 'border-[hsl(var(--success))] bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/20'
                     }`}
                     onClick={handleToggleStatus}
                     disabled={updating}

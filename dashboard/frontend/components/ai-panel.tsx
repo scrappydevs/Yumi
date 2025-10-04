@@ -3,8 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, Send, Loader2, Bot, X } from 'lucide-react';
 
@@ -16,13 +14,6 @@ interface Message {
   timestamp: Date;
 }
 
-interface AIModel {
-  id: string;
-  name: string;
-  description: string;
-  endpoint: string;
-}
-
 interface AIPanelProps {
   onClose?: () => void;
 }
@@ -31,36 +22,13 @@ export function AIPanel({ onClose }: AIPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('flash');
-  const [models, setModels] = useState<AIModel[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Fetch available models on mount
-  useEffect(() => {
-    fetchModels();
-  }, []);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const fetchModels = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/ai/models');
-      const data = await response.json();
-      setModels(data.models || []);
-    } catch (error) {
-      console.error('Failed to fetch models:', error);
-      // Set default models if API fails
-      setModels([
-        { id: 'flash', name: 'Gemini Flash', description: 'Fast responses', endpoint: '/api/ai/generate/flash' },
-        { id: 'pro', name: 'Gemini Pro', description: 'Balanced performance', endpoint: '/api/ai/generate/pro' },
-        { id: 'lite', name: 'Gemini Lite', description: 'Lightweight', endpoint: '/api/ai/generate/lite' },
-      ]);
-    }
-  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -77,10 +45,7 @@ export function AIPanel({ onClose }: AIPanelProps) {
     setIsLoading(true);
 
     try {
-      const selectedModelData = models.find((m) => m.id === selectedModel);
-      const endpoint = selectedModelData?.endpoint || '/api/ai/generate/flash';
-
-      const response = await fetch(`http://localhost:8000${endpoint}`, {
+      const response = await fetch('http://localhost:8000/api/ai/generate/flash', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,10 +98,6 @@ export function AIPanel({ onClose }: AIPanelProps) {
     }
   };
 
-  const clearChat = () => {
-    setMessages([]);
-  };
-
   return (
     <div className="h-full flex flex-col bg-[hsl(var(--card))] border-l border-[hsl(var(--border))]">
       {/* Header */}
@@ -153,30 +114,6 @@ export function AIPanel({ onClose }: AIPanelProps) {
         {onClose && (
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="w-4 h-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Model Selector */}
-      <div className="p-3 border-b border-[hsl(var(--border))] flex items-center gap-2">
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">Model:</span>
-        <Select value={selectedModel} onValueChange={setSelectedModel}>
-          <SelectTrigger className="h-8 text-xs w-[140px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {models.map((model) => (
-              <SelectItem key={model.id} value={model.id} className="text-xs">
-                <div className="flex items-center gap-2">
-                  <span>{model.name}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {messages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearChat} className="ml-auto text-xs h-8">
-            Clear
           </Button>
         )}
       </div>
@@ -202,24 +139,11 @@ export function AIPanel({ onClose }: AIPanelProps) {
               <div
                 className={`max-w-[85%] rounded-lg p-3 ${
                   message.role === 'user'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[#1B1B1B] text-[#ECECEC]'
                     : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'
                 }`}
               >
                 <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs opacity-70">
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                  {message.model && (
-                    <Badge variant="outline" className="text-xs h-4 px-1">
-                      {message.model}
-                    </Badge>
-                  )}
-                </div>
               </div>
             </div>
           ))
@@ -236,30 +160,41 @@ export function AIPanel({ onClose }: AIPanelProps) {
 
       {/* Input */}
       <div className="p-4 border-t border-[hsl(var(--border))]">
-        <div className="flex gap-2">
+        <div className="relative">
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask anything..."
-            className="min-h-[80px] resize-none text-sm"
+            className="min-h-[52px] max-h-[200px] resize-none text-sm pr-12 rounded-3xl border border-[hsl(var(--border))] focus:border-[hsl(var(--border))] focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
             disabled={isLoading}
+            rows={1}
+            style={{
+              height: 'auto',
+              paddingTop: '14px',
+              paddingBottom: '14px',
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = Math.min(target.scrollHeight, 200) + 'px';
+            }}
           />
           <Button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}
             size="icon"
-            className="h-[80px] w-12 shrink-0"
+            className="absolute right-2 bottom-2 h-8 w-8 rounded-full bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90 transition-opacity disabled:opacity-40"
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 text-white" />
             )}
           </Button>
         </div>
-        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2 text-center">
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>

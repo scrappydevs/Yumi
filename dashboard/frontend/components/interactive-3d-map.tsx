@@ -27,7 +27,10 @@ import {
   TrendingUp,
   Search,
   X,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { useIssues } from '@/hooks/use-issues';
 import { reverseGeocode } from '@/lib/geocoding';
@@ -158,8 +161,10 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
   const [layerType, setLayerType] = useState<'hexagon' | 'heatmap' | 'scatter'>('scatter');
   const [searchQuery, setSearchQuery] = useState('');
   const [stateFilter, setStateFilter] = useState<string>('all');
+  const [issueSearchQuery, setIssueSearchQuery] = useState('');
   const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
   const [customLocationName, setCustomLocationName] = useState<string>('Custom Location');
+  const [selectedIssueIndex, setSelectedIssueIndex] = useState<number>(-1);
   
   const [viewState, setViewState] = useState<MapViewState>({
     ...CITIES.sanFrancisco,
@@ -225,6 +230,47 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
   const activeIssues = issuesData.filter(i => i.status !== 'resolved');
   const resolvedIssues = issuesData.filter(i => i.status === 'resolved');
 
+  // Navigation between issues
+  const navigateToIssue = (index: number) => {
+    if (index < 0 || index >= issuesData.length) return;
+    
+    const issue = issuesData[index];
+    const rawIssue = rawIssues.find(i => i.id === issue.id);
+    
+    setSelectedIssueIndex(index);
+    setViewState({
+      latitude: issue.coordinates[1],
+      longitude: issue.coordinates[0],
+      zoom: 17,
+      pitch: 45,
+      bearing: 0,
+      transitionDuration: 800,
+    });
+
+    // Update custom location name
+    if (rawIssue?.geolocation) {
+      reverseGeocode(rawIssue.geolocation).then(result => {
+        setCustomLocationName(result.formatted);
+      }).catch(() => {
+        setCustomLocationName('Custom Location');
+      });
+    }
+  };
+
+  const navigateToNextIssue = () => {
+    const nextIndex = selectedIssueIndex + 1;
+    if (nextIndex < issuesData.length) {
+      navigateToIssue(nextIndex);
+    }
+  };
+
+  const navigateToPreviousIssue = () => {
+    const prevIndex = selectedIssueIndex - 1;
+    if (prevIndex >= 0) {
+      navigateToIssue(prevIndex);
+    }
+  };
+
   // Extract unique states from cities
   const states = useMemo(() => {
     const stateSet = new Set(
@@ -242,6 +288,19 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
       return matchesSearch && matchesState;
     });
   }, [searchQuery, stateFilter]);
+
+  // Filter issues based on search
+  const filteredIssuesForSearch = useMemo(() => {
+    if (!issueSearchQuery) return [];
+    
+    const query = issueSearchQuery.toLowerCase();
+    return rawIssues
+      .filter(issue => 
+        issue.description?.toLowerCase().includes(query) ||
+        issue.id.toLowerCase().includes(query)
+      )
+      .slice(0, 10); // Limit to 10 results
+  }, [rawIssues, issueSearchQuery]);
 
   // Handle city change
   const handleCityChange = (city: keyof typeof CITIES) => {
@@ -383,9 +442,9 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
             layers={layers}
             onClick={(info) => {
               if (info.object) {
-                const issue = rawIssues.find(i => i.id === info.object.id);
-                if (issue) {
-                  window.location.href = `/issues/${issue.id}`;
+                const clickedIndex = issuesData.findIndex(i => i.id === info.object.id);
+                if (clickedIndex !== -1) {
+                  navigateToIssue(clickedIndex);
                 }
               }
             }}
@@ -582,10 +641,134 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               <Maximize2 className="w-4 h-4 mr-2" />
               {viewMode === '3d' ? '3D View' : '2D View'}
             </Button>
+
+            {/* Issue Search */}
+            <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="w-4 h-4 text-[hsl(var(--primary))]" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--foreground))]">
+                    Find Issue
+                  </span>
+                </div>
+                
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
+                  <Input
+                    type="text"
+                    placeholder="Search issues..."
+                    value={issueSearchQuery}
+                    onChange={(e) => setIssueSearchQuery(e.target.value)}
+                    className="h-8 pl-8 pr-8 text-xs bg-[hsl(var(--card))]/60 backdrop-blur-xl border-white/10 shadow-lg"
+                  />
+                  {issueSearchQuery && (
+                    <button
+                      onClick={() => setIssueSearchQuery('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Search Results */}
+                {issueSearchQuery && (
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {filteredIssuesForSearch.length > 0 ? (
+                      <div className="space-y-1">
+                        {filteredIssuesForSearch.map((issue, index) => {
+                          const issueData = issuesData.find(i => i.id === issue.id);
+                          const issueIndex = issuesData.findIndex(i => i.id === issue.id);
+                          return (
+                            <Button
+                              key={issue.id}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (issueIndex !== -1) {
+                                  navigateToIssue(issueIndex);
+                                  setIssueSearchQuery('');
+                                }
+                              }}
+                              className="w-full h-auto text-left justify-start text-xs text-[hsl(var(--muted-foreground))] hover:bg-white/10 py-2 px-2"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-mono text-[10px] text-[hsl(var(--muted-foreground))] mb-0.5">
+                                  {issue.id.slice(0, 8).toUpperCase()}
+                                </div>
+                                <div className="text-xs text-[hsl(var(--foreground))] truncate">
+                                  {issue.description?.slice(0, 40) || 'No description'}
+                                </div>
+                              </div>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-[hsl(var(--muted-foreground))] text-center py-4">
+                        No issues found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Stats Panel - Top Right */}
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 right-4 space-y-2">
+            {/* Issue Navigation - Only show when an issue is selected */}
+            {selectedIssueIndex >= 0 && issuesData[selectedIssueIndex] && (
+              <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-1">
+                        Issue {selectedIssueIndex + 1} of {issuesData.length}
+                      </div>
+                      <div className="text-sm font-medium truncate">
+                        {rawIssues.find(i => i.id === issuesData[selectedIssueIndex].id)?.description?.slice(0, 30) || 'Unknown'}
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 p-0 hover:bg-white/10"
+                        onClick={navigateToPreviousIssue}
+                        disabled={selectedIssueIndex <= 0}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 p-0 hover:bg-white/10"
+                        onClick={navigateToNextIssue}
+                        disabled={selectedIssueIndex >= issuesData.length - 1}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 p-0 hover:bg-white/10"
+                        onClick={() => {
+                          const issue = issuesData[selectedIssueIndex];
+                          window.location.href = `/issues/${issue.id}`;
+                        }}
+                        title="View Details"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Stats Card */}
             <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
               <CardContent className="p-3 space-y-3 min-w-[200px]">
                 <div className="flex items-center justify-between">

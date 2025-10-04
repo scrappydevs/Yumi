@@ -93,16 +93,31 @@ export default function IssuesPage() {
   useEffect(() => {
     async function fetchGroups() {
       try {
+        console.log('🔄 Fetching groups...');
         const data = await apiClient.getGroups();
+        console.log('✅ Groups fetched:', data.length, 'groups');
+        console.log('📊 Groups data:', data.slice(0, 3));
         setGroups(data);
       } catch (err) {
-        console.error('Failed to fetch groups:', err);
+        console.error('❌ Failed to fetch groups:', err);
       } finally {
         setLoadingGroups(false);
       }
     }
     fetchGroups();
   }, []);
+
+  // Calculate group counts
+  const groupCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    issues.forEach(issue => {
+      if (issue.group_id) {
+        counts[issue.group_id] = (counts[issue.group_id] || 0) + 1;
+      }
+    });
+    console.log('📊 Group counts:', counts);
+    return counts;
+  }, [issues]);
 
   // Reverse geocode all issue locations
   useEffect(() => {
@@ -170,6 +185,39 @@ export default function IssuesPage() {
     setGroupFilter('all');
     setPriorityFilter('all');
   };
+
+  // Get active filter chips
+  const activeFilterChips = useMemo(() => {
+    const chips: Array<{ key: string; label: string; onRemove: () => void }> = [];
+    
+    if (statusFilter !== 'all') {
+      chips.push({
+        key: 'status',
+        label: `Status: ${statusFilter === 'complete' ? 'Complete' : 'Incomplete'}`,
+        onRemove: () => setStatusFilter('all'),
+      });
+    }
+    
+    if (groupFilter !== 'all') {
+      const group = groups.find(g => g.id.toString() === groupFilter);
+      chips.push({
+        key: 'group',
+        label: `Category: ${group?.name || 'Unknown'}`,
+        onRemove: () => setGroupFilter('all'),
+      });
+    }
+    
+    if (priorityFilter !== 'all') {
+      const priorityLabel = priorityFilter === '3' ? 'High' : priorityFilter === '2' ? 'Medium' : 'Low';
+      chips.push({
+        key: 'priority',
+        label: `Priority: ${priorityLabel}`,
+        onRemove: () => setPriorityFilter('all'),
+      });
+    }
+    
+    return chips;
+  }, [statusFilter, groupFilter, priorityFilter, groups]);
 
   if (loading || loadingGroups) {
     return (
@@ -254,17 +302,41 @@ export default function IssuesPage() {
             <label className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider whitespace-nowrap">
               Category:
             </label>
-            <Select value={groupFilter} onValueChange={setGroupFilter}>
-              <SelectTrigger className="w-[200px] bg-[hsl(var(--card))]/60 backdrop-blur-xl border-white/10 shadow-lg">
+            <Select value={groupFilter} onValueChange={(value) => {
+              console.log('🔀 Category filter changed to:', value);
+              setGroupFilter(value);
+            }}>
+              <SelectTrigger className="w-[240px] bg-[hsl(var(--card))]/60 backdrop-blur-xl border-white/10 shadow-lg">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
-              <SelectContent className="bg-[hsl(var(--card))]/95 backdrop-blur-xl border-white/10 shadow-2xl">
-                <SelectItem value="all">All Categories</SelectItem>
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id.toString()}>
-                    {group.name}
+              <SelectContent className="bg-[hsl(var(--card))]/95 backdrop-blur-xl border-white/10 shadow-2xl max-h-[400px]">
+                <SelectItem value="all">
+                  <div className="flex items-center justify-between w-full gap-4">
+                    <span>All Categories</span>
+                    <span className="text-xs text-[hsl(var(--muted-foreground))] tabular-nums">
+                      {issues.length}
+                    </span>
+                  </div>
+                </SelectItem>
+                {groups.length > 0 ? (
+                  groups.map((group) => {
+                    const count = groupCounts[group.id] || 0;
+                    return (
+                      <SelectItem key={group.id} value={group.id.toString()}>
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <span>{group.name}</span>
+                          <span className="text-xs text-[hsl(var(--muted-foreground))] tabular-nums">
+                            {count}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })
+                ) : (
+                  <SelectItem value="loading" disabled>
+                    {loadingGroups ? 'Loading categories...' : 'No categories available'}
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -287,7 +359,23 @@ export default function IssuesPage() {
             </Select>
           </div>
 
-          {/* Clear Filters */}
+          {/* Active Filter Chips */}
+          {activeFilterChips.map((chip) => (
+            <div
+              key={chip.key}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/30 rounded-md text-xs"
+            >
+              <span className="text-[hsl(var(--primary))]">{chip.label}</span>
+              <button
+                onClick={chip.onRemove}
+                className="text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]/80"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+
+          {/* Clear All Filters */}
           {hasActiveFilters && (
             <Button
               variant="outline"
@@ -296,7 +384,7 @@ export default function IssuesPage() {
               className="border-white/10 hover:bg-white/10"
             >
               <X className="w-4 h-4 mr-2" />
-              Clear
+              Clear All
             </Button>
           )}
         </div>
@@ -389,7 +477,7 @@ export default function IssuesPage() {
                             <span className="text-xs">
                               {formatDistanceToNow(new Date(issue.timestamp), { addSuffix: true })}
                             </span>
-                          </div>
+            </div>
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Button 

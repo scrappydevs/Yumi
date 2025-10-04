@@ -34,11 +34,16 @@ class AIResponse(BaseModel):
 
 class ImageGenerationRequest(BaseModel):
     """Request model for image generation"""
-    prompt: str = Field(..., description="Description of the image to generate")
-    number_of_images: int = Field(1, ge=1, le=4, description="Number of images (1-4)")
-    aspect_ratio: str = Field("1:1", description="Image aspect ratio: 1:1, 16:9, 9:16, 4:3, 3:4")
-    safety_filter_level: str = Field("block_some", description="Safety filter: block_most, block_some, block_few")
-    person_generation: str = Field("allow_all", description="Person generation: allow_all, allow_adult, block_all")
+    prompt: str = Field(...,
+                        description="Description of the image to generate")
+    number_of_images: int = Field(
+        1, ge=1, le=4, description="Number of images (1-4)")
+    aspect_ratio: str = Field(
+        "1:1", description="Image aspect ratio: 1:1, 16:9, 9:16, 4:3, 3:4")
+    safety_filter_level: str = Field(
+        "block_some", description="Safety filter: block_most, block_some, block_few")
+    person_generation: str = Field(
+        "allow_all", description="Person generation: allow_all, allow_adult, block_all")
 
 
 class ImageData(BaseModel):
@@ -60,11 +65,16 @@ class ImageGenerationResponse(BaseModel):
 
 class VideoGenerationRequest(BaseModel):
     """Request model for video generation"""
-    prompt: str = Field(..., description="Description of the video to generate")
-    aspect_ratio: str = Field("16:9", description="Video aspect ratio: 16:9, 9:16, 1:1")
-    duration_seconds: int = Field(5, ge=2, le=10, description="Video duration in seconds (2-10)")
-    poll_interval: int = Field(10, ge=5, le=30, description="Seconds between status checks")
-    max_wait_time: int = Field(600, ge=60, le=1800, description="Max wait time in seconds")
+    prompt: str = Field(...,
+                        description="Description of the video to generate")
+    aspect_ratio: str = Field(
+        "16:9", description="Video aspect ratio: 16:9, 9:16, 1:1")
+    duration_seconds: int = Field(
+        5, ge=2, le=10, description="Video duration in seconds (2-10)")
+    poll_interval: int = Field(
+        10, ge=5, le=30, description="Seconds between status checks")
+    max_wait_time: int = Field(
+        600, ge=60, le=1800, description="Max wait time in seconds")
 
 
 class VideoData(BaseModel):
@@ -106,6 +116,9 @@ async def generate_with_flash(request: AIRequest):
         )
         return AIResponse(**result)
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Error in generate_with_flash: {error_details}")
         raise HTTPException(
             status_code=500, detail=f"Flash generation failed: {str(e)}")
 
@@ -220,15 +233,15 @@ async def list_models():
 async def generate_images(request: ImageGenerationRequest):
     """
     Generate images using Imagen 4.0
-    
+
     - **prompt**: Description of the image you want to create
     - **number_of_images**: How many images to generate (1-4)
     - **aspect_ratio**: Image dimensions (1:1, 16:9, 9:16, 4:3, 3:4)
     - **safety_filter_level**: Content safety filtering level
     - **person_generation**: Policy for generating people in images
-    
+
     Best for: Visual content creation, illustrations, concept art
-    
+
     Returns base64-encoded PNG images that can be directly displayed in browsers.
     """
     try:
@@ -242,27 +255,28 @@ async def generate_images(request: ImageGenerationRequest):
         )
         return ImageGenerationResponse(**result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Image generation failed: {str(e)}")
 
 
 @router.post("/generate/video", response_model=VideoGenerationResponse)
 async def generate_video(request: VideoGenerationRequest):
     """
     Generate video using Veo 3.0
-    
+
     ⚠️ **Warning**: Video generation takes several minutes to complete!
     This endpoint will wait until the video is ready or timeout occurs.
-    
+
     - **prompt**: Description of the video you want to create
     - **aspect_ratio**: Video dimensions (16:9, 9:16, 1:1)
     - **duration_seconds**: Video length in seconds (2-10)
     - **poll_interval**: How often to check status (5-30 seconds)
     - **max_wait_time**: Maximum time to wait (60-1800 seconds)
-    
+
     Best for: Short video clips, animations, motion content
-    
+
     Returns base64-encoded MP4 video that can be downloaded or displayed.
-    
+
     Note: This is a long-running operation. Consider using async/background tasks
     in production for better user experience.
     """
@@ -277,7 +291,8 @@ async def generate_video(request: VideoGenerationRequest):
         )
         return VideoGenerationResponse(**result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Video generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Video generation failed: {str(e)}")
 
 
 @router.get("/health")
@@ -302,4 +317,3 @@ async def ai_health_check():
             "configured": False,
             "error": str(e)
         }
-

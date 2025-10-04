@@ -1,16 +1,16 @@
-from routers import issues, ai, audio
-from supabase_client import SupabaseClient
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+# Load environment variables FIRST, before any imports that need them
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
+from supabase_client import SupabaseClient
+from routers import issues, ai, audio
 import os
 import subprocess
-
-# Auto-sync secrets from Infisical before starting
+from dotenv import load_dotenv
 
 
 def sync_secrets():
+    """Sync secrets from Infisical to .env file before loading environment variables"""
     try:
         print("🔄 Syncing secrets from Infisical to .env...")
         result = subprocess.run(
@@ -37,11 +37,11 @@ def sync_secrets():
         print("   Using existing .env file if available")
 
 
-# Sync secrets on startup
+# Sync and load secrets BEFORE importing modules that need environment variables
 sync_secrets()
-
-# Load environment variables
 load_dotenv()
+
+# Now import modules that depend on environment variables
 
 
 # Lifespan context manager for startup/shutdown events
