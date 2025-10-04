@@ -26,11 +26,35 @@ export function MentionInput({
   const [cursorPosition, setCursorPosition] = useState(0);
   const [selectedMentions, setSelectedMentions] = useState<Mention[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dropdownPosition, setDropdownPosition] = useState({ bottom: 0, left: 0 });
   
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const { filteredFriends, filterFriends, loading } = useFriendMentions();
+
+  // Calculate dropdown position (Slack-style: above input)
+  const calculateDropdownPosition = () => {
+    if (!inputRef.current) return;
+    
+    const input = inputRef.current;
+    const inputRect = input.getBoundingClientRect();
+    
+    // Dropdown dimensions
+    const dropdownMaxHeight = 256; // max-h-64 = 16rem = 256px
+    const margin = 8; // Gap between input and dropdown
+    
+    // Position dropdown ABOVE the input (Slack style)
+    const bottom = window.innerHeight - inputRect.top + margin;
+    
+    // Align left edge with input
+    const left = inputRect.left;
+    
+    setDropdownPosition({
+      left: left,
+      bottom: bottom,
+    });
+  };
 
   // Detect @ character and extract query after it
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,6 +81,8 @@ export function MentionInput({
         filterFriends(textAfterAt);
         setShowDropdown(true);
         setSelectedIndex(0);
+        // Calculate position on next tick to ensure state is updated
+        setTimeout(() => calculateDropdownPosition(), 0);
       } else {
         console.log('[MENTION] Space detected, hiding dropdown');
         setShowDropdown(false);
@@ -159,6 +185,16 @@ export function MentionInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Scroll selected item into view when navigating with keyboard
+  useEffect(() => {
+    if (showDropdown && dropdownRef.current) {
+      const selectedElement = dropdownRef.current.querySelector(`[data-index="${selectedIndex}"]`);
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedIndex, showDropdown]);
+
   console.log('[MENTION] Render state:', { showDropdown, friendsCount: filteredFriends.length, loading });
 
   return (
@@ -197,17 +233,22 @@ export function MentionInput({
         className={`flex-1 w-full ${className}`}
       />
 
-      {/* Mention Dropdown */}
+      {/* Mention Dropdown - Slack Style */}
       <AnimatePresence>
         {showDropdown && filteredFriends.length > 0 && (
           <motion.div
             ref={dropdownRef}
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-[9999] w-full mt-2 top-full left-0 bg-white rounded-lg shadow-2xl border-2 border-purple-500 max-h-64 overflow-y-auto"
-            style={{ minWidth: '300px' }}
+            className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto"
+            style={{ 
+              minWidth: '360px',
+              maxWidth: '400px',
+              bottom: `${dropdownPosition.bottom}px`,
+              left: `${dropdownPosition.left}px`,
+            }}
           >
             {loading ? (
               <div className="px-4 py-3 text-sm text-gray-500">Loading friends...</div>
@@ -216,18 +257,22 @@ export function MentionInput({
                 {filteredFriends.map((friend, index) => (
                   <button
                     key={friend.id}
+                    data-index={index}
                     onClick={() => selectFriend(friend)}
-                    className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                      index === selectedIndex ? 'bg-purple-50' : ''
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    className={`w-full px-4 py-2.5 flex items-center gap-3 transition-colors border-0 ${
+                      index === selectedIndex 
+                        ? 'bg-[#1164A3] text-white' 
+                        : 'bg-white'
                     }`}
                   >
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-medium text-sm">
+                    <div className="w-9 h-9 rounded flex items-center justify-center text-white font-medium text-sm flex-shrink-0 bg-gradient-to-br from-purple-400 to-pink-400">
                       {friend.avatar_url ? (
                         <img
                           src={friend.avatar_url}
                           alt={friend.username}
-                          className="w-full h-full rounded-full object-cover"
+                          className="w-full h-full rounded object-cover"
                         />
                       ) : (
                         <span>{friend.username[0].toUpperCase()}</span>
@@ -235,11 +280,17 @@ export function MentionInput({
                     </div>
 
                     {/* Friend Info */}
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium text-gray-900">
+                    <div className="flex flex-col items-start min-w-0 flex-1">
+                      <span className={`font-semibold text-sm truncate w-full text-left ${
+                        index === selectedIndex ? 'text-white' : 'text-gray-900'
+                      }`}>
                         {friend.display_name || friend.username}
                       </span>
-                      <span className="text-xs text-gray-500">@{friend.username}</span>
+                      <span className={`text-xs truncate w-full text-left ${
+                        index === selectedIndex ? 'text-white/80' : 'text-gray-500'
+                      }`}>
+                        @{friend.username}
+                      </span>
                     </div>
                   </button>
                 ))}
@@ -251,7 +302,15 @@ export function MentionInput({
 
       {/* Helper Text */}
       {showDropdown && filteredFriends.length === 0 && !loading && (
-        <div className="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3">
+        <div 
+          className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-3"
+          style={{ 
+            minWidth: '360px',
+            maxWidth: '400px',
+            bottom: `${dropdownPosition.bottom}px`,
+            left: `${dropdownPosition.left}px`,
+          }}
+        >
           <p className="text-sm text-gray-500">
             No friends found matching "{mentionQuery}"
           </p>

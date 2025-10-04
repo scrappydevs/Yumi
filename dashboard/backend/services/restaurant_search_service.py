@@ -3,14 +3,16 @@ Restaurant Search Service - Natural language restaurant search using LLM with to
 
 This service orchestrates:
 1. Getting user preferences from taste profile
-2. Finding nearby restaurants from Places API
+2. Finding nearby restaurants from Places API OR database
 3. Using LLM to intelligently rank results based on user query
 """
+import os
 from typing import Dict, Any, List, Optional
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
 from services.taste_profile_service import get_taste_profile_service
+from services.restaurant_db_service import get_restaurant_db_service
 
 
 class RestaurantSearchService:
@@ -22,7 +24,13 @@ class RestaurantSearchService:
         self.supabase_service = get_supabase_service()
         self.places_service = get_places_service()
         self.taste_profile_service = get_taste_profile_service()
-        print("[RESTAURANT SEARCH] Service initialized")
+        self.restaurant_db_service = get_restaurant_db_service()
+        
+        # Feature flag: Use database instead of Google Places API
+        self.use_database = os.getenv('USE_DB_RESTAURANTS', 'true').lower() == 'true'
+        
+        source = "database" if self.use_database else "Google Places API"
+        print(f"[RESTAURANT SEARCH] Service initialized (using {source})")
     
     def get_user_preferences_tool(self, user_id: str) -> Dict[str, Any]:
         """
@@ -54,18 +62,16 @@ class RestaurantSearchService:
         latitude: float,
         longitude: float,
         radius: int = 1000,
-        limit: int = 10,
-        keyword: str = None
+        limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
-        Tool function: Get nearby restaurants from Google Places API.
+        Tool function: Get nearby restaurants from database or Google Places API.
         
         Args:
             latitude: Latitude coordinate
             longitude: Longitude coordinate
             radius: Search radius in meters (default: 1000m = 1km)
             limit: Maximum number of restaurants to return (default: 10)
-            keyword: Optional keyword to filter restaurants (e.g., "Chinese", "Italian")
             
         Returns:
             List of restaurant dicts with place_id, name, cuisine, rating, etc.
@@ -73,16 +79,59 @@ class RestaurantSearchService:
         try:
             print(f"[TOOL] get_nearby_restaurants called at ({latitude}, {longitude})")
             print(f"[TOOL] Radius: {radius}m, Limit: {limit}")
-            if keyword:
-                print(f"[TOOL] Keyword filter: '{keyword}'")
             
-            restaurants = self.places_service.find_nearby_restaurants(
-                latitude=latitude,
-                longitude=longitude,
-                radius=radius,
-                limit=limit,
-                keyword=keyword
-            )
+            restaurants = []
+            
+            if self.use_database:
+                # Use database for restaurant search with smart radius expansion
+                print(f"[TOOL] Using database for restaurant search")
+                
+                # First, try to detect cuisine from context (if available)
+                # This will be set by the parent search_restaurants method
+                requested_cuisine = getattr(self, '_current_search_cuisine', None)
+                
+                # Try increasing radii, but check for cuisine matches
+                search_radii = [radius, 5000, 10000, 20000]  # 1km, 5km, 10km, 20km
+                
+                for search_radius in search_radii:
+                    if search_radius != radius:
+                        print(f"[TOOL] No matching cuisine at {radius}m, expanding to {search_radius}m...")
+                    
+                    restaurants = self.restaurant_db_service.get_nearby_restaurants(
+                        latitude=latitude,
+                        longitude=longitude,
+                        radius_meters=search_radius,
+                        limit=limit
+                    )
+                    
+                    if restaurants:
+                        # Check if we found matching cuisines
+                        if requested_cuisine:
+                            matching = [r for r in restaurants if requested_cuisine.lower() in (r.get('cuisine') or '').lower()]
+                            if matching:
+                                print(f"[TOOL] Found {len(matching)} {requested_cuisine} restaurants at {search_radius}m radius")
+                                restaurants = matching[:limit]  # Prioritize matching cuisine
+                                break
+                            elif search_radius == search_radii[-1]:
+                                # Last radius, return what we have
+                                print(f"[TOOL] No {requested_cuisine} restaurants found, returning {len(restaurants)} other options")
+                                break
+                        else:
+                            # No cuisine filter, just return results
+                            print(f"[TOOL] Found {len(restaurants)} restaurants at {search_radius}m radius")
+                            break
+                
+                if not restaurants:
+                    print(f"[TOOL] No restaurants found even with 20km radius")
+            else:
+                # Use Google Places API
+                print(f"[TOOL] Using Google Places API for restaurant search")
+                restaurants = self.places_service.find_nearby_restaurants(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=radius,
+                    limit=limit
+                )
             
             print(f"[TOOL] Found {len(restaurants)} restaurants")
             return restaurants
@@ -175,31 +224,28 @@ class RestaurantSearchService:
             print(f"[RESTAURANT SEARCH] Step 1: Getting user preferences...")
             preferences = self.get_user_preferences_tool(user_id)
             
-            # Step 1.5: Extract cuisine keyword from query if present
-            cuisine_keyword = None
+            # Step 1.5: Detect cuisine from query for smart radius expansion
+            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian', 
+                              'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
+                              'sushi', 'ramen', 'tacos', 'burgers', 'seafood']
+            detected_cuisine = None
             query_lower = query.lower()
-            
-            # Common cuisine keywords to extract
-            cuisine_keywords = [
-                'chinese', 'italian', 'mexican', 'japanese', 'thai', 'indian', 'french',
-                'korean', 'vietnamese', 'greek', 'spanish', 'american', 'mediterranean',
-                'seafood', 'steakhouse', 'sushi', 'pizza', 'burger', 'bbq', 'vegan', 'vegetarian'
-            ]
-            
-            for keyword in cuisine_keywords:
-                if keyword in query_lower:
-                    cuisine_keyword = keyword
-                    print(f"[RESTAURANT SEARCH] 🍽️ Detected cuisine preference: '{cuisine_keyword}'")
+            for cuisine in cuisine_keywords:
+                if cuisine in query_lower:
+                    detected_cuisine = cuisine
+                    print(f"[RESTAURANT SEARCH] Detected cuisine in query: {detected_cuisine}")
                     break
             
-            # Step 2: Get nearby restaurants (with cuisine filter if detected)
+            # Set on instance for the tool to use
+            self._current_search_cuisine = detected_cuisine
+            
+            # Step 2: Get nearby restaurants
             print(f"[RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
             restaurants = self.get_nearby_restaurants_tool(
                 latitude=latitude,
                 longitude=longitude,
-                radius=2000,  # Increased to 2km radius
-                limit=20,      # Get 20 restaurants
-                keyword=cuisine_keyword  # Filter by cuisine if detected
+                radius=1000,
+                limit=10
             )
             
             if not restaurants:
@@ -214,10 +260,13 @@ class RestaurantSearchService:
             
             # Step 3: Format data for LLM
             print(f"[RESTAURANT SEARCH] Step 3: Asking LLM to analyze and rank...")
+            print(f"[RESTAURANT SEARCH] Restaurants found:")
+            for i, r in enumerate(restaurants, 1):
+                print(f"  {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐)")
             
             # Build restaurants list for prompt
             restaurants_text = "\n".join([
-                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * r.get('price_level', 2)}) - {r['address']}"
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
                 for i, r in enumerate(restaurants)
             ])
             
@@ -229,33 +278,12 @@ class RestaurantSearchService:
 - Flavor Notes: {', '.join(preferences.get('flavorNotes', [])) or 'No preference'}
 """
             
-            # Determine how many recommendations to return based on query
-            # Default to 5, but extract if user specifies (e.g., "top 3", "5 restaurants")
-            num_recommendations = 5  # Default
-            query_lower = query.lower()
+            # Check if preferences are empty
+            has_preferences = bool(preferences.get('cuisines') or preferences.get('priceRange') or 
+                                 preferences.get('atmosphere') or preferences.get('flavorNotes'))
             
-            # Try to extract number from common patterns
-            import re
-            number_patterns = [
-                r'top (\d+)',
-                r'(\d+) restaurants',
-                r'(\d+) places',
-                r'give me (\d+)',
-                r'show me (\d+)',
-            ]
-            
-            for pattern in number_patterns:
-                match = re.search(pattern, query_lower)
-                if match:
-                    num_recommendations = int(match.group(1))
-                    break
-            
-            # Ensure between 1 and 10
-            num_recommendations = max(1, min(10, num_recommendations))
-            print(f"[RESTAURANT SEARCH] Returning top {num_recommendations} recommendations")
-            
-            # Create LLM prompt
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP {num_recommendations} that best match the user's query and preferences.
+            # Create LLM prompt with edge case handling
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the user's query.
 
 USER'S QUERY: "{query}"
 
@@ -264,18 +292,26 @@ USER'S PREFERENCES:{prefs_text}
 AVAILABLE RESTAURANTS:
 {restaurants_text}
 
-TASK:
-1. Analyze how well each restaurant matches the query "{query}"
-2. Consider the user's preferences (cuisines, price, atmosphere)
-3. Select the TOP {num_recommendations} best matches
-4. Provide SPECIFIC, DETAILED reasoning for each recommendation:
-   - Mention specific dishes or menu items they're known for
-   - Describe the vibe, ambiance, or atmosphere
-   - Explain why it matches their taste or query
-   - Reference any unique characteristics or specialties
-   - Keep it to 2-3 sentences with concrete details
+RANKING RULES (PRIORITY ORDER):
+1. **QUERY OVERRIDE**: If the query explicitly mentions a cuisine/food type (e.g., "Chinese food", "Italian restaurant"), ONLY recommend that type regardless of stored preferences.
+2. **EMPTY PREFERENCES**: If preferences are empty or minimal, rely HEAVILY on the query and prioritize highly-rated restaurants.
+3. **VAGUE QUERIES**: If query is vague (e.g., "food near me", "somewhere to eat"), use preferences as primary guide. If both are vague, prioritize highest ratings and variety.
+4. **EXPLICIT REQUIREMENTS**: Always respect explicit query requirements (e.g., "outdoor seating", "cheap eats", "fancy dinner").
+5. **PREFERENCES AS SECONDARY**: Use stored preferences only when query doesn't specify or contradict them.
 
-Return ONLY valid JSON (no markdown, no code blocks) with EXACTLY {num_recommendations} restaurants:
+EXAMPLES:
+- Query "I want Chinese food" + Preferences "Italian, French" → Recommend ONLY Chinese (query wins)
+- Query "somewhere good" + No preferences → Recommend top-rated, diverse options
+- Query "romantic dinner" + Preferences "Casual" → Recommend romantic places (query wins)
+- Query "food" + Preferences "Mexican, Spicy" → Recommend Mexican restaurants (preferences guide)
+
+TASK:
+1. Identify if query has specific requirements (cuisine, atmosphere, price, etc.)
+2. Apply ranking rules above
+3. Select TOP 3 matches
+4. Provide BRIEF reasoning explaining your choice
+
+Return ONLY valid JSON (no markdown, no code blocks):
 {{
   "top_restaurants": [
     {{
@@ -285,32 +321,44 @@ Return ONLY valid JSON (no markdown, no code blocks) with EXACTLY {num_recommend
       "address": "Full address",
       "price_level": 2,
       "match_score": 0.95,
-      "reasoning": "Specific explanation mentioning dishes (e.g., 'famous for their hand-pulled noodles and crispy Peking duck'), the atmosphere (e.g., 'casual, family-friendly vibe with traditional decor'), and why it matches the query. Include concrete details that make it unique."
+      "reasoning": "Brief 1-2 sentence explanation"
+    }},
+    {{
+      "name": "Second Restaurant",
+      "cuisine": "Cuisine",
+      "rating": 4.3,
+      "address": "Address",
+      "price_level": 2,
+      "match_score": 0.85,
+      "reasoning": "Brief reason"
+    }},
+    {{
+      "name": "Third Restaurant",
+      "cuisine": "Cuisine",
+      "rating": 4.2,
+      "address": "Address",
+      "price_level": 3,
+      "match_score": 0.78,
+      "reasoning": "Brief reason"
     }}
-    // ... {num_recommendations} total restaurants
   ],
-  "query_analysis": "One sentence about what the user wants",
-  "preference_matching": "One sentence about preference alignment",
-  "num_recommendations": {num_recommendations}
+  "query_analysis": "What did the user explicitly ask for?",
+  "preference_matching": "How did you balance query vs preferences?"
 }}
 
-IMPORTANT: 
-- Return EXACTLY {num_recommendations} restaurants
-- Keep all reasoning CONCISE - maximum 1-2 sentences each
-- Rank from best to worst match"""
+USER HAS {'MINIMAL' if not has_preferences else 'FULL'} PREFERENCES - adjust weighting accordingly.
+
+IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
+            
+            print(f"[RESTAURANT SEARCH] Prompt being sent to LLM:")
+            print(f"  Query: {query}")
+            print(f"  Preferences: {preferences.get('cuisines', [])[:3]}...")
+            print(f"  Restaurants in prompt: {len(restaurants)}")
             
             # Call Gemini
-            print(f"[RESTAURANT SEARCH] Calling Gemini API...")
             model = self.gemini_service.model
-            
-            try:
-                response = model.generate_content(prompt)
-                print(f"[RESTAURANT SEARCH] Gemini API responded")
-                response_text = response.text.strip()
-                print(f"[RESTAURANT SEARCH] Response length: {len(response_text)} chars")
-            except Exception as e:
-                print(f"[RESTAURANT SEARCH ERROR] Gemini API call failed: {str(e)}")
-                raise
+            response = model.generate_content(prompt)
+            response_text = response.text.strip()
             
             # Clean up markdown
             if response_text.startswith("```json"):
@@ -325,47 +373,30 @@ IMPORTANT:
             import json
             result = json.loads(response_text)
             
-            # Step 5: Enrich results with photo URLs and place_ids
-            # Match LLM-selected restaurants back to original data for photos
-            top_restaurants = result.get('top_restaurants', [])
-            for top_restaurant in top_restaurants:
-                # Find matching restaurant from original list by name
-                for orig_restaurant in restaurants:
-                    if orig_restaurant['name'].lower() == top_restaurant['name'].lower():
-                        # Add photo URL and place_id from original data
-                        top_restaurant['photo_url'] = orig_restaurant.get('photo_url')
-                        top_restaurant['place_id'] = orig_restaurant.get('place_id')
-                        break
-            
-            # Step 6: Also include all nearby restaurants for the photo wheel
-            # Add basic info for all restaurants (not just top 3)
-            all_nearby_with_photos = [
-                {
-                    'name': r['name'],
-                    'photo_url': r.get('photo_url'),
-                    'place_id': r.get('place_id'),
-                    'rating': r.get('rating', 0),
-                    'cuisine': r.get('cuisine', 'Unknown')
-                }
-                for r in restaurants if r.get('photo_url')  # Only include restaurants with photos
-            ]
+            # Log what LLM recommended
+            print(f"[RESTAURANT SEARCH] LLM recommendations:")
+            for i, rec in enumerate(result.get('top_restaurants', []), 1):
+                print(f"  {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}")
             
             # Add metadata
             result["status"] = "success"
             result["stage"] = "4 - LLM analysis"
             result["query"] = query
-            result["all_nearby_restaurants"] = all_nearby_with_photos  # Include all for photo wheel
-            result["num_recommendations"] = num_recommendations  # Include for frontend
             result["location"] = {
                 "latitude": latitude,
                 "longitude": longitude
             }
             
             print(f"[RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants")
-            print(f"[RESTAURANT SEARCH] ✅ Returning {len(all_nearby_with_photos)} total restaurants with photos")
+            
+            # Clean up
+            self._current_search_cuisine = None
+            
             return result
             
         except Exception as e:
+            # Clean up on error too
+            self._current_search_cuisine = None
             print(f"[RESTAURANT SEARCH ERROR] {str(e)}")
             import traceback
             traceback.print_exc()
@@ -448,7 +479,7 @@ IMPORTANT:
             
             # Build restaurants list for prompt
             restaurants_text = "\n".join([
-                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * r.get('price_level', 2)}) - {r['address']}"
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
                 for i, r in enumerate(restaurants)
             ])
             
@@ -460,23 +491,53 @@ IMPORTANT:
 - Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
 """
             
-            # Create LLM prompt (similar to individual but emphasizes group dining)
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the GROUP's query and merged preferences.
+            # Check if merged preferences are substantial
+            has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or 
+                                       merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+            
+            # Create LLM prompt with edge case handling for groups
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 for a GROUP of {len(user_ids)} people dining together.
 
 USER'S QUERY: "{query}"
 
 GROUP'S MERGED PREFERENCES:{prefs_text}
 
-NOTE: These are MERGED preferences from {len(user_ids)} people dining together. The restaurants should accommodate the group and match their combined tastes.
-
 AVAILABLE RESTAURANTS:
 {restaurants_text}
 
+GROUP RANKING RULES (PRIORITY ORDER):
+1. **QUERY OVERRIDE**: If the query explicitly mentions cuisine/food type (e.g., "Chinese food"), ONLY recommend that type regardless of group preferences.
+2. **EMPTY GROUP PREFERENCES**: If group has minimal/no preferences, rely on query and prioritize:
+   - Highly-rated restaurants
+   - Diverse menu options (good for groups with varied tastes)
+   - Group-friendly atmosphere (casual, spacious)
+3. **VAGUE QUERIES**: If query is vague (e.g., "food for group"), use merged preferences. If both vague, prioritize:
+   - Highest ratings
+   - Restaurants that can accommodate groups
+   - Diverse cuisines from merged preferences
+4. **EXPLICIT GROUP NEEDS**: Respect requirements like "vegetarian options", "large tables", "family-friendly", "cheap eats"
+5. **CONFLICT RESOLUTION**: When group has diverse preferences (e.g., "Italian + Japanese + Mexican"), look for:
+   - Fusion restaurants
+   - Places with varied menu
+   - Or pick best-rated from each cuisine type
+6. **PREFERENCES AS SECONDARY**: Use merged preferences only when query doesn't override
+
+EXAMPLES:
+- Query "Chinese food" + Group wants "Italian, French" → ONLY Chinese (query wins)
+- Query "where should we eat?" + Group wants "Mexican, Spicy" → Mexican restaurants
+- Query "lunch spot" + No group preferences → High-rated, group-friendly, diverse menus
+- Query "vegan options" + Group wants "Steakhouse" → Vegan-friendly places (query wins)
+
+GROUP CONTEXT:
+- Dining with {len(user_ids)} people - ensure restaurants can accommodate
+- Merged preferences represent ALL members - aim to satisfy everyone
+- Group dynamics matter - consider noise level, seating, varied menu
+
 TASK:
-1. Analyze how well each restaurant matches the query "{query}"
-2. Consider the GROUP's merged preferences (cuisines, price, atmosphere)
-3. Select the TOP 3 best matches for GROUP DINING
-4. Provide BRIEF reasoning (1-2 sentences max per restaurant)
+1. Identify if query has specific requirements
+2. Apply ranking rules above
+3. Select TOP 3 that work for the ENTIRE group
+4. Explain your reasoning
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {{
@@ -488,13 +549,33 @@ Return ONLY valid JSON (no markdown, no code blocks):
       "address": "Full address",
       "price_level": 2,
       "match_score": 0.95,
-      "reason": "Brief reason why this matches"
+      "reason": "Brief reason (mention query override if applied, note group suitability)"
+    }},
+    {{
+      "name": "Second Restaurant",
+      "cuisine": "Cuisine",
+      "rating": 4.3,
+      "address": "Address",
+      "price_level": 2,
+      "match_score": 0.85,
+      "reason": "Brief reason"
+    }},
+    {{
+      "name": "Third Restaurant",
+      "cuisine": "Cuisine",
+      "rating": 4.2,
+      "address": "Address",
+      "price_level": 3,
+      "match_score": 0.78,
+      "reason": "Brief reason"
     }}
   ],
-  "overall_reasoning": "1-2 sentences about the selection strategy"
+  "overall_reasoning": "How you balanced query vs group preferences"
 }}
 
-Return TOP 3 restaurants in order of best match."""
+GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - adjust accordingly.
+
+IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
             # Call Gemini
             response = self.gemini_service.model.generate_content(prompt)
