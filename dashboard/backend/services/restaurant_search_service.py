@@ -3,14 +3,16 @@ Restaurant Search Service - Natural language restaurant search using LLM with to
 
 This service orchestrates:
 1. Getting user preferences from taste profile
-2. Finding nearby restaurants from Places API
+2. Finding nearby restaurants from Places API OR database
 3. Using LLM to intelligently rank results based on user query
 """
+import os
 from typing import Dict, Any, List, Optional
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
 from services.taste_profile_service import get_taste_profile_service
+from services.restaurant_db_service import get_restaurant_db_service
 
 
 class RestaurantSearchService:
@@ -22,7 +24,13 @@ class RestaurantSearchService:
         self.supabase_service = get_supabase_service()
         self.places_service = get_places_service()
         self.taste_profile_service = get_taste_profile_service()
-        print("[RESTAURANT SEARCH] Service initialized")
+        self.restaurant_db_service = get_restaurant_db_service()
+        
+        # Feature flag: Use database instead of Google Places API
+        self.use_database = os.getenv('USE_DB_RESTAURANTS', 'true').lower() == 'true'
+        
+        source = "database" if self.use_database else "Google Places API"
+        print(f"[RESTAURANT SEARCH] Service initialized (using {source})")
     
     def get_user_preferences_tool(self, user_id: str) -> Dict[str, Any]:
         """
@@ -57,7 +65,7 @@ class RestaurantSearchService:
         limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
-        Tool function: Get nearby restaurants from Google Places API.
+        Tool function: Get nearby restaurants from database or Google Places API.
         
         Args:
             latitude: Latitude coordinate
@@ -72,12 +80,41 @@ class RestaurantSearchService:
             print(f"[TOOL] get_nearby_restaurants called at ({latitude}, {longitude})")
             print(f"[TOOL] Radius: {radius}m, Limit: {limit}")
             
-            restaurants = self.places_service.find_nearby_restaurants(
-                latitude=latitude,
-                longitude=longitude,
-                radius=radius,
-                limit=limit
-            )
+            restaurants = []
+            
+            if self.use_database:
+                # Use database for restaurant search with automatic radius expansion
+                print(f"[TOOL] Using database for restaurant search")
+                
+                # Try increasing radii until we find restaurants
+                search_radii = [radius, 5000, 10000, 20000]  # 1km, 5km, 10km, 20km
+                
+                for search_radius in search_radii:
+                    if search_radius != radius:
+                        print(f"[TOOL] No results at {radius}m, expanding to {search_radius}m...")
+                    
+                    restaurants = self.restaurant_db_service.get_nearby_restaurants(
+                        latitude=latitude,
+                        longitude=longitude,
+                        radius_meters=search_radius,
+                        limit=limit
+                    )
+                    
+                    if restaurants:
+                        print(f"[TOOL] Found {len(restaurants)} restaurants at {search_radius}m radius")
+                        break
+                
+                if not restaurants:
+                    print(f"[TOOL] No restaurants found even with 20km radius")
+            else:
+                # Use Google Places API
+                print(f"[TOOL] Using Google Places API for restaurant search")
+                restaurants = self.places_service.find_nearby_restaurants(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=radius,
+                    limit=limit
+                )
             
             print(f"[TOOL] Found {len(restaurants)} restaurants")
             return restaurants
@@ -191,10 +228,13 @@ class RestaurantSearchService:
             
             # Step 3: Format data for LLM
             print(f"[RESTAURANT SEARCH] Step 3: Asking LLM to analyze and rank...")
+            print(f"[RESTAURANT SEARCH] Restaurants found:")
+            for i, r in enumerate(restaurants, 1):
+                print(f"  {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐)")
             
             # Build restaurants list for prompt
             restaurants_text = "\n".join([
-                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * r.get('price_level', 2)}) - {r['address']}"
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
                 for i, r in enumerate(restaurants)
             ])
             
@@ -278,6 +318,11 @@ USER HAS {'MINIMAL' if not has_preferences else 'FULL'} PREFERENCES - adjust wei
 
 IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
+            print(f"[RESTAURANT SEARCH] Prompt being sent to LLM:")
+            print(f"  Query: {query}")
+            print(f"  Preferences: {preferences.get('cuisines', [])[:3]}...")
+            print(f"  Restaurants in prompt: {len(restaurants)}")
+            
             # Call Gemini
             model = self.gemini_service.model
             response = model.generate_content(prompt)
@@ -295,6 +340,11 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # Parse JSON
             import json
             result = json.loads(response_text)
+            
+            # Log what LLM recommended
+            print(f"[RESTAURANT SEARCH] LLM recommendations:")
+            for i, rec in enumerate(result.get('top_restaurants', []), 1):
+                print(f"  {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}")
             
             # Add metadata
             result["status"] = "success"
@@ -391,7 +441,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
             # Build restaurants list for prompt
             restaurants_text = "\n".join([
-                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * r.get('price_level', 2)}) - {r['address']}"
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
                 for i, r in enumerate(restaurants)
             ])
             
