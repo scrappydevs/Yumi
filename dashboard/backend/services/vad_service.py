@@ -58,7 +58,15 @@ from collections import deque
 from typing import Optional
 import base64
 import io
-from pydub import AudioSegment
+
+# Lazy import for pydub (has Python 3.13 compatibility issues)
+try:
+    from pydub import AudioSegment
+    PYDUB_AVAILABLE = True
+except ImportError:
+    PYDUB_AVAILABLE = False
+    AudioSegment = None
+    print("[VAD] Warning: pydub not available (audioop removed in Python 3.13)")
 
 
 class VAD():

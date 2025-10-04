@@ -4,8 +4,8 @@ Google Places API wrapper with rate limiting and pagination.
 import requests
 import time
 from typing import List, Optional, Dict, Any
-from models import Restaurant, RestaurantPhoto, RestaurantReview
-from config import (
+from .models import Restaurant, RestaurantPhoto, RestaurantReview
+from .config import (
     GOOGLE_PLACES_API_KEY,
     SEARCH_RADIUS_METERS,
     NEXT_PAGE_TOKEN_DELAY,

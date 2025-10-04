@@ -495,8 +495,8 @@ export default function FriendsPage() {
                       {filteredUsers.map((user) => (
                         <motion.div
                           key={user.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
                           className="glass-layer-1 rounded-2xl p-4 shadow-soft hover:shadow-medium transition-all relative overflow-hidden"
                           whileHover={{ scale: 1.01, boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)' }}
                           whileTap={{ scale: 0.99 }}
