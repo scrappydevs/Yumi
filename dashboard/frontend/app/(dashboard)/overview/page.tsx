@@ -181,7 +181,6 @@ export default function DiscoverPage() {
   const [userCoords, setUserCoords] = useState<{lat: number, lng: number} | null>(null);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
-  const [flowingIndex, setFlowingIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -201,9 +200,9 @@ export default function DiscoverPage() {
   useEffect(() => {
     setMounted(true);
     
-    // Orbit animation - faster when thinking, slower when showing results or idle
+    // Orbit animation - smooth rotation at all times
     const interval = setInterval(() => {
-      const speed = isThinking ? 2.0 : (showingResults ? 0.6 : 0.8);  // Much faster during thinking
+      const speed = isThinking ? 1.2 : (showingResults ? 0.6 : 0.8);  // Slightly faster during thinking, but smooth
       setRotation((prev) => (prev + speed) % 360);
     }, 50);
     
@@ -261,50 +260,81 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
-  // Continuous swapping animation - images constantly swap in and out during thinking
+  // Simple thinking animation - fade out images completely and replace with new ones
   useEffect(() => {
-    if (!isThinking || isNarrowing || allNearbyImages.length === 0) {
+    if (!isThinking || isNarrowing || allNearbyImages.length === 0 || visibleImageIds.length === 0) {
       setAbsorbedIndices([]);
-      setFlowingIndex(0);
       return;
     }
-
-    // Continuously cycle through images - always have 2-3 images swapping
-    const flowInterval = setInterval(() => {
-      setFlowingIndex((prev) => {
-        const numImages = allNearbyImages.length;
-        return numImages > 0 ? (prev + 1) % numImages : 0;
+    
+    const cycleAnimation = () => {
+      const numImages = allNearbyImages.length;
+      const numVisible = visibleImageIds.length;
+      if (numImages === 0 || numVisible === 0) return;
+      
+      // Pick 2-3 random VISIBLE images to fade out and replace
+      const numToSwap = Math.floor(Math.random() * 2) + 2; // 2 or 3 images
+      const visibleIndicesToSwap: number[] = [];
+      
+      while (visibleIndicesToSwap.length < Math.min(numToSwap, numVisible)) {
+        const randomVisibleIdx = Math.floor(Math.random() * numVisible);
+        if (!visibleIndicesToSwap.includes(randomVisibleIdx)) {
+          visibleIndicesToSwap.push(randomVisibleIdx);
+        }
+      }
+      
+      // Convert to original image indices for fade tracking
+      const originalIndices = visibleIndicesToSwap.map(visIdx => {
+        const imageId = visibleImageIds[visIdx];
+        return allNearbyImages.findIndex(img => img.id === imageId);
       });
-    }, 250); // Each image swaps every 250ms (very fast and aggressive)
+      
+      // Start fade out
+      setAbsorbedIndices(originalIndices);
+      
+      // After halfway through fade (when opacity hits 0), swap the images
+      setTimeout(() => {
+        // Get all available image IDs that aren't currently visible
+        const availableIds = allNearbyImages
+          .map(img => img.id)
+          .filter(id => !visibleImageIds.includes(id));
+        
+        if (availableIds.length === 0) {
+          // If no images available to swap, just fade back in
+          setAbsorbedIndices([]);
+          return;
+        }
+        
+        // Create new visible array with swapped images
+        const newVisibleIds = [...visibleImageIds];
+        visibleIndicesToSwap.forEach(visIdx => {
+          // Pick a random image from available pool
+          const randomAvailableIdx = Math.floor(Math.random() * availableIds.length);
+          const newImageId = availableIds[randomAvailableIdx];
+          
+          // Swap the image
+          newVisibleIds[visIdx] = newImageId;
+          
+          // Remove from available pool so we don't pick it again
+          availableIds.splice(randomAvailableIdx, 1);
+        });
+        
+        // Update visible images
+        setVisibleImageIds(newVisibleIds);
+        
+        // Clear fade indices to fade in the new images
+        setAbsorbedIndices([]);
+      }, 300); // Halfway through the 600ms fade
+    };
+    
+    // Initial cycle
+    cycleAnimation();
+    
+    // Repeat cycle every 1.5 seconds
+    const flowInterval = setInterval(cycleAnimation, 1500);
 
     return () => clearInterval(flowInterval);
-  }, [isThinking, isNarrowing, allNearbyImages.length]); // Need length dependency to restart animation when images load
-
-  // Calculate which images are currently being swapped out based on flowing index
-  useEffect(() => {
-    if (!isThinking || isNarrowing || allNearbyImages.length === 0) return;
-
-    const numImages = allNearbyImages.length;
-    
-    // Always have 3-4 images in various stages of swapping (more aggressive)
-    const currentSwapping: number[] = [];
-    
-    // Current image swapping out
-    currentSwapping.push(flowingIndex);
-    
-    // Next image starting to swap
-    currentSwapping.push((flowingIndex + 1) % numImages);
-    
-    // Third image
-      currentSwapping.push((flowingIndex + 2) % numImages);
-    
-    // Sometimes include a fourth for extra variety
-    if (flowingIndex % 2 === 0) {
-      currentSwapping.push((flowingIndex + 3) % numImages);
-    }
-
-    setAbsorbedIndices(currentSwapping);
-  }, [flowingIndex, isThinking, isNarrowing, allNearbyImages.length]); // Need length to recalculate when images change
+  }, [isThinking, isNarrowing, allNearbyImages, visibleImageIds]);
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -991,18 +1021,14 @@ export default function DiscoverPage() {
               // Find the original index in allNearbyImages (for animation system)
               const originalIndex = allNearbyImages.findIndex(img => img.id === item.id);
               
-              // Check if being swapped out (absorbed into blob during thinking)
-              const isSwappingOut = absorbedIndices.includes(originalIndex) && isThinking;
-              const swapPosition = absorbedIndices.indexOf(originalIndex);
-              const swapProgress = swapPosition >= 0 ? swapPosition / absorbedIndices.length : 0;
+              // Check if being faded out (during thinking)
+              const isFadingOut = absorbedIndices.includes(originalIndex) && isThinking;
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
               const baseRadius = (isThinking || showingResults) ? 420 : 280;  // Larger radius when thinking/showing results
-              // If swapping out, move toward center
-              const radius = isSwappingOut ? baseRadius * (1 - swapProgress) : baseRadius;
-              const x = 350 + Math.cos(angle) * radius;
-              const y = 350 + Math.sin(angle) * radius;
+              const x = 350 + Math.cos(angle) * baseRadius;
+              const y = 350 + Math.sin(angle) * baseRadius;
               
               // Find the matching restaurant data if available
               const matchingRestaurant = searchResults.find(r => r.place_id === item.id);
@@ -1020,8 +1046,8 @@ export default function DiscoverPage() {
                   animate={{
                     left: x,
                     top: y,
-                    opacity: isSwappingOut ? 0 : 1,
-                    scale: isSwappingOut ? 0.2 : 1,  // More aggressive scale down
+                    opacity: isFadingOut ? 0 : 1,  // Fade to completely invisible
+                    scale: 1,  // Keep scale constant - NO POSITION CHANGE
                   }}
                   exit={{
                     // Fade out in place
@@ -1030,16 +1056,16 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    left: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.6), ease: [0.34, 1.56, 0.64, 1] },  // Smoother initial expansion
-                    top: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.6), ease: [0.34, 1.56, 0.64, 1] },  // Smoother initial expansion
-                    opacity: { duration: isSwappingOut ? 0.25 : (isThinking ? 0.4 : 0.5), ease: isSwappingOut ? 'easeIn' : 'easeInOut' },  // Faster
-                    scale: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.4 : 0.5), ease: isSwappingOut ? 'easeIn' : [0.34, 1.56, 0.64, 1] },  // Faster
-                    delay: isSwappingOut ? swapProgress * 0.05 : (isThinking ? visibleIndex * 0.05 : visibleIndex * 0.03),  // Much less delay for initial load
+                    left: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
+                    top: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
+                    opacity: { duration: 0.3, ease: 'easeInOut' },  // Fast fade in/out
+                    scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
+                    delay: visibleIndex * 0.03,  // Stagger initial load
                   }}
                   style={{
                     x: '-50%',
                     y: '-50%',
-                    zIndex: isSwappingOut ? 1 : 'auto',
+                    zIndex: 'auto',
                   }}
                 >
                   <motion.div
@@ -1048,17 +1074,15 @@ export default function DiscoverPage() {
                       background: 'rgba(255, 255, 255, 0.35)',
                       backdropFilter: 'blur(30px) saturate(180%)',
                       border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                      boxShadow: isSwappingOut
-                        ? 'inset 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.9), 0 0 80px rgba(59, 130, 246, 0.7)'
-                        : 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                      boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                       transformStyle: 'preserve-3d',
                     }}
-                    animate={isThinking && !isSwappingOut ? { 
+                    animate={isThinking && !isFadingOut ? { 
                       scale: [1, 0.97, 1.02, 0.98, 1],
                       rotateY: [0, -4, 4, -2, 0],
                       rotateX: [0, 2, -2, 1, 0],
                     } : {}}
-                    transition={isThinking && !isSwappingOut ? {
+                    transition={isThinking && !isFadingOut ? {
                       duration: 2.5 + visibleIndex * 0.3,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
@@ -1355,6 +1379,53 @@ export default function DiscoverPage() {
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
                 <Send className="w-4 h-4 text-white" />
               </motion.button>
+              
+              {/* View on Map Button - shown when results are available */}
+              <AnimatePresence>
+                {showingResults && searchResults.length > 0 && (
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      // Navigate to spatial page with restaurant data
+                      const restaurantData = searchResults.map(r => ({
+                        place_id: r.place_id,
+                        name: r.name,
+                        address: r.address,
+                        latitude: r.latitude,
+                        longitude: r.longitude,
+                        rating: r.rating,
+                        match_score: r.match_score
+                      }));
+                      
+                      // Store data in sessionStorage
+                      sessionStorage.setItem('selectedRestaurants', JSON.stringify(restaurantData));
+                      if (userCoords) {
+                        sessionStorage.setItem('userLocation', JSON.stringify(userCoords));
+                      }
+                      
+                      // Navigate to spatial page
+                      window.location.href = '/spatial?view=results';
+                    }}
+                    initial={{ opacity: 0, scale: 0.8, width: 36 }}
+                    animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                    exit={{ opacity: 0, scale: 0.8, width: 36 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className="h-9 rounded-xl bg-purple-600 flex items-center justify-center gap-2 px-4 relative overflow-hidden ml-2"
+                    style={{
+                      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
+                    }}
+                    whileHover={{ 
+                      scale: 1.05,
+                      boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 20px rgba(0, 0, 0, 0.2)',
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                    <MapPin className="w-4 h-4 text-white" />
+                    <span className="text-sm font-semibold text-white">View on Map</span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
               </div>
           </form>
         </motion.div>
@@ -1483,11 +1554,12 @@ export default function DiscoverPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => {
-                      // Navigate to reservations page with restaurant details
+                      // Navigate to reservations page with restaurant details and auto-open modal
                       const params = new URLSearchParams({
                         restaurant_name: selectedRestaurant.name,
                         restaurant_address: selectedRestaurant.address || '',
-                        place_id: selectedRestaurant.place_id || ''
+                        place_id: selectedRestaurant.place_id || '',
+                        autoOpen: 'true'  // Signal to auto-open the reservation modal
                       });
                       window.location.href = `/reservations?${params.toString()}`;
                     }}

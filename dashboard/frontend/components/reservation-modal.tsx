@@ -21,6 +21,11 @@ interface ReservationModalProps {
     name?: string
     phone?: string
   }
+  prefillRestaurant?: {
+    name?: string
+    address?: string
+    place_id?: string
+  }
   showIntro?: boolean // Show intro step if coming from friend profile
 }
 
@@ -80,7 +85,7 @@ interface ReservationData {
   }>
 }
 
-export function ReservationModal({ isOpen, onClose, mode: initialMode, reservationId, prefillInvitee, showIntro = false }: ReservationModalProps) {
+export function ReservationModal({ isOpen, onClose, mode: initialMode, reservationId, prefillInvitee, prefillRestaurant, showIntro = false }: ReservationModalProps) {
   const supabase = createClient()
   
   const [mode, setMode] = useState<'create' | 'view'>(initialMode)
@@ -129,7 +134,7 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
         loadReservation()
       }
     }
-  }, [isOpen, initialMode, reservationId, showIntro, prefillInvitee])
+  }, [isOpen, initialMode, reservationId, showIntro, prefillInvitee, prefillRestaurant])
 
   useEffect(() => {
     if (prefillInvitee?.phone) {
@@ -146,6 +151,8 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
       setCurrentUser(user.id)
     }
 
+    console.log('🍽️ Loading create data with prefillRestaurant:', prefillRestaurant)
+
     // Load restaurants
     const { data: restaurantsData } = await supabase
       .from('restaurants')
@@ -154,6 +161,41 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
 
     if (restaurantsData) {
       setRestaurants(restaurantsData)
+      
+      // If we have prefilled restaurant data, try to find or create it
+      if (prefillRestaurant?.name && prefillRestaurant?.place_id) {
+        console.log('🔍 Looking for restaurant:', prefillRestaurant.name)
+        
+        // Check if restaurant already exists
+        const existing = restaurantsData.find(r => r.name === prefillRestaurant.name)
+        
+        if (existing) {
+          console.log('✅ Found existing restaurant:', existing.id)
+          setSelectedRestaurant(existing.id)
+        } else {
+          console.log('➕ Creating new restaurant entry...')
+          // Create new restaurant entry
+          const { data: newRestaurant, error } = await supabase
+            .from('restaurants')
+            .insert({
+              name: prefillRestaurant.name,
+              formatted_address: prefillRestaurant.address || '',
+              place_id: prefillRestaurant.place_id
+            })
+            .select()
+            .single()
+          
+          if (error) {
+            console.error('❌ Error creating restaurant:', error)
+          } else if (newRestaurant) {
+            console.log('✅ Created new restaurant:', newRestaurant.id)
+            setRestaurants([...restaurantsData, newRestaurant])
+            setSelectedRestaurant(newRestaurant.id)
+          }
+        }
+      } else {
+        console.log('ℹ️ No prefilled restaurant data')
+      }
     }
 
     // Load profiles
