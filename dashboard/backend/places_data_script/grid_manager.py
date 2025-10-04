@@ -146,3 +146,53 @@ class GridManager:
         }
 
         return stats
+
+    def prioritize_coordinates(self, priority_coords: List[Tuple[float, float]], tolerance: float = 0.005):
+        """
+        Move cells closest to specific coordinates to the front of the pending queue.
+
+        Args:
+            priority_coords: List of (lat, lng) tuples to prioritize
+            tolerance: Maximum distance in degrees to consider a match (default: ~500m)
+        """
+        cells = self.load_grid()
+
+        # Find the single closest cell to each target coordinate
+        priority_cells = []
+        priority_cell_set = set()  # Track which cells we've selected
+
+        for target_lat, target_lng in priority_coords:
+            closest_cell = None
+            min_distance = float('inf')
+
+            for cell in cells:
+                # Calculate distance
+                dist = math.sqrt(
+                    (cell.lat - target_lat)**2 +
+                    (cell.lng - target_lng)**2
+                )
+
+                # Check if this is the closest cell within tolerance
+                if dist < tolerance and dist < min_distance:
+                    min_distance = dist
+                    closest_cell = cell
+
+            if closest_cell and id(closest_cell) not in priority_cell_set:
+                priority_cells.append(closest_cell)
+                priority_cell_set.add(id(closest_cell))
+
+        # Separate remaining cells
+        other_cells = [c for c in cells if id(c) not in priority_cell_set]
+
+        # Reorder: priority cells first (in the order specified), then everything else
+        reordered_cells = priority_cells + other_cells
+
+        # Save back to file
+        self.save_grid(reordered_cells)
+
+        print(f"✅ Prioritized {len(priority_cells)} cell(s)")
+        for i, cell in enumerate(priority_cells, 1):
+            print(
+                f"   {i}. {cell.lat:.6f}, {cell.lng:.6f} (status: {cell.status})")
+
+        return len(priority_cells)
