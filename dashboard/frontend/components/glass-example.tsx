@@ -5,7 +5,7 @@
  * Remove this file once you're familiar with the patterns.
  */
 
-import { Search, Heart, Share2 } from 'lucide-react';
+import { Search, Heart, Share2, Play, Pause, Download } from 'lucide-react';
 
 export function GlassExamples() {
   return (
@@ -103,6 +103,60 @@ export function GlassExamples() {
           Glass with Inner Glow
         </span>
       </button>
+
+      {/* Example 9: Music Player Panel */}
+      <div className="glass-panel music-panel max-w-sm">
+        <button className="glass-btn-sm" title="Previous">
+          <Pause className="w-4 h-4 text-slate-600" />
+        </button>
+        <button className="glass-btn-sm" title="Play">
+          <Play className="w-4 h-4 text-slate-600" />
+        </button>
+        <button className="glass-btn-sm" title="Like">
+          <Heart className="w-4 h-4 text-slate-600" />
+        </button>
+      </div>
+
+      {/* Example 10: Social Actions Panel */}
+      <div className="glass-panel social-panel max-w-sm">
+        <button className="glass-btn-sm" title="Like">
+          <Heart className="w-4 h-4 text-slate-600" />
+        </button>
+        <button className="glass-btn-sm" title="Share">
+          <Share2 className="w-4 h-4 text-slate-600" />
+        </button>
+        <button className="glass-btn-sm" title="Download">
+          <Download className="w-4 h-4 text-slate-600" />
+        </button>
+      </div>
+
+      {/* Example 11: Large Glass Button */}
+      <div className="flex gap-4">
+        <button className="glass-btn" title="Large Action">
+          <Play className="w-6 h-6 text-slate-600" />
+        </button>
+        <button className="glass-btn-inline">
+          <Share2 className="w-4 h-4 mr-2" />
+          Share Content
+        </button>
+      </div>
+
+      {/* Example 12: Mixed Button Sizes */}
+      <div className="glass-panel p-6 max-w-md">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex gap-2">
+            <button className="glass-btn-sm">
+              <Heart className="w-3 h-3 text-slate-600" />
+            </button>
+            <button className="glass-btn-sm">
+              <Share2 className="w-3 h-3 text-slate-600" />
+            </button>
+          </div>
+          <button className="glass-btn">
+            <Play className="w-5 h-5 text-slate-600" />
+          </button>
+        </div>
+      </div>
 
     </div>
   );

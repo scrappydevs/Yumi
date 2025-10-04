@@ -97,7 +97,7 @@ export default function FavoritesPage() {
               <div className="liquid-glass-dark rounded-xl p-1 flex">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`px-3 py-2 rounded-lg transition-all ${
+                  className={`glass-btn-inline px-3 py-2 rounded-lg transition-all ${
                     viewMode === 'grid' ? 'gradient-purple-blue text-white' : 'text-[hsl(var(--muted-foreground))]'
                   }`}
                 >
@@ -105,7 +105,7 @@ export default function FavoritesPage() {
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-3 py-2 rounded-lg transition-all ${
+                  className={`glass-btn-inline px-3 py-2 rounded-lg transition-all ${
                     viewMode === 'list' ? 'gradient-purple-blue text-white' : 'text-[hsl(var(--muted-foreground))]'
                   }`}
                 >
@@ -113,7 +113,7 @@ export default function FavoritesPage() {
                 </button>
               </div>
               <motion.button
-                className="px-4 py-2 rounded-xl liquid-glass-dark font-medium text-sm flex items-center gap-2"
+                className="glass-btn-inline"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -178,7 +178,7 @@ export default function FavoritesPage() {
                 
                 {/* Heart button */}
                 <motion.button
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg"
+                  className="absolute top-4 right-4 glass-btn"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                 >

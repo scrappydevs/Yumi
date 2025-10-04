@@ -3,15 +3,15 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { createClient } from '@/lib/supabase/client';
 import {
   Utensils,
   Compass,
   Users,
+  MessageCircle,
   User,
   Settings,
   ChevronLeft,
@@ -19,8 +19,7 @@ import {
   Sparkles,
   BookHeart,
   Activity,
-  LogOut,
-  Palette,
+  MapPin,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -40,10 +39,10 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
+  { name: 'Explore', icon: MapPin, href: '/spatial' },
   { name: 'Friends', icon: Users, href: '/friends' },
-  { name: 'Memories', icon: Sparkles, href: '/memories' },
+  { name: 'Messages', icon: MessageCircle, href: '/messages' },
   { name: 'Favorites', icon: BookHeart, href: '/favorites' },
-  { name: 'Glass Examples', icon: Palette, href: '/glass-examples' },
 ];
 
 const secondaryNav: NavigationItem[] = [
@@ -53,43 +52,35 @@ const secondaryNav: NavigationItem[] = [
 
 export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
-  const supabase = createClient();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
   
   return (
     <aside
       className={cn(
-        'relative h-screen border-r border-[hsl(var(--border))] liquid-glass transition-all duration-300 ease-in-out flex flex-col',
+        'relative h-screen transition-all duration-300 ease-in-out flex flex-col glass-layer-1 border-r border-white/20 overflow-hidden',
         isCollapsed ? 'w-[60px]' : 'w-[240px]'
       )}
       style={{
         width: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED,
       }}
     >
-      {/* Header - Seamless */}
-      <div className="h-16 border-b border-[hsl(var(--border))] flex items-center px-4">
-        {!isCollapsed && (
-          <div className="flex items-center gap-2 w-full">
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
-              Yummy
-            </h1>
-          </div>
-        )}
-        {isCollapsed && (
-          <div className="flex items-center justify-center w-full">
-            <div className="w-2 h-2 rounded-full gradient-purple-blue" />
-          </div>
-        )}
+      {/* Specular highlight */}
+      <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+      
+      {/* Header */}
+      <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-center px-4">
+        <div className="flex items-center justify-center">
+          <Utensils className="w-7 h-7" style={{
+            background: 'linear-gradient(135deg, #9B87F5 0%, #7B61FF 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }} />
+        </div>
       </div>
 
       {/* Toggle Button */}
@@ -98,7 +89,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
         size="sm"
         onClick={onToggle}
         className={cn(
-          'absolute -right-3 top-20 z-50 h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 hover:bg-[hsl(var(--muted))]'
+          'absolute -right-3 top-20 z-[100] h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 hover:bg-[hsl(var(--muted))]'
         )}
       >
         {isCollapsed ? (
@@ -168,29 +159,24 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       <div className="border-t border-[hsl(var(--border))] p-2.5">
         {!isCollapsed ? (
           <div className="space-y-1.5">
-            <Button
-              variant="ghost"
-              onClick={handleLogout}
-              className="w-full justify-start gap-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 h-8"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Log out</span>
-            </Button>
-            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] pt-1.5 border-t border-[hsl(var(--border))]">
+            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
               <Activity className="h-3 w-3 text-[hsl(var(--success))]" />
               <span className="uppercase tracking-wider text-[10px]">Online</span>
             </div>
+            <div className="pt-1.5 border-t border-[hsl(var(--border))]">
+              <div className="flex items-center gap-1 text-[10px] text-[hsl(var(--muted-foreground))]">
+                <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
+                  ⌘
+                </kbd>
+                <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
+                  B
+                </kbd>
+                <span className="ml-0.5">Toggle</span>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="space-y-2 flex flex-col items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+          <div className="flex justify-center">
             <Activity className="h-4 w-4 text-[hsl(var(--success))]" />
           </div>
         )}

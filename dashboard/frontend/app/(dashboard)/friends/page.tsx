@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -10,8 +11,10 @@ import {
   UserMinus, 
   Users, 
   X,
+  ArrowRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 type Profile = {
   id: string;
@@ -23,25 +26,36 @@ type Profile = {
   created_at: string;
 };
 
+type FollowingStats = {
+  followers_count: number;
+  following_count: number;
+};
+
 export default function FriendsPage() {
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [friends, setFriends] = useState<Profile[]>([]);
+  const [followers, setFollowers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const [allUsers, setAllUsers] = useState<Profile[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<Profile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'friends' | 'discover'>('friends');
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'friends' | 'followers' | 'discover'>('friends');
   const supabase = createClient();
+  const { user } = useAuth();
+  const router = useRouter();
 
   // Load current user and their friends
   useEffect(() => {
-    loadCurrentUser();
-  }, []);
+    if (user) {
+      loadCurrentUser();
+      loadAllUsers();
+    }
+  }, [user]);
 
   const loadCurrentUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: profile } = await supabase
@@ -52,7 +66,10 @@ export default function FriendsPage() {
 
       if (profile) {
         setCurrentUser(profile);
-        await loadFriends(profile.friends || []);
+        await Promise.all([
+          loadFriends(profile.friends || []),
+          loadFollowers(user.id)
+        ]);
       }
     } catch (error) {
       console.error('Error loading user:', error);
@@ -79,27 +96,51 @@ export default function FriendsPage() {
     }
   };
 
-  const searchUsers = async (query: string) => {
-    if (!query.trim() || !currentUser) {
-      setSearchResults([]);
-      return;
-    }
-
-    setSearchLoading(true);
+  const loadFollowers = async (userId: string) => {
     try {
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .ilike('username', `%${query}%`)
-        .neq('id', currentUser.id)
-        .limit(20);
+        .contains('friends', [userId]);
 
-      setSearchResults(data || []);
+      setFollowers(data || []);
     } catch (error) {
-      console.error('Error searching users:', error);
-    } finally {
-      setSearchLoading(false);
+      console.error('Error loading followers:', error);
     }
+  };
+
+  const loadAllUsers = async () => {
+    if (!user) return;
+    
+    setUsersLoading(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', user.id)
+        .order('created_at', { ascending: false });
+
+      setAllUsers(data || []);
+      setFilteredUsers(data || []);
+    } catch (error) {
+      console.error('Error loading all users:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const filterUsers = (query: string) => {
+    if (!query.trim()) {
+      setFilteredUsers(allUsers);
+      return;
+    }
+
+    const filtered = allUsers.filter(user => 
+      user.username.toLowerCase().includes(query.toLowerCase()) ||
+      (user.display_name && user.display_name.toLowerCase().includes(query.toLowerCase()))
+    );
+    
+    setFilteredUsers(filtered);
   };
 
   const addFriend = async (friendId: string) => {
@@ -116,7 +157,8 @@ export default function FriendsPage() {
       if (!error) {
         setCurrentUser({ ...currentUser, friends: updatedFriends });
         await loadFriends(updatedFriends);
-        setSearchResults(prev => prev.filter(p => p.id !== friendId));
+        // Refresh filtered users to update follow status
+        filterUsers(searchQuery);
       }
     } catch (error) {
       console.error('Error adding friend:', error);
@@ -137,6 +179,8 @@ export default function FriendsPage() {
       if (!error) {
         setCurrentUser({ ...currentUser, friends: updatedFriends });
         await loadFriends(updatedFriends);
+        // Refresh filtered users to update follow status
+        filterUsers(searchQuery);
       }
     } catch (error) {
       console.error('Error removing friend:', error);
@@ -147,62 +191,92 @@ export default function FriendsPage() {
     return currentUser?.friends?.includes(userId) || false;
   };
 
+  const navigateToProfile = (profileId: string) => {
+    router.push(`/profile/${profileId}`);
+  };
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      searchUsers(searchQuery);
-    }, 300);
+      filterUsers(searchQuery);
+    }, 100); // Debounced search with 100ms delay
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [searchQuery, allUsers]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex items-center justify-center h-full bg-white">
         <motion.div 
-          className="text-sm text-slate-400 font-medium"
+          className="w-12 h-12 rounded-full gradient-purple-blue animate-pulse"
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.5, repeat: Infinity }}
-        >
-          Loading...
-        </motion.div>
+        />
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="h-full bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40">
       <div className="max-w-5xl mx-auto h-full flex flex-col px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-semibold text-slate-800 mb-1 tracking-tight">
+          <h1 className="text-4xl font-semibold text-[hsl(var(--foreground))] mb-1 tracking-tight">
             Friends
           </h1>
-          <p className="text-slate-500 text-sm">Connect and discover</p>
+          <p className="text-[hsl(var(--muted-foreground))] text-sm">Connect and discover</p>
         </div>
 
-        {/* Tab Switcher - Apple Style */}
+        {/* Tab Switcher - Liquid Glass Style */}
         <div className="mb-6">
-          <div className="inline-flex p-1 bg-white/60 backdrop-blur-xl rounded-2xl border border-slate-200/60 shadow-sm">
-            <button
+          <div className="inline-flex p-1.5 glass-layer-1 rounded-2xl shadow-soft relative overflow-hidden">
+            {/* Specular highlight */}
+            <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-2xl" />
+            
+            <motion.button
               onClick={() => setActiveTab('friends')}
-              className={`px-6 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`relative px-6 py-2 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'friends'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'glass-layer-1 text-[hsl(var(--foreground))] shadow-soft'
+                  : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
               }`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              My Friends {friends.length > 0 && `(${friends.length})`}
-            </button>
-            <button
+              {activeTab === 'friends' && (
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl pointer-events-none" />
+              )}
+              Following {friends.length > 0 && `(${friends.length})`}
+            </motion.button>
+            <motion.button
+              onClick={() => setActiveTab('followers')}
+              className={`relative px-6 py-2 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === 'followers'
+                  ? 'glass-layer-1 text-[hsl(var(--foreground))] shadow-soft'
+                  : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
+              }`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {activeTab === 'followers' && (
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl pointer-events-none" />
+              )}
+              Followers {followers.length > 0 && `(${followers.length})`}
+            </motion.button>
+            <motion.button
               onClick={() => setActiveTab('discover')}
-              className={`px-6 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`relative px-6 py-2 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'discover'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'glass-layer-1 text-[hsl(var(--foreground))] shadow-soft'
+                  : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
               }`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
+              {activeTab === 'discover' && (
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl pointer-events-none" />
+              )}
               Discover
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -223,7 +297,7 @@ export default function FriendsPage() {
                     <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
                       <Users className="w-10 h-10 text-slate-300" />
                     </div>
-                    <p className="text-sm font-medium mb-1">No friends yet</p>
+                    <p className="text-sm font-medium mb-1">No following yet</p>
                     <p className="text-xs text-slate-400">Start by discovering people</p>
                   </div>
                 ) : (
@@ -233,9 +307,13 @@ export default function FriendsPage() {
                         key={friend.id}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="group bg-white/60 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300/60 transition-all cursor-pointer"
+                        className="group glass-layer-1 rounded-3xl p-6 shadow-soft hover:shadow-medium transition-all cursor-pointer relative overflow-hidden"
                         onClick={() => setSelectedProfile(friend)}
+                        whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)' }}
+                        whileTap={{ scale: 0.98 }}
                       >
+                        {/* Specular highlight */}
+                        <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-3xl" />
                         {/* Avatar */}
                         <div className="flex flex-col items-center mb-4">
                           {friend.avatar_url ? (
@@ -264,19 +342,123 @@ export default function FriendsPage() {
                           </p>
                         )}
 
-                        {/* Action */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFriend(friend.id);
-                          }}
-                          className="w-full text-xs text-slate-600 hover:text-red-600 hover:bg-red-50/50 rounded-xl"
-                        >
-                          <UserMinus className="w-3.5 h-3.5 mr-1.5" />
-                          Unfollow
-                        </Button>
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToProfile(friend.id);
+                            }}
+                            className="flex-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 rounded-xl"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5 mr-1.5" />
+                            View Profile
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFriend(friend.id);
+                            }}
+                            className="text-xs text-slate-600 hover:text-red-600 hover:bg-red-50/50 rounded-xl px-3"
+                          >
+                            <UserMinus className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            ) : activeTab === 'followers' ? (
+              <motion.div
+                key="followers"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="h-full overflow-auto"
+              >
+                {followers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                      <Users className="w-10 h-10 text-slate-300" />
+                    </div>
+                    <p className="text-sm font-medium mb-1">No followers yet</p>
+                    <p className="text-xs text-slate-400">Share your profile to get followers</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
+                    {followers.map((follower) => (
+                      <motion.div
+                        key={follower.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="group glass-layer-1 rounded-3xl p-6 shadow-soft hover:shadow-medium transition-all cursor-pointer relative overflow-hidden"
+                        onClick={() => setSelectedProfile(follower)}
+                        whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)' }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {/* Specular highlight */}
+                        <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-3xl" />
+                        {/* Avatar */}
+                        <div className="flex flex-col items-center mb-4">
+                          {follower.avatar_url ? (
+                            <img
+                              src={follower.avatar_url}
+                              alt={follower.username}
+                              className="w-20 h-20 rounded-full object-cover mb-3 ring-4 ring-slate-100"
+                            />
+                          ) : (
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center mb-3 ring-4 ring-slate-100">
+                              <span className="text-2xl font-semibold text-slate-600">
+                                {follower.username[0].toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <h3 className="font-semibold text-slate-800 text-center text-base">
+                            {follower.display_name || follower.username}
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">@{follower.username}</p>
+                        </div>
+
+                        {/* Bio */}
+                        {follower.bio && (
+                          <p className="text-xs text-slate-600 text-center line-clamp-2 mb-4 px-2">
+                            {follower.bio}
+                          </p>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToProfile(follower.id);
+                            }}
+                            className="flex-1 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 rounded-xl"
+                          >
+                            <ArrowRight className="w-3.5 h-3.5 mr-1.5" />
+                            View Profile
+                          </Button>
+                          {!isFriend(follower.id) && (
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addFriend(follower.id);
+                              }}
+                              size="sm"
+                              className="text-xs bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3"
+                            >
+                              <UserPlus className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </motion.div>
                     ))}
                   </div>
@@ -293,39 +475,45 @@ export default function FriendsPage() {
               >
                 {/* Search Bar */}
                 <div className="mb-6">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <div className="relative glass-layer-1 rounded-2xl shadow-soft overflow-hidden">
+                    {/* Specular highlight */}
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))] z-10" />
                     <Input
                       type="text"
                       placeholder="Search by username..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-11 h-12 rounded-2xl bg-white/60 backdrop-blur-xl border-slate-200/60 text-slate-900 placeholder:text-slate-400 focus:border-slate-200/60 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none focus-visible:border-slate-200/60 shadow-sm focus:shadow-sm transition-none"
+                      className="pl-11 h-12 rounded-2xl bg-transparent border-0 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none relative z-10"
                     />
                   </div>
                 </div>
 
-                {/* Search Results */}
+                {/* Users List */}
                 <div className="flex-1 overflow-auto pb-6">
-                  {searchLoading ? (
+                  {usersLoading ? (
                     <div className="flex justify-center py-12">
                       <motion.div 
                         className="text-sm text-slate-400"
                         animate={{ opacity: [0.5, 1, 0.5] }}
                         transition={{ duration: 1.5, repeat: Infinity }}
                       >
-                        Searching...
+                        Loading users...
                       </motion.div>
                     </div>
-                  ) : searchResults.length > 0 ? (
+                  ) : filteredUsers.length > 0 ? (
                     <div className="space-y-3">
-                      {searchResults.map((user) => (
+                      {filteredUsers.map((user) => (
                         <motion.div
                           key={user.id}
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300/60 transition-all"
+                          className="glass-layer-1 rounded-2xl p-4 shadow-soft hover:shadow-medium transition-all relative overflow-hidden"
+                          whileHover={{ scale: 1.01, boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)' }}
+                          whileTap={{ scale: 0.99 }}
                         >
+                          {/* Specular highlight */}
+                          <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
                           <div className="flex items-center gap-4">
                             {/* Avatar */}
                             <div
@@ -350,7 +538,7 @@ export default function FriendsPage() {
                             {/* Info */}
                             <div
                               className="flex-1 min-w-0 cursor-pointer"
-                              onClick={() => setSelectedProfile(user)}
+                              onClick={() => navigateToProfile(user.id)}
                             >
                               <h3 className="font-semibold text-slate-800 text-sm truncate">
                                 {user.display_name || user.username}
@@ -358,27 +546,38 @@ export default function FriendsPage() {
                               <p className="text-xs text-slate-500 truncate">@{user.username}</p>
                             </div>
 
-                            {/* Add Friend Button */}
-                            {isFriend(user.id) ? (
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 flex-shrink-0">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => removeFriend(user.id)}
-                                className="rounded-xl text-xs text-slate-600 hover:text-red-600 hover:bg-red-50/50 flex-shrink-0"
+                                onClick={() => navigateToProfile(user.id)}
+                                className="rounded-xl text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 px-3"
                               >
-                                <UserMinus className="w-3.5 h-3.5 mr-1.5" />
-                                Unfollow
+                                <ArrowRight className="w-3.5 h-3.5 mr-1.5" />
+                                View
                               </Button>
-                            ) : (
-                              <Button
-                                onClick={() => addFriend(user.id)}
-                                size="sm"
-                                className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs flex-shrink-0"
-                              >
-                                <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-                                Follow
-                              </Button>
-                            )}
+                              {isFriend(user.id) ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFriend(user.id)}
+                                  className="rounded-xl text-xs text-red-600 hover:text-red-700 hover:bg-red-50/50 px-3"
+                                >
+                                  <UserMinus className="w-3.5 h-3.5 mr-1.5" />
+                                  Remove
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={() => addFriend(user.id)}
+                                  size="sm"
+                                  className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs px-3"
+                                >
+                                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                                  Add
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </motion.div>
                       ))}
@@ -389,15 +588,15 @@ export default function FriendsPage() {
                         <Search className="w-10 h-10 text-slate-300" />
                       </div>
                       <p className="text-sm font-medium">No users found</p>
-                      <p className="text-xs text-slate-400 mt-1">Try a different search</p>
+                      <p className="text-xs text-slate-400 mt-1">Try a different search term</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400">
                       <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                        <Search className="w-10 h-10 text-slate-300" />
+                        <Users className="w-10 h-10 text-slate-300" />
                       </div>
-                      <p className="text-sm font-medium">Search for friends</p>
-                      <p className="text-xs text-slate-400 mt-1">Enter a username to start</p>
+                      <p className="text-sm font-medium">No users available</p>
+                      <p className="text-xs text-slate-400 mt-1">Check back later for new users</p>
                     </div>
                   )}
                 </div>
@@ -413,7 +612,7 @@ export default function FriendsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-md z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-black/10 backdrop-blur-md z-50 flex items-center justify-center p-4"
               onClick={() => setSelectedProfile(null)}
             >
               <motion.div
@@ -421,17 +620,22 @@ export default function FriendsPage() {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="bg-white/80 backdrop-blur-2xl rounded-3xl max-w-md w-full shadow-2xl border border-slate-200/60 overflow-hidden"
+                className="glass-card rounded-[32px] max-w-md w-full shadow-strong overflow-hidden relative"
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Specular highlight */}
+                <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-[32px]" />
                 {/* Close Button */}
                 <div className="absolute top-4 right-4 z-10">
-                  <button
+                  <motion.button
                     onClick={() => setSelectedProfile(null)}
-                    className="w-8 h-8 rounded-full bg-slate-100/80 backdrop-blur-sm hover:bg-slate-200/80 flex items-center justify-center transition-colors"
+                    className="glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden"
+                    whileHover={{ scale: 1.1, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)' }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <X className="w-4 h-4 text-slate-600" />
-                  </button>
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                    <X className="w-4 h-4 text-[hsl(var(--foreground))]" />
+                  </motion.button>
                 </div>
 
                 {/* Profile Content */}
@@ -463,36 +667,55 @@ export default function FriendsPage() {
                       </p>
                     )}
 
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-6 px-4 py-2 bg-slate-100/60 rounded-xl">
-                      <Users className="w-3.5 h-3.5" />
-                      <span>{selectedProfile.friends?.length || 0} friends</span>
+                    <div className="glass-layer-1 flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] mb-6 px-4 py-2 rounded-xl shadow-soft relative overflow-hidden">
+                      <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
+                      <Users className="w-3.5 h-3.5 relative z-10" />
+                      <span className="relative z-10">{selectedProfile.friends?.length || 0} friends</span>
                     </div>
 
-                    {/* Action Button */}
-                    {isFriend(selectedProfile.id) ? (
-                      <Button
-                        variant="ghost"
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <motion.button
                         onClick={() => {
-                          removeFriend(selectedProfile.id);
+                          navigateToProfile(selectedProfile.id);
                           setSelectedProfile(null);
                         }}
-                        className="w-full rounded-xl text-slate-600 hover:text-red-600 hover:bg-red-50/50"
+                        className="flex-1 rounded-2xl gradient-purple-blue text-white h-12 text-base font-semibold shadow-lg flex items-center justify-center relative overflow-hidden"
+                        whileHover={{ scale: 1.02, boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)' }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        <UserMinus className="w-4 h-4 mr-2" />
-                        Unfollow
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          addFriend(selectedProfile.id);
-                          setSelectedProfile(null);
-                        }}
-                        className="w-full rounded-xl bg-slate-900 hover:bg-slate-800 text-white"
-                      >
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Follow
-                      </Button>
-                    )}
+                        <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        View Profile
+                      </motion.button>
+                      {isFriend(selectedProfile.id) ? (
+                        <motion.button
+                          onClick={() => {
+                            removeFriend(selectedProfile.id);
+                            setSelectedProfile(null);
+                          }}
+                          className="glass-layer-1 rounded-2xl text-red-600 hover:text-red-700 px-4 shadow-soft relative overflow-hidden h-12"
+                          whileHover={{ scale: 1.05, boxShadow: '0 8px 24px rgba(239, 68, 68, 0.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                          <UserMinus className="w-4 h-4" />
+                        </motion.button>
+                      ) : (
+                        <motion.button
+                          onClick={() => {
+                            addFriend(selectedProfile.id);
+                            setSelectedProfile(null);
+                          }}
+                          className="rounded-2xl gradient-purple-blue text-white px-4 shadow-lg relative overflow-hidden h-12"
+                          whileHover={{ scale: 1.05, boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)' }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                          <UserPlus className="w-4 h-4" />
+                        </motion.button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>

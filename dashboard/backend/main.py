@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from supabase_client import SupabaseClient
-from routers import issues, ai, audio
+from routers import issues, ai, audio, config
 import os
 import subprocess
 from dotenv import load_dotenv
@@ -86,6 +86,7 @@ app.add_middleware(
 app.include_router(issues.router)
 app.include_router(ai.router)
 app.include_router(audio.router)
+app.include_router(config.router)
 
 
 @app.get("/")

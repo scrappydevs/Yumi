@@ -15,6 +15,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/navigation';
 
 const features = [
   {
@@ -59,7 +61,15 @@ const restaurantPhotos = [
 
 export default function Home() {
   const supabase = createClient();
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/overview');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     const interval = setInterval(() => {

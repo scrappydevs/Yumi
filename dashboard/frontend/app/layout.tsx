@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { GlassFilters } from "@/components/glass-filters";
+import { AuthProvider } from "@/lib/auth-context";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
@@ -32,7 +33,9 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         style={{ fontFamily: 'var(--font-inter)' }}
       >
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <GlassFilters />
       </body>
     </html>

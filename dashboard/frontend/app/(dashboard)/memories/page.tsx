@@ -105,12 +105,7 @@ export default function MemoriesPage() {
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.5)',
-                  backdropFilter: 'blur(12px)',
-                  border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                }}
+                className="glass-btn-sm disabled:opacity-40"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -120,12 +115,7 @@ export default function MemoriesPage() {
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1}
-                className="w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.5)',
-                  backdropFilter: 'blur(12px)',
-                  border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                }}
+                className="glass-btn-sm disabled:opacity-40"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -137,14 +127,9 @@ export default function MemoriesPage() {
             <span className="text-xs text-[hsl(var(--muted-foreground))]">Filter:</span>
             <button
               onClick={() => setSelectedFilter(null)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`glass-btn-inline text-xs ${
                 !selectedFilter ? 'gradient-purple-blue text-white' : ''
               }`}
-              style={!selectedFilter ? {} : {
-                background: 'rgba(255, 255, 255, 0.5)',
-                backdropFilter: 'blur(12px)',
-                border: '0.25px solid rgba(0, 0, 0, 0.08)',
-              }}
             >
               All
             </button>
@@ -152,14 +137,9 @@ export default function MemoriesPage() {
               <button
                 key={friend}
                 onClick={() => setSelectedFilter(friend)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                className={`glass-btn-inline text-xs ${
                   selectedFilter === friend ? 'gradient-purple-blue text-white' : ''
                 }`}
-                style={selectedFilter === friend ? {} : {
-                  background: 'rgba(255, 255, 255, 0.5)',
-                  backdropFilter: 'blur(12px)',
-                  border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                }}
               >
                 <Users className="w-3 h-3 inline mr-1" />
                 {friend}
@@ -255,17 +235,8 @@ export default function MemoriesPage() {
               <div className="flex items-center gap-2">
                 <motion.button
                   type="button"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.5)',
-                    backdropFilter: 'blur(12px)',
-                    border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                    boxShadow: 'inset 0 0 25px -8px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.05)',
-                  }}
-                  whileHover={{ 
-                    scale: 1.1,
-                    boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.95), 0 4px 12px rgba(0, 0, 0, 0.08)',
-                  }}
+                  className="glass-btn-sm"
+                  whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent rounded-t-xl" />
@@ -275,14 +246,8 @@ export default function MemoriesPage() {
                 <motion.button
                   type="submit"
                   disabled={!prompt.trim()}
-                  className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden disabled:opacity-40"
-                  style={{
-                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
-                  }}
-                  whileHover={{ 
-                    scale: 1.1,
-                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 20px rgba(0, 0, 0, 0.2)',
-                  }}
+                  className="glass-btn-sm gradient-purple-blue disabled:opacity-40"
+                  whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />

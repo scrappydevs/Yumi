@@ -15,6 +15,8 @@ import {
   Mic,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
+import { MetallicSphereComponent } from '@/components/metallic-sphere';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -146,6 +148,38 @@ const SAMPLE_RESTAURANTS = [
     rating: 4.6,
     location: 'Lower East Side',
   },
+  {
+    id: 17,
+    name: 'Sushi Nakazawa',
+    image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=200&h=200&fit=crop',
+    cuisine: 'Japanese',
+    rating: 4.8,
+    location: 'West Village',
+  },
+  {
+    id: 18,
+    name: 'The Modern',
+    image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=200&h=200&fit=crop',
+    cuisine: 'American',
+    rating: 4.7,
+    location: 'Midtown',
+  },
+  {
+    id: 19,
+    name: 'Osteria Morini',
+    image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=200&h=200&fit=crop',
+    cuisine: 'Italian',
+    rating: 4.6,
+    location: 'SoHo',
+  },
+  {
+    id: 20,
+    name: 'Atoboy',
+    image: 'https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=200&h=200&fit=crop',
+    cuisine: 'Korean',
+    rating: 4.7,
+    location: 'NoMad',
+  },
 ];
 
 export default function DiscoverPage() {
@@ -156,18 +190,25 @@ export default function DiscoverPage() {
   const [location, setLocation] = useState('New York City');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [expandedOnce, setExpandedOnce] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     
     // Orbit animation - faster when thinking
     const interval = setInterval(() => {
-      setRotation((prev) => (prev + (isThinking ? 0.8 : 0.3)) % 360);
+      setRotation((prev) => (prev + (isThinking ? 1.2 : 0.4)) % 360);
     }, 50);
     
     return () => {
       clearInterval(interval);
     };
+  }, [isThinking]);
+
+  useEffect(() => {
+    if (isThinking) {
+      setExpandedOnce(true);
+    }
   }, [isThinking]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -289,189 +330,148 @@ export default function DiscoverPage() {
 
       {/* Main Content - Orbiting Photos with Center Dot */}
       <div className="flex-1 flex items-center justify-center relative">
-        <div className="relative w-[700px] h-[700px]">
-          {/* Center Content - Dynamic */}
-          <AnimatePresence mode="wait">
-            {!isThinking ? (
-              <motion.div 
-                key="default"
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none"
-                initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                animate={{ 
-                  opacity: 1, 
-                  scale: 1,
-                  y: 0,
-                }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{
-                  duration: 0.5,
-                  ease: "easeOut"
-                }}
-              >
-                {/* Glow effect behind text */}
-                <motion.div
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-40 rounded-full -z-10"
-                  animate={{
-                    scale: [1, 1.15, 1],
-                    opacity: [0.2, 0.4, 0.2],
-                  }}
-                  transition={{
-                    duration: 5,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  style={{
-                    background: 'radial-gradient(circle at center, rgba(155, 135, 245, 0.25), rgba(59, 130, 246, 0.18), transparent)',
-                    filter: 'blur(50px)',
-                  }}
-                />
-                
-                <h2 className="text-4xl font-bold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent mb-3">
-                  Yummy
-                </h2>
-                <p className="text-sm text-[hsl(var(--muted-foreground))] mb-2 font-medium">
-                  Food Social Network
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="thinking"
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ 
-                  opacity: 1, 
-                  scale: 1,
-                }}
-                exit={{ opacity: 0, scale: 0.5 }}
-                transition={{ duration: 0.4 }}
-              >
-                {/* Pulsing animated blob */}
-                <motion.div
-                  className="relative w-56 h-56"
-                  animate={{
-                    rotate: [0, 360],
-                  }}
-                  transition={{
-                    duration: 15,
-                    repeat: Infinity,
-                    ease: "linear"
-                  }}
-                >
-                  {/* Outer blob layer - most dramatic */}
-                  <motion.div
-                    className="absolute inset-0 rounded-full"
-                    animate={{
-                      scale: [1, 1.5, 1.2, 1.6, 1.3, 1],
-                      opacity: [0.3, 0.6, 0.4, 0.7, 0.5, 0.3],
-                    }}
-                    transition={{
-                      duration: 2.5,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    style={{
-                      background: 'radial-gradient(circle at 30% 40%, rgba(155, 135, 245, 0.5), rgba(59, 130, 246, 0.4), rgba(99, 179, 237, 0.3), transparent)',
-                      filter: 'blur(45px)',
-                    }}
-                  />
-                  
-                  {/* Middle blob layer */}
-                  <motion.div
-                    className="absolute inset-8 rounded-full"
-                    animate={{
-                      scale: [1.3, 0.9, 1.4, 1, 1.5, 1.3],
-                      opacity: [0.5, 0.8, 0.6, 0.9, 0.7, 0.5],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: 0.2
-                    }}
-                    style={{
-                      background: 'radial-gradient(circle at 60% 50%, rgba(155, 135, 245, 0.6), rgba(59, 130, 246, 0.5), transparent)',
-                      filter: 'blur(28px)',
-                    }}
-                  />
-                  
-                  {/* Inner core blob - fastest */}
-                  <motion.div
-                    className="absolute inset-16 rounded-full"
-                    animate={{
-                      scale: [1, 1.6, 1.3, 1.7, 1.4, 1],
-                      opacity: [0.7, 1, 0.8, 1, 0.9, 0.7],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: 0.4
-                    }}
-                    style={{
-                      background: 'radial-gradient(circle at center, rgba(155, 135, 245, 0.7), rgba(59, 130, 246, 0.6), transparent)',
-                      filter: 'blur(18px)',
-                    }}
-                  />
-                  
-                  {/* Glass center - pulsating */}
-                  <motion.div
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full relative overflow-hidden"
-                    animate={{
-                      scale: [1, 1.2, 1.1, 1.3, 1.15, 1],
-                    }}
-                    transition={{
-                      duration: 1.8,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.5)',
-                      backdropFilter: 'blur(50px) saturate(200%)',
-                      border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                      boxShadow: 'inset 0 0 50px -12px rgba(255, 255, 255, 0.98), 0 12px 50px rgba(155, 135, 245, 0.4)',
-                    }}
-                  >
-                    <div 
-                      className="absolute top-0 left-0 right-0 h-1/2 rounded-t-full"
-                      style={{
-                        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, transparent 100%)',
-                      }}
-                    />
-                  </motion.div>
-                </motion.div>
-                
-                {/* Thinking text - positioned below blob */}
-                <motion.p
-                  className="absolute left-1/2 top-full -translate-x-1/2 mt-6 text-sm font-medium bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent whitespace-nowrap"
-                  animate={{
-                    opacity: [0.5, 1, 0.5],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  Finding Restaurants
-                </motion.p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="relative w-[700px] h-[700px]" style={{ perspective: '1000px' }}>
+          
+          {/* Three.js Blob - Always mounted, just hidden/shown */}
+          <div 
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ 
+              opacity: isThinking ? 1 : 0,
+              transition: 'opacity 0.01s ease-out',
+              zIndex: isThinking ? 10 : -1,
+            }}
+          >
+            {/* Apple-style pink and blue glow effect */}
+            <motion.div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              animate={{
+                scale: isThinking ? [1, 1.3, 1] : 1,
+                opacity: isThinking ? [0.4, 0.6, 0.4] : 0,
+                rotate: isThinking ? [0, 180, 360] : 0,
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              style={{
+                background: 'radial-gradient(circle at 30% 40%, rgba(255, 107, 157, 0.5), rgba(0, 122, 255, 0.4), transparent 70%)',
+                filter: 'blur(60px)',
+              }}
+            />
+            
+            {/* Secondary glow - blue to pink */}
+            <motion.div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              animate={{
+                scale: isThinking ? [1.1, 1.4, 1.1] : 1,
+                opacity: isThinking ? [0.3, 0.5, 0.3] : 0,
+                rotate: isThinking ? [360, 180, 0] : 0,
+              }}
+              transition={{
+                duration: 5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.5
+              }}
+              style={{
+                background: 'radial-gradient(circle at 70% 60%, rgba(90, 200, 250, 0.4), rgba(255, 55, 95, 0.3), transparent 70%)',
+                filter: 'blur(70px)',
+              }}
+            />
+            
+            <div className="w-[280px] h-[280px] relative">
+              <LiquidGlassBlob isAnimating={isThinking} />
+            </div>
+            
+            <motion.p
+              className="text-sm font-semibold whitespace-nowrap text-center mt-6 bg-gradient-to-r from-[#FF375F] via-[#007AFF] to-[#5AC8FA] bg-clip-text text-transparent"
+              animate={{
+                opacity: isThinking ? [0.5, 1, 0.5] : 0,
+                scale: isThinking ? [0.98, 1.02, 0.98] : 1,
+              }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: [0.25, 0.46, 0.45, 0.94]
+              }}
+            >
+              Finding Restaurants
+            </motion.p>
+          </div>
+          
+          {/* Metallic Sphere - 3D, subtle and latent */}
+          <div 
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+            style={{
+              opacity: isThinking ? 0 : 1,
+              transition: 'opacity 0.01s ease-out',
+              zIndex: 5,
+            }}
+          >
+            {/* Subtle glow */}
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              animate={{
+                opacity: [0.15, 0.25, 0.15],
+                scale: [1, 1.1, 1],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              style={{
+                background: 'radial-gradient(circle at center, rgba(200, 200, 220, 0.2), transparent 70%)',
+                filter: 'blur(20px)',
+              }}
+            />
+            
+            <div className="w-24 h-24 relative">
+              <MetallicSphereComponent isActive={false} />
+            </div>
+          </div>
 
-          {/* Orbiting Restaurant Photos - Larger Circle */}
-          {SAMPLE_RESTAURANTS.map((restaurant, index) => {
-            const angle = ((index / SAMPLE_RESTAURANTS.length) * 360 + rotation) * (Math.PI / 180);
-            const radius = 270;
-            const x = 350 + Math.cos(angle) * radius;
-            const y = 350 + Math.sin(angle) * radius;
+          {/* Orbiting Restaurant Photos - Dynamic Circle */}
+          <AnimatePresence mode="sync">
+          {(() => {
+            // Always render all 20 restaurants, but control visibility
+            // First 10 are the "core" images, next 10 fill in between
+            return SAMPLE_RESTAURANTS.map((restaurant, index) => {
+              const isCore = index < 10; // First 10 are core images
+              const shouldShow = isCore || isThinking; // Show new images only when thinking
+              
+              // For core images: use their index (0-9)
+              // For new images: interleave between core images (0.5, 1.5, 2.5, etc.)
+              const effectiveIndex = isCore ? index : (index - 10) + 0.5;
+              const totalSlots = isThinking ? 20 : 10;
+              
+              const angle = ((effectiveIndex / 10) * 360 + rotation) * (Math.PI / 180);
+              const radius = isThinking ? 350 : 200; // Increased spacing when expanded
+              const x = 350 + Math.cos(angle) * radius;
+              const y = 350 + Math.sin(angle) * radius;
+            
+            if (!shouldShow) return null;
             
             return (
               <motion.div
                 key={restaurant.id}
                 className="absolute"
-                style={{
+                initial={false}
+                animate={{
                   left: x,
                   top: y,
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.8,
+                  transition: { duration: 0.00 }
+                }}
+                transition={{
+                  duration: 0.00,
+                  ease: [0.22, 1, 0.36, 1], // Fast ease-out, no slow parts
+                }}
+                style={{
                   x: '-50%',
                   y: '-50%',
                 }}
@@ -483,31 +483,47 @@ export default function DiscoverPage() {
                     backdropFilter: 'blur(30px) saturate(180%)',
                     border: '0.25px solid rgba(0, 0, 0, 0.08)',
                     boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                    transformStyle: 'preserve-3d',
                   }}
-                  initial={{ opacity: 0 }}
+                  initial={{ opacity: isCore ? 1 : 0, scale: isCore ? 1 : 0.8 }}
                   animate={{ 
                     opacity: 1,
-                    ...(isThinking && {
-                      scale: [1, 0.95, 1.05, 1],
-                      rotate: [0, -3, 3, 0],
-                    }),
+                    scale: isThinking ? [1, 0.95, 1.02, 0.98, 1.01, 1] : 1,
+                    rotateX: isThinking ? [0, 8, -5, 3, -2, 0] : 0,
+                    rotateY: isThinking ? [0, -6, 8, -4, 2, 0] : 0,
+                    rotateZ: isThinking ? [0, -3, 4, -2, 1, 0] : 0,
+                    y: isThinking ? [0, -4, 2, -1, 1, 0] : 0,
                   }}
-                  transition={{
-                    delay: 0.2 + index * 0.05,
-                    duration: 0.6,
-                    ease: "easeOut",
-                    ...(isThinking && {
-                      scale: {
-                        duration: 1.5 + index * 0.2,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      },
-                      rotate: {
-                        duration: 2 + index * 0.3,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }
-                    }),
+                  transition={isThinking ? {
+                    delay: isCore ? 0 : 0.1,
+                    scale: {
+                      duration: 0.1 + index * 0.2,
+                      repeat: Infinity,
+                      ease: [0.4, 0, 0.6, 1]
+                    },
+                    rotateX: {
+                      duration: 0.1 + index * 0.25,
+                      repeat: Infinity,
+                      ease: [0.25, 0.46, 0.45, 0.94]
+                    },
+                    rotateY: {
+                      duration: 0.1 + index * 0.3,
+                      repeat: Infinity,
+                      ease: [0.25, 0.46, 0.45, 0.94]
+                    },
+                    rotateZ: {
+                      duration: 0.1 + index * 0.22,
+                      repeat: Infinity,
+                      ease: [0.4, 0, 0.6, 1]
+                    },
+                    y: {
+                      duration: 0.1 + index * 0.35,
+                      repeat: Infinity,
+                      ease: [0.25, 0.46, 0.45, 0.94]
+                    }
+                  } : {
+                    duration: 0.05,
+                    ease: [0.22, 1, 0.36, 1]
                   }}
                   whileHover={{ 
                     zIndex: 50,
@@ -566,7 +582,9 @@ export default function DiscoverPage() {
                 </motion.div>
               </motion.div>
             );
-          })}
+            });
+          })()}
+          </AnimatePresence>
                   </div>
                 </div>
                 
