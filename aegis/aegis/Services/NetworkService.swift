@@ -461,6 +461,89 @@ class NetworkService {
         print("✅ [DISCOVER] Received \(discoverResponse.restaurants.count) restaurants")
         return discoverResponse
     }
+    
+    // MARK: - Search Restaurants
+    func searchRestaurants(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+        authToken: String
+    ) async throws -> DiscoverResponse {
+        let url = URL(string: "\(baseURL)/api/restaurants/search")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // Add query
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"query\"\r\n\r\n".data(using: .utf8)!)
+        body.append(query.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add latitude
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"latitude\"\r\n\r\n".data(using: .utf8)!)
+        body.append(String(latitude).data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add longitude
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"longitude\"\r\n\r\n".data(using: .utf8)!)
+        body.append(String(longitude).data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        request.timeoutInterval = 30 // LLM can take time
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("❌ [SEARCH] Server error: \(httpResponse.statusCode)")
+            if let responseText = String(data: data, encoding: .utf8) {
+                print("❌ [SEARCH] Response: \(responseText)")
+            }
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        
+        // The search endpoint returns top_restaurants instead of restaurants
+        struct SearchResponse: Codable {
+            let status: String
+            let topRestaurants: [Restaurant]
+            let reasoning: String?
+            let location: LocationCoordinates
+            
+            enum CodingKeys: String, CodingKey {
+                case status
+                case topRestaurants = "top_restaurants"
+                case reasoning
+                case location
+            }
+        }
+        
+        let searchResponse = try decoder.decode(SearchResponse.self, from: data)
+        print("✅ [SEARCH] Received \(searchResponse.topRestaurants.count) restaurants")
+        
+        // Convert to DiscoverResponse format
+        return DiscoverResponse(
+            status: searchResponse.status,
+            restaurants: searchResponse.topRestaurants,
+            reasoning: searchResponse.reasoning,
+            location: searchResponse.location
+        )
+    }
 }
 
 // MARK: - Response Models
