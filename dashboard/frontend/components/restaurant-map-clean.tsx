@@ -162,7 +162,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       clickableIcons: false, // Disable default POI clicks for better performance
       isFractionalZoomEnabled: true, // Smoother zoom transitions
       // Performance optimizations
-      renderingType: window.google.maps.RenderingType.VECTOR, // Vector rendering for smoother performance
+      renderingType: window.google?.maps?.RenderingType?.VECTOR, // Vector rendering for smoother performance
       controlSize: 32, // Smaller controls for better performance
       // Smooth animation settings
       animationDuration: 300, // Smooth pan/zoom animations (300ms)
