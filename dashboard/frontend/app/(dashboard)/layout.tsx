@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { AegisSidebar } from '@/components/aegis-sidebar';
+import { AIPanel } from '@/components/ai-panel';
 import { Button } from '@/components/ui/button';
-import { Activity, Users } from 'lucide-react';
+import { Activity, Users, Sparkles } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -11,13 +12,20 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
-  // Keyboard shortcut for sidebar toggle (Cmd+B / Ctrl+B)
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+B / Ctrl+B for sidebar toggle
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
         setSidebarCollapsed((prev) => !prev);
+      }
+      // Cmd+K / Ctrl+K for AI panel toggle
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setAiPanelOpen((prev) => !prev);
       }
     };
 
@@ -52,6 +60,15 @@ export default function DashboardLayout({
                 <Activity className="w-4 h-4" />
                 <span className="uppercase tracking-wide text-xs">System Operational</span>
               </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`border-[hsl(var(--border))] ${aiPanelOpen ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white' : ''}`}
+                onClick={() => setAiPanelOpen(!aiPanelOpen)}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI Assistant
+              </Button>
               <Button variant="outline" size="sm" className="border-[hsl(var(--border))]">
                 <Users className="w-4 h-4 mr-2" />
                 Admin
@@ -60,10 +77,19 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+        {/* Page Content with AI Panel */}
+        <div className="flex-1 flex overflow-hidden">
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+          
+          {/* AI Panel */}
+          {aiPanelOpen && (
+            <div className="w-[400px] h-full flex-shrink-0">
+              <AIPanel onClose={() => setAiPanelOpen(false)} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

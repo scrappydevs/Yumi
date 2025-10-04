@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  Building2,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -48,6 +50,11 @@ const secondaryNav: NavigationItem[] = [
 
 export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   const pathname = usePathname();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   
   return (
     <aside
@@ -100,16 +107,16 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       </Button>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navigation.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = mounted && pathname === item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
               className={cn(
-                'group flex items-center gap-3 rounded-sm px-2 py-2 text-sm font-medium transition-all hover:bg-[hsl(var(--muted))]',
+                'group flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm font-medium transition-all hover:bg-[hsl(var(--muted))]',
                 isActive
                   ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
                   : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
@@ -131,17 +138,17 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
           );
         })}
 
-        <Separator className="my-4 bg-[hsl(var(--border))]" />
+        <Separator className="my-2 bg-[hsl(var(--border))]" />
 
         {secondaryNav.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = mounted && pathname === item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
               className={cn(
-                'group flex items-center gap-3 rounded-sm px-2 py-2 text-sm font-medium transition-all hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]',
+                'group flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm font-medium transition-all hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]',
                 isActive
                   ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
                   : 'text-[hsl(var(--muted-foreground))]',
@@ -155,18 +162,15 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-[hsl(var(--border))] p-3">
+      {/* Footer - Compact */}
+      <div className="border-t border-[hsl(var(--border))] p-2.5">
         {!isCollapsed ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
               <Activity className="h-3 w-3 text-[hsl(var(--success))]" />
-              <span className="uppercase tracking-wider">System Online</span>
+              <span className="uppercase tracking-wider text-[10px]">Online</span>
             </div>
-            <div className="text-[10px] text-[hsl(var(--muted-foreground))]">
-              Last sync: 2 min ago
-            </div>
-            <div className="mt-3 pt-2 border-t border-[hsl(var(--border))]">
+            <div className="pt-1.5 border-t border-[hsl(var(--border))]">
               <div className="flex items-center gap-1 text-[10px] text-[hsl(var(--muted-foreground))]">
                 <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
                   ⌘
@@ -174,7 +178,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
                 <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
                   B
                 </kbd>
-                <span className="ml-1">Toggle</span>
+                <span className="ml-0.5">Toggle</span>
               </div>
             </div>
           </div>

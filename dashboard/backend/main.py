@@ -1,3 +1,5 @@
+from routers import issues, ai, audio
+from supabase_client import SupabaseClient
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -6,6 +8,8 @@ import os
 import subprocess
 
 # Auto-sync secrets from Infisical before starting
+
+
 def sync_secrets():
     try:
         print("🔄 Syncing secrets from Infisical to .env...")
@@ -21,7 +25,8 @@ def sync_secrets():
                 f.write(result.stdout)
             print("✅ Secrets synced to .env successfully!")
         else:
-            print("⚠️  Could not sync from Infisical. Using existing .env file if available")
+            print(
+                "⚠️  Could not sync from Infisical. Using existing .env file if available")
             if result.stderr:
                 print(f"   Error: {result.stderr.strip()}")
     except FileNotFoundError:
@@ -31,16 +36,16 @@ def sync_secrets():
         print(f"⚠️  Could not sync secrets: {e}")
         print("   Using existing .env file if available")
 
+
 # Sync secrets on startup
 sync_secrets()
 
 # Load environment variables
 load_dotenv()
 
-from supabase_client import SupabaseClient
-from routers import issues
 
 # Lifespan context manager for startup/shutdown events
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -49,9 +54,9 @@ async def lifespan(app: FastAPI):
         print("✅ Application startup complete")
     except Exception as e:
         print(f"⚠️  Warning: Could not initialize Supabase: {e}")
-    
+
     yield
-    
+
     # Shutdown
     print("🔄 Application shutdown")
 
@@ -79,6 +84,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(issues.router)
+app.include_router(ai.router)
+app.include_router(audio.router)
+
 
 @app.get("/")
 async def root():
@@ -88,6 +96,7 @@ async def root():
         "docs": "/docs"
     }
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "aegis-api"}
@@ -95,10 +104,10 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8000"))
-    
+
     uvicorn.run(
         "main:app",
         host=host,

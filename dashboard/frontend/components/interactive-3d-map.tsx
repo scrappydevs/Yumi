@@ -30,6 +30,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useIssues } from '@/hooks/use-issues';
+import { reverseGeocode } from '@/lib/geocoding';
 
 // City presets for navigation - All 50 US States
 const CITIES = {
@@ -157,6 +158,8 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
   const [layerType, setLayerType] = useState<'hexagon' | 'heatmap' | 'scatter'>('scatter');
   const [searchQuery, setSearchQuery] = useState('');
   const [stateFilter, setStateFilter] = useState<string>('all');
+  const [hoveredIssueId, setHoveredIssueId] = useState<string | null>(null);
+  const [customLocationName, setCustomLocationName] = useState<string>('Custom Location');
   
   const [viewState, setViewState] = useState<MapViewState>({
     ...CITIES.sanFrancisco,
@@ -169,6 +172,8 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     const zoom = searchParams.get('zoom');
     
     if (lat && lng) {
+      // Clear selected city when navigating to specific coordinates
+      setSelectedCity('' as keyof typeof CITIES);
       setViewState({
         latitude: parseFloat(lat),
         longitude: parseFloat(lng),
@@ -177,28 +182,43 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
         bearing: 0,
         transitionDuration: 1500,
       });
+
+      // Find the issue at this location and get its name
+      const issue = rawIssues.find(i => i.geolocation === `${lat},${lng}`);
+      if (issue && issue.geolocation) {
+        reverseGeocode(issue.geolocation).then(result => {
+          setCustomLocationName(result.formatted);
+        }).catch(() => {
+          setCustomLocationName('Custom Location');
+        });
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, rawIssues]);
 
   // Convert Supabase issues to map visualization format
   const issuesData = useMemo<IssueData[]>(() => {
     if (!rawIssues.length) return [];
     
-    return rawIssues
-      .map(issue => {
-        const coords = parseGeolocation(issue.geolocation);
-        if (!coords) return null;
-        
-        return {
-          id: issue.id,
-          coordinates: coords,
-          type: issue.description?.split(' ')[0] || 'Unknown',
-          severity: Math.random(), // TODO: Add severity field to database
-          priority: 'medium' as const, // TODO: Add priority field to database
-          status: issue.status === 'complete' ? 'resolved' as const : 'pending' as const,
-        };
-      })
-      .filter((issue): issue is IssueData => issue !== null);
+    const mapped: IssueData[] = [];
+    
+    for (const issue of rawIssues) {
+      const coords = parseGeolocation(issue.geolocation);
+      if (!coords) continue;
+      
+      const priority: 'high' | 'medium' | 'low' = 
+        issue.priority === 3 ? 'high' : issue.priority === 1 ? 'low' : 'medium';
+      
+      mapped.push({
+        id: issue.id,
+        coordinates: coords,
+        type: issue.description?.split(' ')[0] || 'Unknown',
+        severity: Math.random(), // TODO: Add severity field to database
+        priority,
+        status: issue.status === 'complete' ? 'resolved' as const : 'pending' as const,
+      });
+    }
+    
+    return mapped;
   }, [rawIssues]);
 
   // Filter issues by status
@@ -361,6 +381,19 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
             onViewStateChange={({ viewState: newViewState }) => setViewState(newViewState as MapViewState)}
             controller={true}
             layers={layers}
+            onClick={(info) => {
+              if (info.object) {
+                const issue = rawIssues.find(i => i.id === info.object.id);
+                if (issue) {
+                  window.location.href = `/issues/${issue.id}`;
+                }
+              }
+            }}
+            getCursor={({ isDragging, isHovering }) => {
+              if (isDragging) return 'grabbing';
+              if (isHovering && layerType === 'scatter') return 'pointer';
+              return 'grab';
+            }}
             getTooltip={({ object }) => {
               if (!object) return null;
               const issue = rawIssues.find(i => i.id === object.id);
@@ -396,7 +429,7 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               
               return {
                 html: `
-                  <div style="background: rgba(28, 33, 39, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); max-width: 320px;">
+                  <div style="background: rgba(28, 33, 39, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); max-width: 320px; cursor: pointer;">
                     ${imageHtml}
                     <div style="padding: 12px;">
                       <div style="color: white; font-weight: 600; font-size: 13px; margin-bottom: 8px; line-height: 1.4;">
@@ -407,20 +440,15 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                         <div style="margin-bottom: 4px;">Type: <span style="color: white;">${object.type}</span></div>
                         <div>Status: <span style="color: white;">${object.status}</span></div>
                       </div>
-                      <a 
-                        href="/issues/${issue.id}"
-                        style="display: inline-flex; align-items: center; font-size: 11px; color: #2D72D2; text-decoration: none; margin-top: 4px;"
-                        onmouseover="this.style.textDecoration='underline'"
-                        onmouseout="this.style.textDecoration='none'"
-                      >
-                        View Details →
-                      </a>
+                      <div style="display: inline-flex; align-items: center; font-size: 11px; color: #2D72D2; margin-top: 4px; padding: 4px 8px; background: rgba(45, 114, 210, 0.1); border-radius: 4px;">
+                        Click to view details →
+                      </div>
                     </div>
                   </div>
                 `,
                 style: {
                   backgroundColor: 'transparent',
-                  pointerEvents: 'auto',
+                  pointerEvents: 'none',
                 },
               };
             }}
@@ -584,7 +612,9 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                 </div>
                 <div className="pt-2 border-t border-[hsl(var(--border))]">
                   <div className="text-xs text-[hsl(var(--muted-foreground))]">
-                    City: <span className="text-[hsl(var(--foreground))] font-medium">{CITIES[selectedCity].name}</span>
+                    City: <span className="text-[hsl(var(--foreground))] font-medium">
+                      {selectedCity && CITIES[selectedCity] ? CITIES[selectedCity].name : customLocationName}
+                    </span>
                   </div>
                 </div>
               </CardContent>
