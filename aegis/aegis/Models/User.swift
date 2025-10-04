@@ -46,3 +46,22 @@ struct Profile: Codable, Identifiable {
         displayName ?? username
     }
 }
+
+// Blended preferences model for group taste profile
+struct BlendedPreferences: Codable {
+    let blendedText: String
+    let userCount: Int
+    let userNames: [String]
+    let topCuisines: [String]
+    let atmospherePreferences: [String]
+    let priceRange: String
+    
+    enum CodingKeys: String, CodingKey {
+        case blendedText = "blended_text"
+        case userCount = "user_count"
+        case userNames = "user_names"
+        case topCuisines = "top_cuisines"
+        case atmospherePreferences = "atmosphere_preferences"
+        case priceRange = "price_range"
+    }
+}
