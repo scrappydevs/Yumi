@@ -118,8 +118,11 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
 
   useEffect(() => {
     if (isOpen) {
+      console.log('🔓 Modal opened:', { mode: initialMode, reservationId, currentUser })
+      
       // Reset mode to match initialMode
       setMode(initialMode)
+      setShowDeleteConfirm(false) // Reset confirmation dialog
       
       // Reset step when modal opens
       setStep(showIntro ? 'intro' : 'form')
@@ -244,14 +247,50 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const loadReservation = async () => {
     setLoading(true)
     try {
+      console.log('📥 Loading reservation:', reservationId)
       const data = await apiRequest<ReservationData>(
         API_CONFIG.endpoints.reservations.getById(reservationId!)
       )
+      console.log('📊 Reservation loaded:', {
+        id: data.id,
+        organizer_id: data.organizer_id,
+        currentUser,
+        isOrganizer: data.organizer_id === currentUser
+      })
       setReservation(data)
     } catch (err) {
       console.error('Failed to load reservation:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCancelReservation = async () => {
+    if (!reservationId || !currentUser) return
+    
+    setDeleting(true)
+    try {
+      // Delete the reservation from Supabase
+      const { error } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', reservationId)
+        .eq('organizerId', currentUser) // Only organizer can delete
+      
+      if (error) {
+        console.error('Failed to delete reservation:', error)
+        alert('Failed to cancel reservation. Please try again.')
+        return
+      }
+      
+      console.log('✅ Reservation deleted successfully')
+      setShowDeleteConfirm(false)
+      onClose() // Close modal after successful deletion
+    } catch (err) {
+      console.error('Error canceling reservation:', err)
+      alert('Failed to cancel reservation. Please try again.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -807,30 +846,100 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
               </div>
 
               {/* Invites */}
-              <div className="pt-4 border-t border-gray-100">
-                <h4 className="text-sm font-semibold text-black mb-3">
-                  Invites ({reservation.invites.length})
-                </h4>
-                <div className="space-y-1.5">
-                  {reservation.invites.map((invite) => (
-                    <div
-                      key={invite.id}
-                      className="flex items-center justify-between py-2"
-                    >
-                      <span className="text-sm text-gray-700">
-                        {invite.inviteeName || invite.inviteePhoneE164}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        invite.rsvpStatus === 'yes' ? 'bg-green-100 text-green-700' :
-                        invite.rsvpStatus === 'no' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {invite.rsvpStatus.toUpperCase()}
-                      </span>
-                    </div>
-                  ))}
+              {reservation.invites && reservation.invites.length > 0 && (
+                <div className="pt-4 border-t border-gray-100">
+                  <h4 className="text-sm font-semibold text-black mb-3">
+                    Invites ({reservation.invites.length})
+                  </h4>
+                  <div className="space-y-1.5">
+                    {reservation.invites.map((invite) => (
+                      <div
+                        key={invite.id}
+                        className="flex items-center justify-between py-2"
+                      >
+                        <span className="text-sm text-gray-700">
+                          {invite.inviteeName || invite.inviteePhoneE164}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          invite.rsvpStatus === 'yes' ? 'bg-green-100 text-green-700' :
+                          invite.rsvpStatus === 'no' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {invite.rsvpStatus.toUpperCase()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Cancel Button - Always show for organizer */}
+              {(() => {
+                console.log('🔍 CANCEL BUTTON DEBUG:', {
+                  currentUser,
+                  organizerId: reservation.organizer_id,
+                  matches: reservation.organizer_id === currentUser,
+                  willShow: currentUser && reservation.organizer_id === currentUser,
+                  reservationData: reservation
+                });
+                return currentUser && reservation.organizer_id === currentUser;
+              })() && (
+                <div className="pt-6 border-t border-gray-100">
+                  {!showDeleteConfirm ? (
+                    <Button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      variant="outline"
+                      className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Cancel Reservation
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-red-900 mb-1">
+                              Are you sure?
+                            </p>
+                            <p className="text-sm text-red-700">
+                              This will permanently delete the reservation. This action cannot be undone.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          variant="outline"
+                          className="flex-1"
+                          disabled={deleting}
+                        >
+                          Keep Reservation
+                        </Button>
+                        <Button
+                          onClick={handleCancelReservation}
+                          disabled={deleting}
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          {deleting ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                              Canceling...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Yes, Cancel It
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
