@@ -70,7 +70,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   return (
     <aside
       className={cn(
-        'relative h-screen transition-all duration-300 ease-in-out flex flex-col glass-layer-1 border-r border-white/20 overflow-hidden',
+        'relative h-screen transition-all duration-300 ease-in-out flex flex-col glass-layer-1 border-r border-white/20 overflow-hidden z-[1000]',
         isCollapsed ? 'w-[60px]' : 'w-[240px]'
       )}
       style={{
@@ -100,7 +100,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
             size="sm"
             onClick={onToggle}
             className={cn(
-              'absolute -right-3 top-1/2 -translate-y-1/2 z-[100] h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 opacity-60 hover:opacity-100 hover:bg-[hsl(var(--muted))] transition-opacity duration-200'
+              'absolute -right-3 top-1/2 -translate-y-1/2 z-[9999] h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 opacity-60 hover:opacity-100 hover:bg-[hsl(var(--muted))] transition-opacity duration-200'
             )}
           >
             {isCollapsed ? (

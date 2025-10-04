@@ -54,7 +54,8 @@ class RestaurantSearchService:
         latitude: float,
         longitude: float,
         radius: int = 1000,
-        limit: int = 10
+        limit: int = 10,
+        keyword: str = None
     ) -> List[Dict[str, Any]]:
         """
         Tool function: Get nearby restaurants from Google Places API.
@@ -64,6 +65,7 @@ class RestaurantSearchService:
             longitude: Longitude coordinate
             radius: Search radius in meters (default: 1000m = 1km)
             limit: Maximum number of restaurants to return (default: 10)
+            keyword: Optional keyword to filter restaurants (e.g., "Chinese", "Italian")
             
         Returns:
             List of restaurant dicts with place_id, name, cuisine, rating, etc.
@@ -71,12 +73,15 @@ class RestaurantSearchService:
         try:
             print(f"[TOOL] get_nearby_restaurants called at ({latitude}, {longitude})")
             print(f"[TOOL] Radius: {radius}m, Limit: {limit}")
+            if keyword:
+                print(f"[TOOL] Keyword filter: '{keyword}'")
             
             restaurants = self.places_service.find_nearby_restaurants(
                 latitude=latitude,
                 longitude=longitude,
                 radius=radius,
-                limit=limit
+                limit=limit,
+                keyword=keyword
             )
             
             print(f"[TOOL] Found {len(restaurants)} restaurants")
@@ -170,13 +175,31 @@ class RestaurantSearchService:
             print(f"[RESTAURANT SEARCH] Step 1: Getting user preferences...")
             preferences = self.get_user_preferences_tool(user_id)
             
-            # Step 2: Get nearby restaurants
+            # Step 1.5: Extract cuisine keyword from query if present
+            cuisine_keyword = None
+            query_lower = query.lower()
+            
+            # Common cuisine keywords to extract
+            cuisine_keywords = [
+                'chinese', 'italian', 'mexican', 'japanese', 'thai', 'indian', 'french',
+                'korean', 'vietnamese', 'greek', 'spanish', 'american', 'mediterranean',
+                'seafood', 'steakhouse', 'sushi', 'pizza', 'burger', 'bbq', 'vegan', 'vegetarian'
+            ]
+            
+            for keyword in cuisine_keywords:
+                if keyword in query_lower:
+                    cuisine_keyword = keyword
+                    print(f"[RESTAURANT SEARCH] 🍽️ Detected cuisine preference: '{cuisine_keyword}'")
+                    break
+            
+            # Step 2: Get nearby restaurants (with cuisine filter if detected)
             print(f"[RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
             restaurants = self.get_nearby_restaurants_tool(
                 latitude=latitude,
                 longitude=longitude,
-                radius=1000,
-                limit=10
+                radius=2000,  # Increased to 2km radius
+                limit=20,      # Get 20 restaurants
+                keyword=cuisine_keyword  # Filter by cuisine if detected
             )
             
             if not restaurants:
@@ -206,8 +229,33 @@ class RestaurantSearchService:
 - Flavor Notes: {', '.join(preferences.get('flavorNotes', [])) or 'No preference'}
 """
             
+            # Determine how many recommendations to return based on query
+            # Default to 5, but extract if user specifies (e.g., "top 3", "5 restaurants")
+            num_recommendations = 5  # Default
+            query_lower = query.lower()
+            
+            # Try to extract number from common patterns
+            import re
+            number_patterns = [
+                r'top (\d+)',
+                r'(\d+) restaurants',
+                r'(\d+) places',
+                r'give me (\d+)',
+                r'show me (\d+)',
+            ]
+            
+            for pattern in number_patterns:
+                match = re.search(pattern, query_lower)
+                if match:
+                    num_recommendations = int(match.group(1))
+                    break
+            
+            # Ensure between 1 and 10
+            num_recommendations = max(1, min(10, num_recommendations))
+            print(f"[RESTAURANT SEARCH] Returning top {num_recommendations} recommendations")
+            
             # Create LLM prompt
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the user's query and preferences.
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP {num_recommendations} that best match the user's query and preferences.
 
 USER'S QUERY: "{query}"
 
@@ -219,10 +267,15 @@ AVAILABLE RESTAURANTS:
 TASK:
 1. Analyze how well each restaurant matches the query "{query}"
 2. Consider the user's preferences (cuisines, price, atmosphere)
-3. Select the TOP 3 best matches
-4. Provide BRIEF reasoning (1-2 sentences max per restaurant)
+3. Select the TOP {num_recommendations} best matches
+4. Provide SPECIFIC, DETAILED reasoning for each recommendation:
+   - Mention specific dishes or menu items they're known for
+   - Describe the vibe, ambiance, or atmosphere
+   - Explain why it matches their taste or query
+   - Reference any unique characteristics or specialties
+   - Keep it to 2-3 sentences with concrete details
 
-Return ONLY valid JSON (no markdown, no code blocks):
+Return ONLY valid JSON (no markdown, no code blocks) with EXACTLY {num_recommendations} restaurants:
 {{
   "top_restaurants": [
     {{
@@ -232,37 +285,32 @@ Return ONLY valid JSON (no markdown, no code blocks):
       "address": "Full address",
       "price_level": 2,
       "match_score": 0.95,
-      "reasoning": "Brief 1-2 sentence explanation of why this matches"
-    }},
-    {{
-      "name": "Second Restaurant",
-      "cuisine": "Cuisine",
-      "rating": 4.3,
-      "address": "Address",
-      "price_level": 2,
-      "match_score": 0.85,
-      "reasoning": "Brief reason"
-    }},
-    {{
-      "name": "Third Restaurant",
-      "cuisine": "Cuisine",
-      "rating": 4.2,
-      "address": "Address",
-      "price_level": 3,
-      "match_score": 0.78,
-      "reasoning": "Brief reason"
+      "reasoning": "Specific explanation mentioning dishes (e.g., 'famous for their hand-pulled noodles and crispy Peking duck'), the atmosphere (e.g., 'casual, family-friendly vibe with traditional decor'), and why it matches the query. Include concrete details that make it unique."
     }}
+    // ... {num_recommendations} total restaurants
   ],
   "query_analysis": "One sentence about what the user wants",
-  "preference_matching": "One sentence about preference alignment"
+  "preference_matching": "One sentence about preference alignment",
+  "num_recommendations": {num_recommendations}
 }}
 
-IMPORTANT: Keep all reasoning CONCISE - maximum 1-2 sentences each."""
+IMPORTANT: 
+- Return EXACTLY {num_recommendations} restaurants
+- Keep all reasoning CONCISE - maximum 1-2 sentences each
+- Rank from best to worst match"""
             
             # Call Gemini
+            print(f"[RESTAURANT SEARCH] Calling Gemini API...")
             model = self.gemini_service.model
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
+            
+            try:
+                response = model.generate_content(prompt)
+                print(f"[RESTAURANT SEARCH] Gemini API responded")
+                response_text = response.text.strip()
+                print(f"[RESTAURANT SEARCH] Response length: {len(response_text)} chars")
+            except Exception as e:
+                print(f"[RESTAURANT SEARCH ERROR] Gemini API call failed: {str(e)}")
+                raise
             
             # Clean up markdown
             if response_text.startswith("```json"):
@@ -277,16 +325,44 @@ IMPORTANT: Keep all reasoning CONCISE - maximum 1-2 sentences each."""
             import json
             result = json.loads(response_text)
             
+            # Step 5: Enrich results with photo URLs and place_ids
+            # Match LLM-selected restaurants back to original data for photos
+            top_restaurants = result.get('top_restaurants', [])
+            for top_restaurant in top_restaurants:
+                # Find matching restaurant from original list by name
+                for orig_restaurant in restaurants:
+                    if orig_restaurant['name'].lower() == top_restaurant['name'].lower():
+                        # Add photo URL and place_id from original data
+                        top_restaurant['photo_url'] = orig_restaurant.get('photo_url')
+                        top_restaurant['place_id'] = orig_restaurant.get('place_id')
+                        break
+            
+            # Step 6: Also include all nearby restaurants for the photo wheel
+            # Add basic info for all restaurants (not just top 3)
+            all_nearby_with_photos = [
+                {
+                    'name': r['name'],
+                    'photo_url': r.get('photo_url'),
+                    'place_id': r.get('place_id'),
+                    'rating': r.get('rating', 0),
+                    'cuisine': r.get('cuisine', 'Unknown')
+                }
+                for r in restaurants if r.get('photo_url')  # Only include restaurants with photos
+            ]
+            
             # Add metadata
             result["status"] = "success"
             result["stage"] = "4 - LLM analysis"
             result["query"] = query
+            result["all_nearby_restaurants"] = all_nearby_with_photos  # Include all for photo wheel
+            result["num_recommendations"] = num_recommendations  # Include for frontend
             result["location"] = {
                 "latitude": latitude,
                 "longitude": longitude
             }
             
             print(f"[RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants")
+            print(f"[RESTAURANT SEARCH] ✅ Returning {len(all_nearby_with_photos)} total restaurants with photos")
             return result
             
         except Exception as e:

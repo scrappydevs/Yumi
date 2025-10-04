@@ -23,173 +23,97 @@ import { useVoiceOutput } from '@/hooks/use-voice-output';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 
-// Mock restaurant data with food images
-const SAMPLE_RESTAURANTS = [
-  {
-    id: 1,
-    name: 'Nobu Downtown',
-    image: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=200&h=200&fit=crop',
-    cuisine: 'Japanese',
-    rating: 4.8,
-    location: 'Downtown NYC',
-  },
-  {
-    id: 2,
-    name: 'Le Bernardin',
-    image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200&h=200&fit=crop',
-    cuisine: 'French',
-    rating: 4.9,
-    location: 'Midtown',
-  },
-  {
-    id: 3,
-    name: 'Carbone',
-    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&h=200&fit=crop',
-    cuisine: 'Italian',
-    rating: 4.7,
-    location: 'Greenwich Village',
-  },
-  {
-    id: 4,
-    name: 'Momofuku Ko',
-    image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=200&h=200&fit=crop',
-    cuisine: 'Asian Fusion',
-    rating: 4.6,
-    location: 'East Village',
-  },
-  {
-    id: 5,
-    name: 'Eleven Madison Park',
-    image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=200&h=200&fit=crop',
-    cuisine: 'American',
-    rating: 4.9,
-    location: 'Flatiron',
-  },
-  {
-    id: 6,
-    name: 'Cosme',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-    cuisine: 'Mexican',
-    rating: 4.7,
-    location: 'Flatiron',
-  },
-  {
-    id: 7,
-    name: 'Peter Luger',
-    image: 'https://images.unsplash.com/photo-1558030006-450675393462?w=200&h=200&fit=crop',
-    cuisine: 'Steakhouse',
-    rating: 4.8,
-    location: 'Brooklyn',
-  },
-  {
-    id: 8,
-    name: 'Blue Hill',
-    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&h=200&fit=crop',
-    cuisine: 'American',
-    rating: 4.7,
-    location: 'Greenwich Village',
-  },
-  {
-    id: 9,
-    name: 'Gramercy Tavern',
-    image: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=200&h=200&fit=crop',
-    cuisine: 'American',
-    rating: 4.6,
-    location: 'Gramercy',
-  },
-  {
-    id: 10,
-    name: 'Masa',
-    image: 'https://images.unsplash.com/photo-1563612116625-3012372fccce?w=200&h=200&fit=crop',
-    cuisine: 'Japanese',
-    rating: 4.9,
-    location: 'Midtown',
-  },
-  {
-    id: 11,
-    name: 'Del Posto',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&h=200&fit=crop',
-    cuisine: 'Italian',
-    rating: 4.5,
-    location: 'Chelsea',
-  },
-  {
-    id: 12,
-    name: 'Lilia',
-    image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=200&h=200&fit=crop',
-    cuisine: 'Italian',
-    rating: 4.8,
-    location: 'Williamsburg',
-  },
-  {
-    id: 13,
-    name: 'Ippudo',
-    image: 'https://images.unsplash.com/photo-1617093727343-374698b1b08d?w=200&h=200&fit=crop',
-    cuisine: 'Ramen',
-    rating: 4.5,
-    location: 'Hell\'s Kitchen',
-  },
-  {
-    id: 14,
-    name: 'Daniel',
-    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&h=200&fit=crop',
-    cuisine: 'French',
-    rating: 4.8,
-    location: 'Upper East Side',
-  },
-  {
-    id: 15,
-    name: 'Marea',
-    image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=200&h=200&fit=crop',
-    cuisine: 'Seafood',
-    rating: 4.7,
-    location: 'Midtown',
-  },
-  {
-    id: 16,
-    name: 'Contra',
-    image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=200&h=200&fit=crop',
-    cuisine: 'American',
-    rating: 4.6,
-    location: 'Lower East Side',
-  },
-  {
-    id: 17,
-    name: 'Sushi Nakazawa',
-    image: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=200&h=200&fit=crop',
-    cuisine: 'Japanese',
-    rating: 4.8,
-    location: 'West Village',
-  },
-  {
-    id: 18,
-    name: 'The Modern',
-    image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=200&h=200&fit=crop',
-    cuisine: 'American',
-    rating: 4.7,
-    location: 'Midtown',
-  },
-  {
-    id: 19,
-    name: 'Osteria Morini',
-    image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=200&h=200&fit=crop',
-    cuisine: 'Italian',
-    rating: 4.6,
-    location: 'SoHo',
-  },
-  {
-    id: 20,
-    name: 'Atoboy',
-    image: 'https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=200&h=200&fit=crop',
-    cuisine: 'Korean',
-    rating: 4.7,
-    location: 'NoMad',
-  },
-];
+// Cuisine-based fallback images for restaurants without photos
+const CUISINE_FALLBACK_IMAGES: { [key: string]: string } = {
+  // Asian
+  'Japanese': 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=200&h=200&fit=crop', // sushi
+  'Chinese': 'https://images.unsplash.com/photo-1525755662778-989d0524087e?w=200&h=200&fit=crop', // chinese food
+  'Thai': 'https://images.unsplash.com/photo-1559314809-0d155014e29e?w=200&h=200&fit=crop', // pad thai
+  'Korean': 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=200&h=200&fit=crop', // korean bbq
+  'Vietnamese': 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=200&h=200&fit=crop', // pho
+  'Indian': 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=200&h=200&fit=crop', // indian curry
+  
+  // Italian & Mediterranean
+  'Italian': 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?w=200&h=200&fit=crop', // pasta
+  'Pizza': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&h=200&fit=crop', // pizza
+  'Mediterranean': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop', // mediterranean
+  'Greek': 'https://images.unsplash.com/photo-1544982503-9f984c14501a?w=200&h=200&fit=crop', // greek food
+  
+  // American & Fast Food
+  'American': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop', // burger
+  'Burger': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop', // burger
+  'BBQ': 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=200&h=200&fit=crop', // bbq
+  'Steakhouse': 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=200&h=200&fit=crop', // steak
+  'Seafood': 'https://images.unsplash.com/photo-1559737558-2f4d82e4738a?w=200&h=200&fit=crop', // seafood
+  
+  // Latin American
+  'Mexican': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop', // tacos
+  'Latin': 'https://images.unsplash.com/photo-1626509653291-18d6f0290d3d?w=200&h=200&fit=crop', // latin food
+  'Spanish': 'https://images.unsplash.com/photo-1534080564583-6be75777b70a?w=200&h=200&fit=crop', // paella
+  
+  // Other
+  'French': 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=200&h=200&fit=crop', // fine dining
+  'Cafe': 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop', // cafe
+  'Coffee': 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop', // cafe
+  'Bakery': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&h=200&fit=crop', // bakery
+  'Dessert': 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=200&h=200&fit=crop', // dessert
+  'Ice Cream': 'https://images.unsplash.com/photo-1551024601-bec78aea704b?w=200&h=200&fit=crop', // dessert
+  'Vegetarian': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop', // salad
+  'Vegan': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop', // salad
+  'Bar': 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=200&h=200&fit=crop', // bar
+  'Pub': 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=200&h=200&fit=crop', // bar
+  'Sushi': 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=200&h=200&fit=crop', // sushi
+  'Ramen': 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=200&h=200&fit=crop', // ramen
+  'Noodle': 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=200&h=200&fit=crop', // noodles
+  'Sandwich': 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=200&h=200&fit=crop', // sandwich
+  'Deli': 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=200&h=200&fit=crop', // deli
+  
+  // Default fallback
+  'default': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&h=200&fit=crop', // restaurant
+};
+
+// Helper function to get fallback image based on cuisine, name, or description
+function getFallbackImage(cuisine?: string, nameOrDescription?: string): string {
+  // Try cuisine first
+  if (cuisine) {
+    const cuisineMatch = Object.keys(CUISINE_FALLBACK_IMAGES).find(
+      key => cuisine.toLowerCase().includes(key.toLowerCase())
+    );
+    if (cuisineMatch) {
+      console.log(`🖼️ Fallback matched cuisine "${cuisine}" -> ${cuisineMatch}`);
+      return CUISINE_FALLBACK_IMAGES[cuisineMatch];
+    }
+  }
+  
+  // Try name/description if cuisine didn't match
+  if (nameOrDescription) {
+    const descMatch = Object.keys(CUISINE_FALLBACK_IMAGES).find(
+      key => nameOrDescription.toLowerCase().includes(key.toLowerCase())
+    );
+    if (descMatch) {
+      console.log(`🖼️ Fallback matched name "${nameOrDescription}" -> ${descMatch}`);
+      return CUISINE_FALLBACK_IMAGES[descMatch];
+    }
+  }
+  
+  // Always return default fallback - NEVER empty!
+  console.log(`🖼️ Using default fallback for: ${nameOrDescription || 'unknown'}`);
+  return CUISINE_FALLBACK_IMAGES['default'];
+}
+
+// Ensure a restaurant always has an image URL (never empty/null/undefined)
+function ensureImageUrl(restaurant: any): string {
+  if (restaurant.photo_url && restaurant.photo_url.trim()) {
+    return restaurant.photo_url;
+  }
+  // No photo URL - use fallback
+  return getFallbackImage(restaurant.cuisine, restaurant.name || restaurant.description);
+}
 
 // City coordinates mapping
 const CITY_COORDINATES: { [key: string]: { lat: number; lng: number } } = {
   'New York City': { lat: 40.7580, lng: -73.9855 },
+  'Boston': { lat: 42.3601, lng: -71.0589 },  // Near Harvard
   'San Francisco': { lat: 37.7749, lng: -122.4194 },
   'Los Angeles': { lat: 34.0522, lng: -118.2437 },
   'Chicago': { lat: 41.8781, lng: -87.6298 },
@@ -205,16 +129,52 @@ interface SearchResult {
   price_level: number;
   match_score: number;
   reasoning: string;
+  photo_url?: string;
+  place_id?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+// Helper function to calculate distance between two points (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in km
+  return distance;
+}
+
+// Helper function to estimate travel times
+function calculateTravelTimes(distanceKm: number): { walk: string, drive: string } {
+  const walkSpeed = 5; // km/h
+  const driveSpeed = 30; // km/h average in city
+  
+  const walkMinutes = Math.round((distanceKm / walkSpeed) * 60);
+  const driveMinutes = Math.round((distanceKm / driveSpeed) * 60);
+  
+  return {
+    walk: walkMinutes < 60 ? `${walkMinutes} min` : `${Math.round(walkMinutes / 60)} hr ${walkMinutes % 60} min`,
+    drive: driveMinutes < 60 ? `${driveMinutes} min` : `${Math.round(driveMinutes / 60)} hr ${driveMinutes % 60} min`
+  };
 }
 
 export default function DiscoverPage() {
   const [prompt, setPrompt] = useState('');
-  const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<SearchResult | null>(null);
+  const [hoveredRestaurant, setHoveredRestaurant] = useState<SearchResult | null>(null);
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const [location, setLocation] = useState('New York City');
+  const [location, setLocation] = useState('Boston');  // Default to Boston
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [showingResults, setShowingResults] = useState(false);  // New state for showing results
+  const [isNarrowing, setIsNarrowing] = useState(false);  // New state for narrowing phase
+  const [userCoords, setUserCoords] = useState<{lat: number, lng: number} | null>(null);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
   const [flowingIndex, setFlowingIndex] = useState(0);
@@ -224,21 +184,69 @@ export default function DiscoverPage() {
   const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [allNearbyImages, setAllNearbyImages] = useState<Array<{url: string, name: string, id: string, index?: number}>>([]);
+  const [visibleImageIds, setVisibleImageIds] = useState<string[]>([]);
+  const [isLoadingDefaults, setIsLoadingDefaults] = useState(false);
+  const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const { speak, isSpeaking, stop } = useVoiceOutput();
   const { user } = useAuth();
 
   useEffect(() => {
     setMounted(true);
     
-    // Orbit animation - faster when thinking
+    // Orbit animation - faster when thinking, slower when showing results or idle
     const interval = setInterval(() => {
-      setRotation((prev) => (prev + (isThinking ? 1.2 : 0.4)) % 360);
+      const speed = isThinking ? 1.2 : (showingResults ? 0.6 : 0.8);  // Latent state is now faster (0.8)
+      setRotation((prev) => (prev + speed) % 360);
     }, 50);
+    
+    // Get user's actual geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserCoords(coords);
+          console.log(`📍 Detected location: ${coords.lat}, ${coords.lng}`);
+          
+          // Auto-detect closest city
+          const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
+            const distance = Math.sqrt(
+              Math.pow(coords.lat - cityCoords.lat, 2) + 
+              Math.pow(coords.lng - cityCoords.lng, 2)
+            );
+            return { city, distance };
+          });
+          
+          const closest = distances.sort((a, b) => a.distance - b.distance)[0];
+          if (closest) {
+            console.log(`🎯 Closest city: ${closest.city}`);
+            setLocation(closest.city);
+          }
+        },
+        (error) => {
+          console.warn('Geolocation error:', error.message);
+        }
+      );
+    }
     
     return () => {
       clearInterval(interval);
     };
-  }, [isThinking]);
+  }, [isThinking, showingResults]);
+
+  // Load default recommendations on mount and when location changes
+  useEffect(() => {
+    // Only load if:
+    // - User is authenticated and component is mounted
+    // - Not currently loading or thinking
+    // - Location has actually changed (prevent duplicate calls)
+    if (user && mounted && !isLoadingDefaults && !isThinking && location !== lastLoadedLocation) {
+      loadDefaultRecommendations();
+    }
+  }, [user, mounted, location, isLoadingDefaults, isThinking, lastLoadedLocation]); // location change triggers reload
 
   useEffect(() => {
     if (isThinking) {
@@ -246,42 +254,50 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
-  // Continuous flowing animation - images constantly flow in and out
+  // Continuous swapping animation - images constantly swap in and out during thinking
   useEffect(() => {
-    if (!isThinking) {
+    if (!isThinking || isNarrowing || allNearbyImages.length === 0) {
       setAbsorbedIndices([]);
       setFlowingIndex(0);
       return;
     }
 
-    // Continuously cycle through images - always have 2-3 images flowing through
+    // Continuously cycle through images - always have 2-3 images swapping
     const flowInterval = setInterval(() => {
-      setFlowingIndex((prev) => (prev + 1) % 10);
-    }, 600); // Each image flows for 600ms
+      setFlowingIndex((prev) => {
+        const numImages = allNearbyImages.length;
+        return numImages > 0 ? (prev + 1) % numImages : 0;
+      });
+    }, 400); // Each image swaps every 400ms (faster, more aggressive)
 
     return () => clearInterval(flowInterval);
-  }, [isThinking]);
+  }, [isThinking, isNarrowing, allNearbyImages.length]); // Need length dependency to restart animation when images load
 
-  // Calculate which images are currently being absorbed based on flowing index
+  // Calculate which images are currently being swapped out based on flowing index
   useEffect(() => {
-    if (!isThinking) return;
+    if (!isThinking || isNarrowing || allNearbyImages.length === 0) return;
 
-    // Always have 2-3 images in various stages of absorption
-    const currentAbsorbed: number[] = [];
+    const numImages = allNearbyImages.length;
     
-    // Current image flowing in
-    currentAbsorbed.push(flowingIndex);
+    // Always have 3-4 images in various stages of swapping (more aggressive)
+    const currentSwapping: number[] = [];
     
-    // Next image starting to flow
-    currentAbsorbed.push((flowingIndex + 1) % 10);
+    // Current image swapping out
+    currentSwapping.push(flowingIndex);
     
-    // Sometimes include a third for variety
-    if (flowingIndex % 3 === 0) {
-      currentAbsorbed.push((flowingIndex + 2) % 10);
+    // Next image starting to swap
+    currentSwapping.push((flowingIndex + 1) % numImages);
+    
+    // Third image
+      currentSwapping.push((flowingIndex + 2) % numImages);
+    
+    // Sometimes include a fourth for extra variety
+    if (flowingIndex % 2 === 0) {
+      currentSwapping.push((flowingIndex + 3) % numImages);
     }
 
-    setAbsorbedIndices(currentAbsorbed);
-  }, [flowingIndex, isThinking]);
+    setAbsorbedIndices(currentSwapping);
+  }, [flowingIndex, isThinking, isNarrowing, allNearbyImages.length]); // Need length to recalculate when images change
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -313,30 +329,19 @@ export default function DiscoverPage() {
     e.preventDefault();
     if (!prompt.trim()) return;
     
+    const searchQuery = prompt;  // Save the query before clearing
+    setPrompt('');  // Clear the input immediately
     setIsThinking(true);
+    setShowingResults(false);  // Reset results state
+    setIsNarrowing(false);  // Reset narrowing state
     setSearchError(null);
     setSearchResults([]);
-    
-    const thinkingPhrases = [
-      "Finding restaurants",
-      "Hang on tight",
-      "Looking for the perfect spot",
-      "Searching nearby",
-      "Let me check what's available",
-      "One moment please",
-      "Analyzing your options",
-    ];
-    
-    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
-    setCurrentPhrase(randomPhrase);
-    
-    if (!isMuted) {
-      await speak(randomPhrase);
-    }
+    setAllNearbyImages([]); // Reset images for new search
+    setVisibleImageIds([]);
     
     try {
-      // Get coordinates for selected location
-      const coords = CITY_COORDINATES[location] || CITY_COORDINATES['New York City'];
+      // Get coordinates - use actual user location if available, otherwise use selected city
+      const coords = userCoords || CITY_COORDINATES[location] || CITY_COORDINATES['Boston'];
       
       // Get auth session for JWT token
       const supabase = createClient();
@@ -346,13 +351,266 @@ export default function DiscoverPage() {
         throw new Error('Not authenticated. Please sign in.');
       }
       
-      // Call backend API
+      // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
+      // Step 1: Finding restaurants
+      const step1Text = 'Finding restaurants nearby';
+      setCurrentPhrase(step1Text);
+      if (!isMuted) {
+        await speak(step1Text);
+      }
+      console.log('📍 Fetching nearby restaurants...');
+      const nearbyFormData = new FormData();
+      nearbyFormData.append('latitude', coords.lat.toString());
+      nearbyFormData.append('longitude', coords.lng.toString());
+      nearbyFormData.append('radius', '2000');
+      nearbyFormData.append('limit', '20');
+      
+      const nearbyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: nearbyFormData,
+      });
+      
+      if (!nearbyResponse.ok) {
+        throw new Error('Failed to fetch nearby restaurants');
+      }
+      
+      const nearbyData = await nearbyResponse.json();
+      console.log(`✅ Got ${nearbyData.restaurants.length} nearby restaurants`);
+      
+      // Immediately show all nearby restaurant images with staggered animation
+      const allImages = nearbyData.restaurants
+        .map((r: any, index: number) => ({
+          url: ensureImageUrl(r),
+          name: r.name,
+          id: r.place_id || `restaurant-${r.name}`,
+          index
+        }));
+      
+      if (allImages.length > 0) {
+        // Just update images - let existing useEffect handle swapping animation
+        setAllNearbyImages(allImages);
+        
+        // Show only ~10-15 images initially (so animation has images to swap in/out)
+        const initialCount = Math.min(15, allImages.length);
+        const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
+        setVisibleImageIds(initialImageIds);
+        
+        // Wait for "Finding restaurants nearby" speech to complete
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Step 2: Analyzing your food preferences
+        const step2Text = 'Analyzing your food preferences';
+        setCurrentPhrase(step2Text);
+        if (!isMuted) {
+          await speak(step2Text);
+        }
+        
+        // Wait for step 2 speech to complete before continuing
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // PHASE 2: Now call LLM for analysis (happens while images swap)
+        console.log('🤖 Asking LLM to analyze restaurants...');
+        const searchFormData = new FormData();
+        searchFormData.append('query', searchQuery);  // Use saved query
+        searchFormData.append('latitude', coords.lat.toString());
+        searchFormData.append('longitude', coords.lng.toString());
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/search`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: searchFormData,
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
+          throw new Error(errorData.detail || 'Failed to search restaurants');
+        }
+        
+        const data = await response.json();
+        console.log('✅ LLM analysis complete');
+        console.log(`📊 Received ${data.all_nearby_restaurants?.length || 0} filtered restaurants`);
+        
+        // PHASE 3: Show final results
+        if (data.top_restaurants && data.top_restaurants.length > 0) {
+          // Filter to only restaurants with place_ids (photos have fallbacks now)
+          const restaurantsWithIds = data.top_restaurants.filter((r: SearchResult) => r.place_id);
+          const finalCount = Math.min(5, restaurantsWithIds.length);
+          
+          // Ensure all restaurants have a photo_url (use fallback if needed)
+          restaurantsWithIds.forEach((r: SearchResult) => {
+            if (!r.photo_url) {
+              r.photo_url = getFallbackImage(r.cuisine, r.name);
+            }
+          });
+          
+          // Get the top N IDs
+          const topIds = restaurantsWithIds
+            .slice(0, finalCount)
+            .map((r: SearchResult) => r.place_id);
+          
+          console.log(`🎯 Found top ${finalCount}: ${topIds.join(', ')}`);
+          
+          // Update status to "Narrowing down"
+          setCurrentPhrase('Narrowing down');
+          setIsNarrowing(true);  // Enable narrowing mode for different exit animation
+          
+          // Build current pool of images
+          let currentImagePool = [...allNearbyImages];
+          const existingIds = new Set(currentImagePool.map((img: {id: string}) => img.id));
+          
+          // First, merge filtered images into allNearbyImages (to ensure top N are available)
+          if (data.all_nearby_restaurants && data.all_nearby_restaurants.length > 0) {
+            const filteredImages = data.all_nearby_restaurants
+              .filter((r: any) => r.place_id)
+              .map((r: any, index: number) => ({
+                url: ensureImageUrl(r),
+                name: r.name,
+                id: r.place_id,
+                index: currentImagePool.length + index
+              }));
+            
+            console.log(`🖼️ Merging ${filteredImages.length} filtered restaurants into image pool`);
+            
+            // Merge new images with existing ones (avoid duplicates)
+            const newImages = filteredImages.filter((img: {id: string}) => !existingIds.has(img.id));
+            newImages.forEach((img: {id: string}) => existingIds.add(img.id));
+            currentImagePool = [...currentImagePool, ...newImages];
+          }
+          
+          // CRITICAL: Ensure ALL top 5 restaurants are in the image pool
+          const topRestaurants = restaurantsWithIds.slice(0, finalCount);
+          topRestaurants.forEach((restaurant: SearchResult, idx: number) => {
+            if (!existingIds.has(restaurant.place_id!)) {
+              console.log(`⚠️ Adding missing top restaurant to pool: ${restaurant.name}`);
+              currentImagePool.push({
+                url: restaurant.photo_url!,
+                name: restaurant.name,
+                id: restaurant.place_id!,
+                index: currentImagePool.length
+              });
+              existingIds.add(restaurant.place_id!);
+            }
+          });
+          
+          // Update the image pool
+          setAllNearbyImages(currentImagePool);
+          console.log(`✅ Image pool now has ${currentImagePool.length} restaurants, all top ${finalCount} guaranteed present`);
+          
+          // Verify all top restaurants have images in the pool
+          topRestaurants.forEach((restaurant: SearchResult) => {
+            const imageInPool = currentImagePool.find(img => img.id === restaurant.place_id);
+            if (imageInPool) {
+              console.log(`  ✓ ${restaurant.name}: ${imageInPool.url.substring(0, 50)}...`);
+            } else {
+              console.error(`  ✗ MISSING: ${restaurant.name} (ID: ${restaurant.place_id})`);
+            }
+          });
+          
+          // FIRST: Add ALL missing top images instantly (all at once)
+          let currentVisible = [...visibleImageIds];
+          const imagesToAdd = topIds.filter((id: string) => !currentVisible.includes(id));
+          if (imagesToAdd.length > 0) {
+            console.log(`➕ Adding ${imagesToAdd.length} top result images instantly...`);
+            currentVisible = [...currentVisible, ...imagesToAdd];
+            setVisibleImageIds(currentVisible);
+            console.log(`✅ All top ${finalCount} restaurants now visible`);
+          }
+          
+          // Brief pause to let the new images appear
+          await new Promise(resolve => setTimeout(resolve, 600));
+          
+          // NOW: Gradually remove non-top images one by one (top images stay visible!)
+          const imagesToRemove = currentVisible.filter((id: string) => !topIds.includes(id));
+          
+          // Shuffle for random removal effect
+          const shuffledImagesToRemove = [...imagesToRemove].sort(() => Math.random() - 0.5);
+          
+          console.log(`🔽 Narrowing from ${currentVisible.length} to ${finalCount} images...`);
+          
+          // Remove one image at a time with delay (randomly) - but keep the top 5!
+          for (const idToRemove of shuffledImagesToRemove) {
+            await new Promise(resolve => setTimeout(resolve, 300)); // Delay between each removal
+            currentVisible = currentVisible.filter(id => id !== idToRemove);
+            setVisibleImageIds([...currentVisible]);
+            console.log(`  ↓ ${currentVisible.length} remaining (keeping top ${finalCount})`);
+          }
+          
+          // Wait for animations to settle
+          await new Promise(resolve => setTimeout(resolve, 600));
+          
+          // Stop thinking and show results
+          const step3Text = `Found ${finalCount} great option${finalCount !== 1 ? 's' : ''}`;
+          setCurrentPhrase(step3Text);
+          
+          // Switch to results state (keep images visible, calm blob)
+          setIsThinking(false);
+          setIsNarrowing(false);  // Exit narrowing mode
+          setShowingResults(true);
+          
+          // Use the processed restaurants (with fallback images)
+          setSearchResults(restaurantsWithIds.slice(0, finalCount));
+          
+          // Speak result if not muted
+          if (!isMuted) {
+            await speak(step3Text);
+          }
+        } else {
+          // No recommendations from LLM
+          setSearchError('No restaurants found. Try a different query or location.');
+          setIsThinking(false);
+          setShowingResults(false);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
+      setIsThinking(false);
+      
+      if (!isMuted) {
+        await speak('Sorry, something went wrong');
+      }
+    }
+  };
+
+  const loadDefaultRecommendations = async () => {
+    // Prevent multiple simultaneous calls
+    if (isLoadingDefaults) {
+      console.log('⏭️ Already loading defaults, skipping...');
+      return;
+    }
+    
+    setIsLoadingDefaults(true);
+    
+    try {
+      // Get coordinates - use actual user location if available, otherwise use selected city
+      const coords = userCoords || CITY_COORDINATES[location] || CITY_COORDINATES['Boston'];
+      
+      // Get auth session for JWT token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.log('🔒 Not authenticated, skipping default recommendations');
+        setIsLoadingDefaults(false);
+        return;
+      }
+      
+      console.log(`📍 Loading nearby restaurants for ${location}...`);
+      
+      // Use the FAST nearby endpoint (no LLM, just Google Places)
       const formData = new FormData();
-      formData.append('query', prompt);
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
+      formData.append('radius', '2000');
+      formData.append('limit', '10');  // Only fetch 10 for latent state
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/search`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -361,34 +619,41 @@ export default function DiscoverPage() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
-        throw new Error(errorData.detail || 'Failed to search restaurants');
+        console.error('❌ Failed to load nearby restaurants');
+        setIsLoadingDefaults(false);
+        return;
       }
       
       const data = await response.json();
+      console.log(`✅ Got ${data.restaurants?.length || 0} nearby restaurants`);
       
-      // Update results
-      if (data.top_restaurants && data.top_restaurants.length > 0) {
-        setSearchResults(data.top_restaurants);
+      // Load restaurants for the photo wheel
+      if (data.restaurants && data.restaurants.length > 0) {
+        const images = data.restaurants
+          .map((r: any) => ({
+            url: ensureImageUrl(r),
+            name: r.name,
+            id: r.place_id || `restaurant-${r.name}`
+          }));
         
-        // Speak result if not muted
-        if (!isMuted) {
-          const resultPhrase = `Found ${data.top_restaurants.length} great options for you`;
-          await speak(resultPhrase);
+        if (images.length > 0) {
+          console.log(`🖼️ Displaying ${images.length} restaurant images`);
+          setAllNearbyImages(images);
+          setVisibleImageIds(images.map((img: {id: string}) => img.id));
+          setLastLoadedLocation(location); // Mark this location as loaded
         }
-      } else {
-        setSearchError('No restaurants found. Try a different query or location.');
+        
+        // Don't show results panel for default view
+        setSearchResults([]);
       }
+      
+      console.log('✅ Nearby restaurants loaded successfully');
       
     } catch (error) {
-      console.error('Search error:', error);
-      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
-      
-      if (!isMuted) {
-        await speak('Sorry, something went wrong');
-      }
+      console.error('Error loading default recommendations:', error);
+      // Fail silently - not critical to page load
     } finally {
-      setIsThinking(false);
+      setIsLoadingDefaults(false);
     }
   };
 
@@ -513,7 +778,7 @@ export default function DiscoverPage() {
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                 
                 <div className="relative py-2">
-                  {['New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
+                  {['Boston', 'New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
                     <motion.button
                       key={loc}
                       className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-white/40 transition-colors"
@@ -543,10 +808,10 @@ export default function DiscoverPage() {
           {/* Three.js Blob - Always mounted, just hidden/shown */}
           <div 
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ 
-              opacity: isThinking ? 1 : 0,
-              transition: 'opacity 0.01s ease-out',
-              zIndex: isThinking ? 10 : -1,
+            style={{
+              opacity: (isThinking || showingResults) ? 1 : 0,
+              transition: 'opacity 0.6s ease-out',
+              zIndex: (isThinking || showingResults) ? 10 : -1,
             }}
           >
             {/* Apple-style pink and blue glow effect */}
@@ -595,12 +860,12 @@ export default function DiscoverPage() {
             <motion.p
               className="text-sm font-semibold whitespace-nowrap text-center mt-6 bg-gradient-to-r from-[#FF375F] via-[#007AFF] to-[#5AC8FA] bg-clip-text text-transparent"
               animate={{
-                opacity: isThinking ? [0.5, 1, 0.5] : 0,
+                opacity: (isThinking || showingResults) ? (isThinking ? [0.5, 1, 0.5] : 1) : 0,
                 scale: isThinking ? [0.98, 1.02, 0.98] : 1,
               }}
               transition={{
                 duration: 2.5,
-                repeat: Infinity,
+                repeat: isThinking ? Infinity : 0,
                 ease: [0.25, 0.46, 0.45, 0.94]
               }}
             >
@@ -612,7 +877,7 @@ export default function DiscoverPage() {
           <div 
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
             style={{
-              opacity: isThinking ? 0 : 1,
+              opacity: (isThinking || showingResults) ? 0 : 1,
               transition: 'opacity 0.01s ease-out',
               zIndex: 5,
             }}
@@ -638,179 +903,288 @@ export default function DiscoverPage() {
             <div className="w-24 h-24 relative">
               <MetallicSphereComponent isActive={false} />
             </div>
+            
+            <motion.p
+              className="mt-6 text-sm font-semibold whitespace-nowrap text-center text-gray-400"
+              animate={{
+                opacity: [0.5, 1, 0.5],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: [0.25, 0.46, 0.45, 0.94]
+              }}
+            >
+              Feeling Hungry?
+            </motion.p>
           </div>
 
-          {/* Orbiting Restaurant Photos - Dynamic Circle */}
+          {/* Orbiting Restaurant Photos - Dynamic from actual search results */}
           <AnimatePresence mode="sync">
           {(() => {
-            // Always render all 20 restaurants, but control visibility
-            // First 10 are the "core" images, next 10 fill in between
-            return SAMPLE_RESTAURANTS.map((restaurant, index) => {
-              const isCore = index < 10; // First 10 are core images
-              const shouldShow = isCore || isThinking; // Show new images only when thinking
+            // Filter to only visible images
+            const visibleImages = allNearbyImages.filter(img => visibleImageIds.includes(img.id));
+            const numImages = visibleImages.length;
+            
+            if (numImages === 0) return null;
+            
+            return visibleImages.map((item, visibleIndex) => {
+              // Find the original index in allNearbyImages (for animation system)
+              const originalIndex = allNearbyImages.findIndex(img => img.id === item.id);
               
-              // Check if this image is being absorbed into the glob
-              const isAbsorbed = isThinking && isCore && absorbedIndices.includes(index);
+              // Check if being swapped out (absorbed into blob during thinking)
+              const isSwappingOut = absorbedIndices.includes(originalIndex) && isThinking;
+              const swapPosition = absorbedIndices.indexOf(originalIndex);
+              const swapProgress = swapPosition >= 0 ? swapPosition / absorbedIndices.length : 0;
               
-              // Calculate absorption progress for staggered animation (0 to 1)
-              const absorbedPosition = absorbedIndices.indexOf(index);
-              const absorptionProgress = absorbedPosition >= 0 ? absorbedPosition / absorbedIndices.length : 0;
-              
-              // For core images: use their index (0-9)
-              // For new images: interleave between core images (0.5, 1.5, 2.5, etc.)
-              const effectiveIndex = isCore ? index : (index - 10) + 0.5;
-              const totalSlots = isThinking ? 20 : 10;
-              
-              const angle = ((effectiveIndex / 10) * 360 + rotation) * (Math.PI / 180);
-              // If absorbed, interpolate radius based on absorption progress for staggered effect
-              const normalRadius = isThinking ? 350 : 200;
-              const targetRadius = isAbsorbed ? 0 : normalRadius;
-              const radius = targetRadius;
+              // Calculate position on circle (use visibleIndex for positioning)
+              const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
+              const baseRadius = (isThinking || showingResults) ? 350 : 280;  // Keep large radius when showing results
+              // If swapping out, move toward center
+              const radius = isSwappingOut ? baseRadius * (1 - swapProgress) : baseRadius;
               const x = 350 + Math.cos(angle) * radius;
               const y = 350 + Math.sin(angle) * radius;
-            
-            if (!shouldShow) return null;
-            
-            return (
-              <motion.div
-                key={restaurant.id}
-                className="absolute"
-                initial={false}
-                animate={{
-                  left: x,
-                  top: y,
-                  opacity: isAbsorbed ? 0 : 1,
-                  scale: isAbsorbed ? 0.2 : 1,
-                }}
-                exit={{
-                  opacity: 0,
-                  scale: 0.8,
-                  transition: { duration: 0.00 }
-                }}
-                transition={{
-                  duration: isAbsorbed ? 0.5 : 0.00,
-                  ease: isAbsorbed ? [0.4, 0.0, 0.2, 1] : [0.22, 1, 0.36, 1],
-                  delay: isAbsorbed ? absorptionProgress * 0.1 : 0,
-                }}
-                style={{
-                  x: '-50%',
-                  y: '-50%',
-                  zIndex: isAbsorbed ? 1 : 'auto',
-                }}
-              >
+              
+              // Find the matching restaurant data if available
+              const matchingRestaurant = searchResults.find(r => r.place_id === item.id);
+              
+              return (
                 <motion.div
-                  className="rounded-2xl p-2.5 shadow-medium cursor-pointer relative overflow-hidden"
+                  key={item.id}
+                  className="absolute"
+                  initial={{ 
+                    opacity: 0, 
+                    scale: 0.1,  // Start even smaller for more dramatic entrance
+                    left: '50%',  // Start at center (inside blob)
+                    top: '50%'    // Start at center (inside blob)
+                  }}
+                  animate={{
+                    left: x,
+                    top: y,
+                    opacity: isSwappingOut ? 0 : 1,
+                    scale: isSwappingOut ? 0.2 : 1,  // More aggressive scale down
+                  }}
+                  exit={{
+                    // Fade out in place
+                    opacity: 0,
+                    scale: 0.9,
+                    transition: { duration: 0.4, ease: 'easeOut' }
+                  }}
+                  transition={{
+                    left: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.8), ease: [0.34, 1.56, 0.64, 1] },  // Faster during thinking
+                    top: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.5 : 0.8), ease: [0.34, 1.56, 0.64, 1] },  // Faster during thinking
+                    opacity: { duration: isSwappingOut ? 0.25 : (isThinking ? 0.4 : 0.6), ease: isSwappingOut ? 'easeIn' : 'easeInOut' },  // Faster during thinking
+                    scale: { duration: isSwappingOut ? 0.3 : (isThinking ? 0.4 : 0.7), ease: isSwappingOut ? 'easeIn' : [0.34, 1.56, 0.64, 1] },  // Faster during thinking
+                    delay: isSwappingOut ? swapProgress * 0.05 : (isThinking ? visibleIndex * 0.05 : visibleIndex * 0.08),  // Less delay during thinking
+                  }}
                   style={{
-                    background: 'rgba(255, 255, 255, 0.35)',
-                    backdropFilter: 'blur(30px) saturate(180%)',
-                    border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                    boxShadow: isAbsorbed 
-                      ? 'inset 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.9), 0 0 80px rgba(59, 130, 246, 0.7), 0 0 100px rgba(96, 165, 250, 0.5)'
-                      : 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
-                    transformStyle: 'preserve-3d',
+                    x: '-50%',
+                    y: '-50%',
+                    zIndex: isSwappingOut ? 1 : 'auto',
                   }}
-                  initial={{ opacity: isCore ? 1 : 0, scale: isCore ? 1 : 0.8 }}
-                  animate={{ 
-                    opacity: 1,
-                    scale: isThinking ? [1, 0.95, 1.02, 0.98, 1.01, 1] : 1,
-                    rotateX: isThinking ? [0, 8, -5, 3, -2, 0] : 0,
-                    rotateY: isThinking ? [0, -6, 8, -4, 2, 0] : 0,
-                    rotateZ: isThinking ? [0, -3, 4, -2, 1, 0] : 0,
-                    y: isThinking ? [0, -4, 2, -1, 1, 0] : 0,
-                  }}
-                  transition={isThinking ? {
-                    delay: isCore ? 0 : 0.1,
-                    scale: {
-                      duration: 0.1 + index * 0.2,
-                      repeat: Infinity,
-                      ease: [0.4, 0, 0.6, 1]
-                    },
-                    rotateX: {
-                      duration: 0.1 + index * 0.25,
-                      repeat: Infinity,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    },
-                    rotateY: {
-                      duration: 0.1 + index * 0.3,
-                      repeat: Infinity,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    },
-                    rotateZ: {
-                      duration: 0.1 + index * 0.22,
-                      repeat: Infinity,
-                      ease: [0.4, 0, 0.6, 1]
-                    },
-                    y: {
-                      duration: 0.1 + index * 0.35,
-                      repeat: Infinity,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    }
-                  } : {
-                    duration: 0.05,
-                    ease: [0.22, 1, 0.36, 1]
-                  }}
-                  whileHover={{ 
-                    zIndex: 50,
-                    boxShadow: 'inset 0 0 35px -8px rgba(255, 255, 255, 0.95), 0 16px 48px rgba(0, 0, 0, 0.2)',
-                    transition: { duration: 0.3 }
-                  }}
-                  onClick={() => setSelectedRestaurant(restaurant.id)}
                 >
-                  {/* Inner specular highlight */}
-                  <div 
-                    className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-2xl"
+                  <motion.div
+                    className="rounded-2xl p-2.5 shadow-medium cursor-pointer relative overflow-hidden"
                     style={{
-                      background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%)',
+                      background: 'rgba(255, 255, 255, 0.35)',
+                      backdropFilter: 'blur(30px) saturate(180%)',
+                      border: '0.25px solid rgba(0, 0, 0, 0.08)',
+                      boxShadow: isSwappingOut
+                        ? 'inset 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.9), 0 0 80px rgba(59, 130, 246, 0.7)'
+                        : 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                      transformStyle: 'preserve-3d',
                     }}
-                  />
-                  
-                  <div className="relative group">
-                    <img
-                      src={restaurant.image}
-                      alt={restaurant.name}
-                      className="object-cover rounded-xl"
+                    animate={isThinking && !isSwappingOut ? { 
+                      scale: [1, 0.97, 1.02, 0.98, 1],
+                      rotateY: [0, -4, 4, -2, 0],
+                      rotateX: [0, 2, -2, 1, 0],
+                    } : {}}
+                    transition={isThinking && !isSwappingOut ? {
+                      duration: 2.5 + visibleIndex * 0.3,
+                      repeat: Infinity,
+                      ease: [0.25, 0.46, 0.45, 0.94]
+                    } : {}}
+                    whileHover={{ 
+                      scale: 1.1,
+                      zIndex: 50,
+                      boxShadow: 'inset 0 0 35px -8px rgba(255, 255, 255, 0.95), 0 16px 48px rgba(0, 0, 0, 0.2)',
+                      transition: { duration: 0.3 }
+                    }}
+                    onMouseEnter={() => matchingRestaurant && setHoveredRestaurant(matchingRestaurant)}
+                    onMouseLeave={() => setHoveredRestaurant(null)}
+                    onClick={() => matchingRestaurant && setSelectedRestaurant(matchingRestaurant)}
+                  >
+                    {/* Inner specular highlight */}
+                    <div 
+                      className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-2xl"
                       style={{
-                        width: '112px',
-                        height: '112px',
-                        minWidth: '112px',
-                        minHeight: '112px',
-                        maxWidth: '112px',
-                        maxHeight: '112px',
-                        boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                        background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%)',
                       }}
                     />
-                    {/* Info overlay */}
-                    <motion.div 
-                      className="absolute inset-0 rounded-xl flex items-center justify-center"
-                      initial={{ opacity: 0 }}
-                      whileHover={{ 
-                        opacity: 1,
-                        transition: { duration: 0.2 }
-                      }}
-                      style={{
-                        background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3), transparent)',
-                        backdropFilter: 'blur(4px)',
-                      }}
-                    >
-                      <div className="absolute bottom-2 left-2 right-2">
-                        <div className="text-white text-[10px] font-bold truncate mb-0.5">
-                          {restaurant.name}
-              </div>
-                        <div className="flex items-center gap-0.5">
-                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                          <span className="text-white text-[9px] font-semibold">{restaurant.rating}</span>
-                  </div>
-                </div>
-                    </motion.div>
-                  </div>
+                    
+                    <div className="relative group">
+                      <img
+                        src={item.url}
+                        alt={item.name}
+                        className="object-cover rounded-xl"
+                        style={{
+                          width: '112px',
+                          height: '112px',
+                          minWidth: '112px',
+                          minHeight: '112px',
+                          maxWidth: '112px',
+                          maxHeight: '112px',
+                          boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                        }}
+                      />
+                      {/* Info overlay on hover */}
+                      {matchingRestaurant && (
+                        <motion.div 
+                          className="absolute inset-0 rounded-xl flex items-center justify-center"
+                          initial={{ opacity: 0 }}
+                          whileHover={{ 
+                            opacity: 1,
+                            transition: { duration: 0.2 }
+                          }}
+                          style={{
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3), transparent)',
+                            backdropFilter: 'blur(4px)',
+                          }}
+                        >
+                          <div className="absolute bottom-2 left-2 right-2">
+                            <div className="text-white text-[10px] font-bold truncate mb-0.5">
+                              {item.name}
+                            </div>
+                            <div className="flex items-center gap-0.5">
+                              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                              <span className="text-white text-[9px] font-semibold">{matchingRestaurant.rating}</span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            );
+              );
             });
           })()}
           </AnimatePresence>
                   </div>
                 </div>
+                
+      {/* Hover Panel - Appears on right when hovering over a restaurant */}
+      <AnimatePresence>
+        {hoveredRestaurant && showingResults && (
+          <motion.div
+            key="hover-panel"
+            className="fixed right-8 top-1/2 w-96 pointer-events-none z-50"
+            initial={{ opacity: 0, x: 50, y: '-50%' }}
+            animate={{ opacity: 1, x: 0, y: '-50%' }}
+            exit={{ opacity: 0, x: 50, y: '-50%' }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div 
+              className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden"
+              style={{
+                backdropFilter: 'blur(40px) saturate(180%)',
+                background: 'rgba(255, 255, 255, 0.5)',
+                border: '0.5px solid rgba(255, 255, 255, 0.6)',
+                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 20px 60px rgba(0, 0, 0, 0.15)',
+              }}
+            >
+              {/* Specular highlight */}
+              <div 
+                className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-3xl"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 100%)',
+                }}
+              />
+              
+              <div className="relative space-y-4">
+                {/* Restaurant Name */}
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">
+                    {hoveredRestaurant.name}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {hoveredRestaurant.cuisine} • {hoveredRestaurant.price_level === 1 ? '$' : hoveredRestaurant.price_level === 2 ? '$$' : hoveredRestaurant.price_level === 3 ? '$$$' : '$$$$'}
+                  </p>
+                </div>
+                
+                {/* Match Score */}
+                {hoveredRestaurant.match_score && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${hoveredRestaurant.match_score * 100}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">
+                      {Math.round(hoveredRestaurant.match_score * 100)}%
+                    </span>
+                  </div>
+                )}
+                
+                {/* Rating */}
+                <div className="flex items-center gap-2">
+                  <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                  <span className="text-lg font-semibold text-gray-900">
+                    {hoveredRestaurant.rating}
+                  </span>
+                </div>
+                
+                {/* Reasoning */}
+                {hoveredRestaurant.reasoning && (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Why we recommend this:
+                    </p>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {hoveredRestaurant.reasoning}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Address */}
+                {hoveredRestaurant.address && (
+                  <div className="pt-2">
+                    <p className="text-xs text-gray-500">
+                      {hoveredRestaurant.address}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Distance & Travel Time */}
+                {userCoords && hoveredRestaurant.latitude && hoveredRestaurant.longitude && (
+                  <div className="pt-2 border-t border-gray-200/50 mt-2">
+                    <p className="text-sm font-medium text-gray-700 mb-1">
+                      Distance & Travel:
+                    </p>
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        const distanceKm = calculateDistance(
+                          userCoords.lat, userCoords.lng,
+                          hoveredRestaurant.latitude!, hoveredRestaurant.longitude!
+                        );
+                        const { walk, drive } = calculateTravelTimes(distanceKm);
+                        return (
+                          <>
+                            <p>{distanceKm.toFixed(1)} km away</p>
+                            <p>Walk: {walk} • Drive: {drive}</p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
                 
       {/* Compact Search Bar - Minimal */}
       <div className="w-full max-w-3xl mb-8 z-10">
@@ -848,25 +1222,27 @@ export default function DiscoverPage() {
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Where should we eat tonight?"
-              className="flex-1 bg-transparent border-0 outline-none focus:outline-none text-sm placeholder:text-[hsl(var(--muted-foreground))]"
+              placeholder={isThinking ? "AI is thinking..." : "Where should we eat tonight?"}
+              disabled={isThinking}
+              className="flex-1 bg-transparent border-0 outline-none focus:outline-none text-sm placeholder:text-[hsl(var(--muted-foreground))] disabled:opacity-50 disabled:cursor-not-allowed"
             />
             
             <div className="flex items-center gap-2">
               <motion.button
                 type="button"
-                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
+                disabled={isThinking}
+                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.6))',
                   backdropFilter: 'blur(12px)',
                   border: '0.5px solid rgba(255, 255, 255, 0.3)',
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.05)',
                 }}
-                whileHover={{ 
+                whileHover={!isThinking ? { 
                   scale: 1.1,
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0, 0, 0, 0.08)',
-                }}
-                whileTap={{ scale: 0.95 }}
+                } : {}}
+                whileTap={!isThinking ? { scale: 0.95 } : {}}
               >
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
                 <MessageSquare className="w-4 h-4 text-[hsl(var(--foreground))]" />
@@ -875,7 +1251,8 @@ export default function DiscoverPage() {
               <motion.button
                 type="button"
                 onClick={toggleVoiceRecording}
-                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden"
+                disabled={isThinking}
+                className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: isRecording 
                     ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.7), rgba(220, 38, 38, 0.6))'
@@ -884,8 +1261,8 @@ export default function DiscoverPage() {
                   border: '0.5px solid rgba(255, 255, 255, 0.3)',
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.05)',
                 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={!isThinking ? { scale: 1.1 } : {}}
+                whileTap={!isThinking ? { scale: 0.95 } : {}}
                 animate={isRecording ? {
                   boxShadow: [
                     'inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(239, 68, 68, 0.3)',
@@ -906,15 +1283,16 @@ export default function DiscoverPage() {
               
               <motion.button
                 type="submit"
-                className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden"
+                disabled={isThinking}
+                className="w-9 h-9 rounded-xl gradient-purple-blue flex items-center justify-center relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15)',
                 }}
-                whileHover={{ 
+                whileHover={!isThinking ? { 
                   scale: 1.1,
                   boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 20px rgba(0, 0, 0, 0.2)',
-                }}
-                whileTap={{ scale: 0.95 }}
+                } : {}}
+                whileTap={!isThinking ? { scale: 0.95 } : {}}
               >
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
                 <Send className="w-4 h-4 text-white" />
@@ -924,70 +1302,7 @@ export default function DiscoverPage() {
         </motion.div>
       </div>
 
-      {/* Search Results Panel */}
-      <AnimatePresence>
-        {searchResults.length > 0 && (
-          <motion.div
-            className="w-full max-w-4xl mb-8 z-10"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
-              
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-                Top Recommendations for you
-              </h3>
-              
-              <div className="space-y-4">
-                {searchResults.map((restaurant, index) => (
-                  <motion.div
-                    key={index}
-                    className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                    
-                    <div className="flex items-start justify-between relative">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-2xl font-bold text-purple-600">#{index + 1}</span>
-                          <div>
-                            <h4 className="text-lg font-bold">{restaurant.name}</h4>
-                            <p className="text-sm text-gray-600">{restaurant.cuisine} • {'$'.repeat(restaurant.price_level)}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 mb-2">
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                            <span className="font-semibold">{restaurant.rating}</span>
-                          </div>
-                          <div className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
-                            {Math.round(restaurant.match_score * 100)}% match
-                          </div>
-                        </div>
-                        
-                        <p className="text-sm text-gray-700 mb-2">{restaurant.reasoning}</p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {restaurant.address}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Search Results Panel - Removed, now only showing modal on image click */}
 
       {/* Error Message */}
       <AnimatePresence>
@@ -1016,46 +1331,136 @@ export default function DiscoverPage() {
             onClick={() => setSelectedRestaurant(null)}
           >
             <motion.div
-              className="glass-card rounded-[32px] p-8 max-w-lg w-full shadow-strong"
+              className="bg-white rounded-[32px] p-8 max-w-lg w-full shadow-strong"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", damping: 20 }}
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-              
-              {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant) && (
-                <div className="relative">
+              <div className="relative">
                   <img
-                    src={SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.image}
-                    alt=""
+                  src={selectedRestaurant.photo_url || getFallbackImage(selectedRestaurant.cuisine, selectedRestaurant.name)}
+                    alt={selectedRestaurant.name}
                     className="w-full h-56 object-cover rounded-2xl mb-5 shadow-lg"
                   />
-                  <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
-                    {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.name}
-                  </h2>
-                  <div className="flex items-center gap-3 mb-5">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold gradient-purple-blue text-white">
-                      {SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.cuisine}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                      <span className="font-bold">{SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.rating}</span>
-          </div>
-                    <div className="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span>{SAMPLE_RESTAURANTS.find(r => r.id === selectedRestaurant)!.location}</span>
-          </div>
-          </div>
+                <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent">
+                  {selectedRestaurant.name}
+                </h2>
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold gradient-purple-blue text-white">
+                    {selectedRestaurant.cuisine}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span className="font-bold">{selectedRestaurant.rating}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-600">
+                    {'$'.repeat(selectedRestaurant.price_level)}
+                  </span>
+                </div>
+                
+                {/* Reasoning */}
+                <p className="text-sm text-gray-700 mb-4 leading-relaxed">
+                  {selectedRestaurant.reasoning}
+                </p>
+                
+                {/* Address */}
+                <div className="flex items-start gap-2 mb-3 text-sm text-[hsl(var(--muted-foreground))]">
+                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>{selectedRestaurant.address}</span>
+                </div>
+                
+                {/* Distance & Travel Time */}
+                {userCoords && selectedRestaurant.latitude && selectedRestaurant.longitude && (
+                  <div className="mb-5 p-3 bg-gray-50 rounded-xl">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">Distance & Travel</div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      {(() => {
+                        const distanceKm = calculateDistance(
+                          userCoords.lat, userCoords.lng,
+                          selectedRestaurant.latitude!, selectedRestaurant.longitude!
+                        );
+                        const { walk, drive } = calculateTravelTimes(distanceKm);
+                        return (
+                          <>
+                            <div>
+                              <div className="text-gray-500">Distance</div>
+                              <div className="font-semibold text-gray-900">{distanceKm.toFixed(1)} km</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Walk</div>
+                              <div className="font-semibold text-gray-900">{walk}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Drive</div>
+                              <div className="font-semibold text-gray-900">{drive}</div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Match Score */}
+                <div className="mb-5">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="font-semibold">Match Score</span>
+                    <span className="text-purple-600 font-bold">{Math.round(selectedRestaurant.match_score * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <motion.div
+                      className="h-full gradient-purple-blue"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${selectedRestaurant.match_score * 100}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-3">
                   <motion.button 
-                    className="w-full gradient-purple-blue text-white rounded-2xl h-12 text-base font-semibold shadow-lg"
+                    className="flex-1 gradient-purple-blue text-white rounded-2xl h-12 text-base font-semibold shadow-lg flex items-center justify-center gap-2"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      // Navigate to reservations page with restaurant details
+                      const params = new URLSearchParams({
+                        restaurant_name: selectedRestaurant.name,
+                        restaurant_address: selectedRestaurant.address || '',
+                        place_id: selectedRestaurant.place_id || ''
+                      });
+                      window.location.href = `/reservations?${params.toString()}`;
+                    }}
                   >
+                    <Users className="w-4 h-4" />
                     Reserve Table
                   </motion.button>
-      </div>
-              )}
+                  
+                  <motion.button 
+                    className="flex-1 bg-gray-100 text-gray-900 rounded-2xl h-12 text-base font-semibold shadow-md flex items-center justify-center gap-2 border border-gray-200"
+                    whileHover={{ scale: 1.02, backgroundColor: '#f3f4f6' }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      // Navigate to discover page with maps tab (assuming tabs exist)
+                      // Or use Google Maps as fallback
+                      if (selectedRestaurant.latitude && selectedRestaurant.longitude) {
+                        // Open in Google Maps
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${selectedRestaurant.latitude},${selectedRestaurant.longitude}`, '_blank');
+                      } else {
+                        // Fallback to address search
+                        const query = encodeURIComponent(selectedRestaurant.name + ' ' + selectedRestaurant.address);
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                      }
+                    }}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    View in Maps
+                  </motion.button>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
