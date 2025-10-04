@@ -493,7 +493,7 @@ export default function DiscoverPage() {
           <AnimatePresence mode="sync">
           {(() => {
             // Always render all 20 restaurants, but control visibility
-            // First 10 are the "core" images, next 10 fill in between
+            // First 10 are the "core" images, next 10 are "new" images
             return SAMPLE_RESTAURANTS.map((restaurant, index) => {
               const isCore = index < 10; // First 10 are core images
               const shouldShow = isCore || isThinking; // Show new images only when thinking
@@ -504,7 +504,13 @@ export default function DiscoverPage() {
               const totalSlots = isThinking ? 20 : 10;
               
               const angle = ((effectiveIndex / 10) * 360 + rotation) * (Math.PI / 180);
-              const radius = isThinking ? 350 : 200; // Increased spacing when expanded
+              
+              // When thinking: core images move INTO the blob (small radius), new images go to outer circle
+              // When not thinking: core images at normal radius
+              const radius = isThinking 
+                ? (isCore ? 80 : 350)  // Core images move into blob, new images at outer circle
+                : 200;  // Normal state
+              
               const x = 350 + Math.cos(angle) * radius;
               const y = 350 + Math.sin(angle) * radius;
             
@@ -522,11 +528,11 @@ export default function DiscoverPage() {
                 exit={{
                   opacity: 0,
                   scale: 0.8,
-                  transition: { duration: 0.00 }
+                  transition: { duration: 0.4 }
                 }}
                 transition={{
-                  duration: 0.00,
-                  ease: [0.22, 1, 0.36, 1], // Fast ease-out, no slow parts
+                  duration: 0.8,  // Smooth transition for movement
+                  ease: [0.22, 1, 0.36, 1],
                 }}
                 style={{
                   x: '-50%',
@@ -544,42 +550,50 @@ export default function DiscoverPage() {
                   }}
                   initial={{ opacity: isCore ? 1 : 0, scale: isCore ? 1 : 0.8 }}
                   animate={{ 
-                    opacity: 1,
-                    scale: isThinking ? [1, 0.95, 1.02, 0.98, 1.01, 1] : 1,
+                    opacity: isThinking ? (isCore ? 0.4 : 1) : 1,  // Core images fade when absorbed
+                    scale: isThinking 
+                      ? (isCore 
+                          ? [0.5, 0.45, 0.52, 0.48, 0.51, 0.5]  // Smaller when absorbed into blob
+                          : [1, 0.95, 1.02, 0.98, 1.01, 1])     // Normal animation for outer images
+                      : 1,
                     rotateX: isThinking ? [0, 8, -5, 3, -2, 0] : 0,
                     rotateY: isThinking ? [0, -6, 8, -4, 2, 0] : 0,
                     rotateZ: isThinking ? [0, -3, 4, -2, 1, 0] : 0,
                     y: isThinking ? [0, -4, 2, -1, 1, 0] : 0,
                   }}
                   transition={isThinking ? {
-                    delay: isCore ? 0 : 0.1,
+                    delay: isCore ? 0 : 0.15,  // New images appear after core ones are absorbed
+                    opacity: {
+                      duration: 0.6,
+                      ease: [0.4, 0, 0.2, 1]
+                    },
                     scale: {
-                      duration: 0.1 + index * 0.2,
+                      duration: 2 + index * 0.2,
                       repeat: Infinity,
                       ease: [0.4, 0, 0.6, 1]
                     },
                     rotateX: {
-                      duration: 0.1 + index * 0.25,
+                      duration: 2 + index * 0.25,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     },
                     rotateY: {
-                      duration: 0.1 + index * 0.3,
+                      duration: 2 + index * 0.3,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     },
                     rotateZ: {
-                      duration: 0.1 + index * 0.22,
+                      duration: 2 + index * 0.22,
                       repeat: Infinity,
                       ease: [0.4, 0, 0.6, 1]
                     },
                     y: {
-                      duration: 0.1 + index * 0.35,
+                      duration: 2 + index * 0.35,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     }
                   } : {
-                    duration: 0.05,
+                    duration: 0.8,
                     ease: [0.22, 1, 0.36, 1]
                   }}
                   whileHover={{ 
