@@ -315,6 +315,169 @@ IMPORTANT: Keep all reasoning CONCISE - maximum 1-2 sentences each."""
                     "longitude": longitude
                 }
             }
+    
+    async def search_restaurants_for_group(
+        self,
+        query: str,
+        user_ids: List[str],
+        latitude: float,
+        longitude: float
+    ) -> Dict[str, Any]:
+        """
+        Search restaurants for a group of users with merged preferences.
+        
+        Similar to search_restaurants but takes multiple user IDs and merges their preferences.
+        
+        Args:
+            query: User's natural language query
+            user_ids: List of user UUIDs (requesting user + mentioned friends)
+            latitude: Location latitude
+            longitude: Location longitude
+            
+        Returns:
+            Search results with top 3 restaurants matching merged group preferences
+        """
+        print(f"[GROUP RESTAURANT SEARCH] Query: '{query}'")
+        print(f"[GROUP RESTAURANT SEARCH] Users: {len(user_ids)} people")
+        print(f"[GROUP RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
+        
+        try:
+            # Step 1: Merge preferences from all users
+            print(f"[GROUP RESTAURANT SEARCH] Step 1: Merging preferences for {len(user_ids)} users...")
+            merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(user_ids)
+            print(f"[GROUP RESTAURANT SEARCH] Merged preferences: {merged_preferences}")
+            
+            # Step 2: Get nearby restaurants (same as individual search)
+            print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
+            restaurants = self.get_nearby_restaurants_tool(
+                latitude=latitude,
+                longitude=longitude,
+                radius=1000,
+                limit=10
+            )
+            
+            if not restaurants:
+                return {
+                    "status": "success",
+                    "stage": "group - no restaurants found",
+                    "query": query,
+                    "user_count": len(user_ids),
+                    "top_restaurants": [],
+                    "message": "No restaurants found nearby",
+                    "location": {"latitude": latitude, "longitude": longitude}
+                }
+            
+            # Step 3: Use LLM to rank based on merged preferences
+            print(f"[GROUP RESTAURANT SEARCH] Step 3: Asking LLM to analyze for group...")
+            
+            # Build restaurants list for prompt
+            restaurants_text = "\n".join([
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * r.get('price_level', 2)}) - {r['address']}"
+                for i, r in enumerate(restaurants)
+            ])
+            
+            # Build merged preferences text
+            prefs_text = f"""
+- Favorite Cuisines: {', '.join(merged_preferences.get('cuisines', [])) or 'None specified'}
+- Price Range: {merged_preferences.get('priceRange') or 'No preference'}
+- Atmosphere: {', '.join(merged_preferences.get('atmosphere', [])) or 'No preference'}
+- Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
+"""
+            
+            # Create LLM prompt (similar to individual but emphasizes group dining)
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the GROUP's query and merged preferences.
+
+USER'S QUERY: "{query}"
+
+GROUP'S MERGED PREFERENCES:{prefs_text}
+
+NOTE: These are MERGED preferences from {len(user_ids)} people dining together. The restaurants should accommodate the group and match their combined tastes.
+
+AVAILABLE RESTAURANTS:
+{restaurants_text}
+
+TASK:
+1. Analyze how well each restaurant matches the query "{query}"
+2. Consider the GROUP's merged preferences (cuisines, price, atmosphere)
+3. Select the TOP 3 best matches for GROUP DINING
+4. Provide BRIEF reasoning (1-2 sentences max per restaurant)
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{{
+  "top_restaurants": [
+    {{
+      "name": "Restaurant Name",
+      "cuisine": "Cuisine Type",
+      "rating": 4.5,
+      "address": "Full address",
+      "price_level": 2,
+      "match_score": 0.95,
+      "reason": "Brief reason why this matches"
+    }}
+  ],
+  "overall_reasoning": "1-2 sentences about the selection strategy"
+}}
+
+Return TOP 3 restaurants in order of best match."""
+            
+            # Call Gemini
+            response = self.gemini_service.model.generate_content(prompt)
+            response_text = response.text.strip()
+            
+            # Clean up markdown if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+            
+            # Parse JSON
+            import json
+            result = json.loads(response_text)
+            
+            # Add metadata
+            result["status"] = "success"
+            result["stage"] = "group - LLM analysis"
+            result["query"] = query
+            result["user_count"] = len(user_ids)
+            result["merged_preferences"] = merged_preferences
+            result["location"] = {
+                "latitude": latitude,
+                "longitude": longitude
+            }
+            
+            print(f"[GROUP RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants for group")
+            return result
+            
+        except Exception as e:
+            print(f"[GROUP RESTAURANT SEARCH ERROR] {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback
+            merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(user_ids)
+            restaurants = self.get_nearby_restaurants_tool(
+                latitude=latitude,
+                longitude=longitude,
+                radius=1000,
+                limit=10
+            )
+            
+            return {
+                "status": "success",
+                "stage": "group - Fallback",
+                "error": str(e),
+                "query": query,
+                "user_count": len(user_ids),
+                "merged_preferences": merged_preferences,
+                "nearby_restaurants": restaurants,
+                "location": {
+                    "latitude": latitude,
+                    "longitude": longitude
+                }
+            }
 
 
 # Singleton instance

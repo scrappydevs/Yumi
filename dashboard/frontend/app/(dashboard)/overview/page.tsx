@@ -19,6 +19,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
+import { MentionInput } from '@/components/ui/mention-input';
+import { Mention } from '@/hooks/use-friend-mentions';
 import { useVoiceOutput } from '@/hooks/use-voice-output';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
@@ -209,11 +211,13 @@ interface SearchResult {
 
 export default function DiscoverPage() {
   const [prompt, setPrompt] = useState('');
+  const [mentions, setMentions] = useState<Mention[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [location, setLocation] = useState('New York City');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -278,15 +282,24 @@ export default function DiscoverPage() {
     setSearchError(null);
     setSearchResults([]);
     
-    const thinkingPhrases = [
-      "Finding restaurants",
-      "Hang on tight",
-      "Looking for the perfect spot",
-      "Searching nearby",
-      "Let me check what's available",
-      "One moment please",
-      "Analyzing your options",
-    ];
+    // Check if this is a group search (has mentions)
+    const isGroupSearch = mentions.length > 0;
+    
+    const thinkingPhrases = isGroupSearch
+      ? [
+          `Finding restaurants for you and ${mentions.length} ${mentions.length === 1 ? 'friend' : 'friends'}`,
+          "Looking for perfect group dining spots",
+          "Searching for places you'll all love",
+        ]
+      : [
+          "Finding restaurants",
+          "Hang on tight",
+          "Looking for the perfect spot",
+          "Searching nearby",
+          "Let me check what's available",
+          "One moment please",
+          "Analyzing your options",
+        ];
     
     const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
     setCurrentPhrase(randomPhrase);
@@ -307,13 +320,23 @@ export default function DiscoverPage() {
         throw new Error('Not authenticated. Please sign in.');
       }
       
-      // Call backend API
+      // Build form data
       const formData = new FormData();
       formData.append('query', prompt);
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/search`, {
+      // Determine endpoint based on mentions
+      let endpoint = '/api/restaurants/search';
+      
+      if (isGroupSearch) {
+        // Group search - add friend IDs
+        const friendIds = mentions.map(m => m.id).join(',');
+        formData.append('friend_ids', friendIds);
+        endpoint = '/api/restaurants/search-group';
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -334,7 +357,9 @@ export default function DiscoverPage() {
         
         // Speak result if not muted
         if (!isMuted) {
-          const resultPhrase = `Found ${data.top_restaurants.length} great options for you`;
+          const resultPhrase = isGroupSearch
+            ? `Found ${data.top_restaurants.length} great options for your group`
+            : `Found ${data.top_restaurants.length} great options for you`;
           await speak(resultPhrase);
         }
       } else {
@@ -430,7 +455,13 @@ export default function DiscoverPage() {
         >
           <motion.button
             className="glass-layer-1 pl-4 pr-5 py-3 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2.5"
-            onClick={() => setShowLocationPicker(!showLocationPicker)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const spaceBelow = window.innerHeight - rect.bottom;
+              const dropdownHeight = 180; // Approximate height for 6 items
+              setDropdownPositionAbove(spaceBelow < dropdownHeight);
+              setShowLocationPicker(!showLocationPicker);
+            }}
             whileHover={{
               scale: 1.05,
               boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)',
@@ -463,26 +494,26 @@ export default function DiscoverPage() {
           <AnimatePresence>
             {showLocationPicker && (
               <motion.div
-                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-layer-1 rounded-2xl shadow-strong overflow-hidden"
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                className={`absolute ${dropdownPositionAbove ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} right-0 glass-layer-1 rounded-xl shadow-strong overflow-hidden`}
+                initial={{ opacity: 0, y: dropdownPositionAbove ? 10 : -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                exit={{ opacity: 0, y: dropdownPositionAbove ? 10 : -10, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                style={{ minWidth: '200px' }}
+                style={{ width: '110px' }}
               >
                 {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                 
-                <div className="relative py-2">
+                <div className="relative py-1">
                   {['New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
                     <motion.button
                       key={loc}
-                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-white/40 transition-colors"
+                      className="w-full px-2 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
                       onClick={() => {
                         setLocation(loc);
                         setShowLocationPicker(false);
                       }}
-                      whileHover={{ x: 4 }}
+                      whileHover={{ x: 2 }}
                       style={{
                         background: location === loc ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' : 'transparent',
                       }}
@@ -760,7 +791,7 @@ export default function DiscoverPage() {
       {/* Compact Search Bar - Minimal */}
       <div className="w-full max-w-3xl mb-8 z-10">
         <motion.div
-          className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative overflow-hidden flex items-center gap-3"
+          className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative flex items-center gap-3"
           initial={{ y: 20, opacity: 0 }}
           animate={{ 
             y: 0, 
@@ -774,7 +805,7 @@ export default function DiscoverPage() {
         >
           {/* Animated specular highlight */}
           <motion.div 
-            className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-full"
+            className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-full overflow-hidden"
             style={{
               background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%)',
             }}
@@ -788,13 +819,13 @@ export default function DiscoverPage() {
             }}
           />
           
-          <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative">
-            <input
-              type="text"
+          <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative z-10">
+            <MentionInput
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Where should we eat tonight?"
-              className="flex-1 bg-transparent border-0 outline-none focus:outline-none text-sm placeholder:text-[hsl(var(--muted-foreground))]"
+              onChange={setPrompt}
+              onMentionsChange={setMentions}
+              placeholder="Where should we eat? (Type @ to mention friends)"
+              className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
             />
             
             <div className="flex items-center gap-2">
@@ -884,7 +915,10 @@ export default function DiscoverPage() {
               
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-purple-600" />
-                Top Recommendations for you
+                {mentions.length > 0 
+                  ? `Top Recommendations for you & ${mentions.map(m => m.display_name || m.username).join(', ')}`
+                  : 'Top Recommendations for you'
+                }
               </h3>
               
               <div className="space-y-4">

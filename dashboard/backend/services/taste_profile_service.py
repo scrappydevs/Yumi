@@ -111,6 +111,85 @@ class TasteProfileService:
                 "flavorNotes": []
             }
     
+    def merge_multiple_user_preferences(
+        self,
+        user_ids: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Merge preferences from multiple users for group restaurant search.
+        
+        Strategy:
+        - Cuisines: Union of all users' favorite cuisines (up to 8 total)
+        - Price range: Take the most expensive preference (to accommodate everyone's budget)
+        - Atmosphere: Union of atmosphere preferences
+        - Flavor notes: Union of flavor preferences
+        
+        Args:
+            user_ids: List of user UUIDs to merge preferences for
+            
+        Returns:
+            Merged preferences dict with combined preferences
+        """
+        if not user_ids:
+            return {
+                "cuisines": [],
+                "priceRange": "",
+                "atmosphere": [],
+                "flavorNotes": []
+            }
+        
+        print(f"[TASTE PROFILE] Merging preferences for {len(user_ids)} users")
+        
+        # Collect all preferences
+        all_preferences = []
+        for user_id in user_ids:
+            prefs = self.get_current_preferences(user_id)
+            all_preferences.append(prefs)
+            print(f"[TASTE PROFILE] User {user_id[:8]}... preferences: {prefs}")
+        
+        # Initialize merged dict
+        merged = {
+            "cuisines": [],
+            "priceRange": "",
+            "atmosphere": [],
+            "flavorNotes": []
+        }
+        
+        # 1. Merge cuisines - Union of all users' cuisines
+        all_cuisines = set()
+        for prefs in all_preferences:
+            all_cuisines.update(prefs.get("cuisines", []))
+        merged["cuisines"] = list(all_cuisines)[:8]  # Limit to 8
+        
+        # 2. Merge price ranges - Take most expensive to accommodate everyone
+        price_order = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4, "": 0}
+        max_price = ""
+        max_price_value = 0
+        
+        for prefs in all_preferences:
+            price = prefs.get("priceRange", "")
+            price_value = price_order.get(price, 0)
+            if price_value > max_price_value:
+                max_price_value = price_value
+                max_price = price
+        
+        merged["priceRange"] = max_price
+        
+        # 3. Merge atmosphere - Union of all atmosphere tags
+        all_atmosphere = set()
+        for prefs in all_preferences:
+            all_atmosphere.update(prefs.get("atmosphere", []))
+        merged["atmosphere"] = list(all_atmosphere)
+        
+        # 4. Merge flavor notes - Union of all flavor preferences
+        all_flavors = set()
+        for prefs in all_preferences:
+            all_flavors.update(prefs.get("flavorNotes", []))
+        merged["flavorNotes"] = list(all_flavors)[:10]  # Limit to 10
+        
+        print(f"[TASTE PROFILE] ✅ Merged preferences: {merged}")
+        return merged
+    
     async def analyze_review_with_llm(
         self,
         review_data: Dict[str, Any],
