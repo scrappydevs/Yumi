@@ -16,14 +16,15 @@ def get_jwt_secret():
 
 
 class ActionTokenPayload:
-    def __init__(self, resv_id: str, user_id: str, action: Literal["confirm", "owner_cancel"], jti: str):
+    def __init__(self, resv_id: str, user_id: str, action: Literal["confirm", "owner_cancel", "invite_accept", "invite_decline"], jti: str, invite_id: str = None):
         self.resv_id = resv_id
         self.user_id = user_id
         self.action = action
         self.jti = jti
+        self.invite_id = invite_id
 
 
-def sign_action_token(resv_id: str, user_id: str, action: Literal["confirm", "owner_cancel"], ttl_seconds: int = 900) -> str:
+def sign_action_token(resv_id: str, user_id: str = None, action: Literal["confirm", "owner_cancel", "invite_accept", "invite_decline"] = "confirm", ttl_seconds: int = 900, invite_id: str = None) -> str:
     """
     Sign an action token with a TTL
     
@@ -40,12 +41,17 @@ def sign_action_token(resv_id: str, user_id: str, action: Literal["confirm", "ow
     
     payload = {
         'resvId': resv_id,
-        'userId': user_id,
         'action': action,
         'jti': jti,
         'exp': datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
         'iat': datetime.now(timezone.utc)
     }
+    
+    # Add optional fields
+    if user_id:
+        payload['userId'] = user_id
+    if invite_id:
+        payload['inviteId'] = invite_id
     
     token = jwt.encode(payload, get_jwt_secret(), algorithm='HS256')
     return token
@@ -68,7 +74,8 @@ def verify_action_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, get_jwt_secret(), algorithms=['HS256'])
         
-        if not all(k in payload for k in ['jti', 'resvId', 'userId', 'action']):
+        # Require at minimum: jti, resvId, action
+        if not all(k in payload for k in ['jti', 'resvId', 'action']):
             raise jwt.InvalidTokenError('Invalid token payload')
         
         return payload

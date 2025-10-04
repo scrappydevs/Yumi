@@ -97,20 +97,69 @@ async def inbound_sms(request: Request, From: str = Form(...), Body: str = Form(
                 "respondedAt": now
             }).eq("id", invite["id"]).execute()
             
-            # Check if we should confirm the reservation
+            # Check if everyone has accepted
             all_invites = supabase.table("reservation_invites") \
                 .select("rsvpStatus") \
                 .eq("reservationId", reservation["id"]) \
                 .execute()
             
-            has_yes = any(inv["rsvpStatus"] == "yes" for inv in all_invites.data)
+            # Check if ALL invites said yes
+            all_accepted = all(inv["rsvpStatus"] == "yes" for inv in all_invites.data)
             
-            if has_yes and reservation["status"] == "pending":
-                # Confirm reservation
+            if all_accepted and reservation["status"] == "pending":
+                # Everyone accepted! Confirm reservation
                 supabase.table("reservations").update({"status": "confirmed"}).eq("id", reservation["id"]).execute()
                 
-                # Calendar event will be generated on-demand
-                pass
+                # 🎯 TRIGGER VOICE CALL TO RESTAURANT
+                try:
+                    from services.voice_call_service import VoiceCallService
+                    from datetime import datetime
+                    
+                    # Get restaurant details
+                    restaurant = supabase.table("restaurants")\
+                        .select("name, phone, formatted_address")\
+                        .eq("id", reservation["restaurantId"])\
+                        .limit(1)\
+                        .execute()
+                    
+                    if restaurant.data and restaurant.data[0].get("phone"):
+                        restaurant_data = restaurant.data[0]
+                        reservation_time = datetime.fromisoformat(reservation["startsAt"].replace('Z', '+00:00'))
+                        
+                        # Get organizer info for callback
+                        organizer = supabase.table("profiles")\
+                            .select("display_name, phone")\
+                            .eq("id", reservation["organizerId"])\
+                            .limit(1)\
+                            .execute()
+                        
+                        organizer_name = organizer.data[0].get("display_name", "Customer") if organizer.data else "Customer"
+                        organizer_phone = organizer.data[0].get("phone", phone_e164) if organizer.data else phone_e164
+                        
+                        # Make the call!
+                        app_base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+                        call_result = VoiceCallService.make_reservation_call(
+                            restaurant_name=restaurant_data["name"],
+                            restaurant_phone=restaurant_data["phone"],
+                            party_size=reservation["partySize"],
+                            reservation_time=reservation_time,
+                            customer_name=organizer_name,
+                            customer_phone=organizer_phone,
+                            callback_url=f"{app_base_url}/api/voice/call-status"
+                        )
+                        
+                        print(f"📞 Voice call initiated: {call_result}")
+                        
+                        # Store call SID in reservation
+                        if call_result.get("success"):
+                            supabase.table("reservations").update({
+                                "callSid": call_result["call_sid"]
+                            }).eq("id", reservation["id"]).execute()
+                            
+                except Exception as e:
+                    print(f"⚠️ Failed to initiate voice call: {e}")
+                    # Don't fail the whole flow if call fails
+                    pass
             
             return twiml_response(confirmed_reply())
         

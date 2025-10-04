@@ -216,6 +216,8 @@ export default function DiscoverPage() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [expandedOnce, setExpandedOnce] = useState(false);
+  const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
+  const [flowingIndex, setFlowingIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -243,6 +245,43 @@ export default function DiscoverPage() {
       setExpandedOnce(true);
     }
   }, [isThinking]);
+
+  // Continuous flowing animation - images constantly flow in and out
+  useEffect(() => {
+    if (!isThinking) {
+      setAbsorbedIndices([]);
+      setFlowingIndex(0);
+      return;
+    }
+
+    // Continuously cycle through images - always have 2-3 images flowing through
+    const flowInterval = setInterval(() => {
+      setFlowingIndex((prev) => (prev + 1) % 10);
+    }, 600); // Each image flows for 600ms
+
+    return () => clearInterval(flowInterval);
+  }, [isThinking]);
+
+  // Calculate which images are currently being absorbed based on flowing index
+  useEffect(() => {
+    if (!isThinking) return;
+
+    // Always have 2-3 images in various stages of absorption
+    const currentAbsorbed: number[] = [];
+    
+    // Current image flowing in
+    currentAbsorbed.push(flowingIndex);
+    
+    // Next image starting to flow
+    currentAbsorbed.push((flowingIndex + 1) % 10);
+    
+    // Sometimes include a third for variety
+    if (flowingIndex % 3 === 0) {
+      currentAbsorbed.push((flowingIndex + 2) % 10);
+    }
+
+    setAbsorbedIndices(currentAbsorbed);
+  }, [flowingIndex, isThinking]);
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -610,13 +649,23 @@ export default function DiscoverPage() {
               const isCore = index < 10; // First 10 are core images
               const shouldShow = isCore || isThinking; // Show new images only when thinking
               
+              // Check if this image is being absorbed into the glob
+              const isAbsorbed = isThinking && isCore && absorbedIndices.includes(index);
+              
+              // Calculate absorption progress for staggered animation (0 to 1)
+              const absorbedPosition = absorbedIndices.indexOf(index);
+              const absorptionProgress = absorbedPosition >= 0 ? absorbedPosition / absorbedIndices.length : 0;
+              
               // For core images: use their index (0-9)
               // For new images: interleave between core images (0.5, 1.5, 2.5, etc.)
               const effectiveIndex = isCore ? index : (index - 10) + 0.5;
               const totalSlots = isThinking ? 20 : 10;
               
               const angle = ((effectiveIndex / 10) * 360 + rotation) * (Math.PI / 180);
-              const radius = isThinking ? 350 : 200; // Increased spacing when expanded
+              // If absorbed, interpolate radius based on absorption progress for staggered effect
+              const normalRadius = isThinking ? 350 : 200;
+              const targetRadius = isAbsorbed ? 0 : normalRadius;
+              const radius = targetRadius;
               const x = 350 + Math.cos(angle) * radius;
               const y = 350 + Math.sin(angle) * radius;
             
@@ -630,6 +679,8 @@ export default function DiscoverPage() {
                 animate={{
                   left: x,
                   top: y,
+                  opacity: isAbsorbed ? 0 : 1,
+                  scale: isAbsorbed ? 0.2 : 1,
                 }}
                 exit={{
                   opacity: 0,
@@ -637,12 +688,14 @@ export default function DiscoverPage() {
                   transition: { duration: 0.00 }
                 }}
                 transition={{
-                  duration: 0.00,
-                  ease: [0.22, 1, 0.36, 1], // Fast ease-out, no slow parts
+                  duration: isAbsorbed ? 0.5 : 0.00,
+                  ease: isAbsorbed ? [0.4, 0.0, 0.2, 1] : [0.22, 1, 0.36, 1],
+                  delay: isAbsorbed ? absorptionProgress * 0.1 : 0,
                 }}
                 style={{
                   x: '-50%',
                   y: '-50%',
+                  zIndex: isAbsorbed ? 1 : 'auto',
                 }}
               >
                 <motion.div
@@ -651,7 +704,9 @@ export default function DiscoverPage() {
                     background: 'rgba(255, 255, 255, 0.35)',
                     backdropFilter: 'blur(30px) saturate(180%)',
                     border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                    boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                    boxShadow: isAbsorbed 
+                      ? 'inset 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(139, 92, 246, 0.9), 0 0 80px rgba(59, 130, 246, 0.7), 0 0 100px rgba(96, 165, 250, 0.5)'
+                      : 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                     transformStyle: 'preserve-3d',
                   }}
                   initial={{ opacity: isCore ? 1 : 0, scale: isCore ? 1 : 0.8 }}

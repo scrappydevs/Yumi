@@ -66,9 +66,9 @@ model Reservation {
   createdAt     DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime          @updatedAt @db.Timestamptz(6)
 
-  invites       ReservationInvite[]
-  calendarEvent CalendarEvent?
-  messages      OutboundMessage[]
+  invites        ReservationInvite[]
+  calendarEvents CalendarEvent[]      // Changed from one-to-one to one-to-many
+  messages       OutboundMessage[]
 
   @@map("reservations")
 }
@@ -86,12 +86,13 @@ model ReservationInvite {
 
   @@index([reservationId])
   @@index([inviteePhoneE164])
+  @@index([inviteeProfileId])
   @@map("reservation_invites")
 }
 
 model CalendarEvent {
   id            String   @id @default(uuid()) @db.Uuid
-  reservationId String   @unique @db.Uuid
+  reservationId String   @db.Uuid  // Removed @unique to allow many events per reservation
   userId        String   @db.Uuid
   title         String
   startsAt      DateTime @db.Timestamptz(6)
@@ -101,6 +102,8 @@ model CalendarEvent {
 
   reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
+  @@unique([reservationId, userId])  // One calendar event per user per reservation
+  @@index([userId])
   @@map("calendar_events")
 }
 
