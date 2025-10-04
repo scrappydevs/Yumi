@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { createClient } from '@/lib/supabase/client';
 import {
   Utensils,
   Compass,
@@ -20,6 +22,7 @@ import {
   BookHeart,
   Activity,
   MapPin,
+  LogOut,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -41,7 +44,6 @@ const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
   { name: 'Explore', icon: MapPin, href: '/spatial' },
   { name: 'Friends', icon: Users, href: '/friends' },
-  { name: 'Messages', icon: MessageCircle, href: '/messages' },
   { name: 'Favorites', icon: BookHeart, href: '/favorites' },
 ];
 
@@ -53,10 +55,16 @@ const secondaryNav: NavigationItem[] = [
 export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = React.useState(false);
+  const supabase = createClient();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  };
   
   return (
     <aside
@@ -83,21 +91,32 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
         </div>
       </div>
 
-      {/* Toggle Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onToggle}
-        className={cn(
-          'absolute -right-3 top-20 z-[100] h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 hover:bg-[hsl(var(--muted))]'
-        )}
-      >
-        {isCollapsed ? (
-          <ChevronRight className="h-3 w-3" />
-        ) : (
-          <ChevronLeft className="h-3 w-3" />
-        )}
-      </Button>
+      {/* Toggle Button with Tooltip */}
+      <Tooltip delayDuration={1000}>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
+            className={cn(
+              'absolute -right-3 top-1/2 -translate-y-1/2 z-[100] h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 opacity-60 hover:opacity-100 hover:bg-[hsl(var(--muted))] transition-opacity duration-200'
+            )}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-3 w-3" />
+            ) : (
+              <ChevronLeft className="h-3 w-3" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="right" 
+          sideOffset={8} 
+          className="!animate-none !zoom-in-0 !fade-in-0 data-[side=right]:!slide-in-from-left-0 !duration-0"
+        >
+          <span className="text-xs">⌘B to toggle</span>
+        </TooltipContent>
+      </Tooltip>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
@@ -155,31 +174,20 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
         })}
       </nav>
 
-      {/* Footer - Compact */}
+      {/* Footer - Logout Button */}
       <div className="border-t border-[hsl(var(--border))] p-2.5">
-        {!isCollapsed ? (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
-              <Activity className="h-3 w-3 text-[hsl(var(--success))]" />
-              <span className="uppercase tracking-wider text-[10px]">Online</span>
-            </div>
-            <div className="pt-1.5 border-t border-[hsl(var(--border))]">
-              <div className="flex items-center gap-1 text-[10px] text-[hsl(var(--muted-foreground))]">
-                <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
-                  ⌘
-                </kbd>
-                <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
-                  B
-                </kbd>
-                <span className="ml-0.5">Toggle</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <Activity className="h-4 w-4 text-[hsl(var(--success))]" />
-          </div>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          className={cn(
+            'w-full text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10 hover:text-[hsl(var(--destructive))]',
+            isCollapsed ? 'justify-center px-0' : 'justify-start gap-2'
+          )}
+        >
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!isCollapsed && <span className="text-sm font-medium">Logout</span>}
+        </Button>
       </div>
     </aside>
   );

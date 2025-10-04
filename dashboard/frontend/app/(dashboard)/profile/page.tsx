@@ -249,7 +249,7 @@ export default function ProfilePage() {
   const preferences = parsePreferences(profile.preferences || '{}');
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto bg-white">
       <div className="max-w-5xl mx-auto p-8 space-y-12">
         {/* Profile Header */}
         <div className="grid grid-cols-[auto_1fr_auto] gap-8 items-start pb-12 border-b border-slate-200/60">
@@ -363,12 +363,13 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Preferences */}
-            <div className="glass-panel p-6">
-              <div className="glass-highlight" />
-              <h2 className="text-lg font-bold mb-4">Preferences</h2>
-              
-              <div className="space-y-4">
+          {/* Preferences */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-sm font-medium text-slate-500">Preferences</h2>
+            </div>
+            
+            <div className="space-y-4">
                 {preferences.cuisines && preferences.cuisines.length > 0 && (
                   <div>
                     <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
@@ -414,57 +415,50 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {(!preferences.cuisines && !preferences.priceRange && !preferences.atmosphere) && (
-                  <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                    <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No preferences set</p>
-                    <button className="glass-btn-inline text-xs mt-2">
-                      Set preferences
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* My Photos */}
-          <div className="glass-panel p-6">
-            <div className="glass-highlight" />
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">My Photos</h2>
-              <button className="glass-btn-inline text-xs">
-                View all →
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              {photos.length > 0 ? (
-                photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    className="relative rounded-lg overflow-hidden aspect-square cursor-pointer group"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={`Photo ${photo.id}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Heart className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-4 text-center py-8 text-[hsl(var(--muted-foreground))]">
-                  <Heart className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No photos yet</p>
-                  <button className="glass-btn-inline text-xs mt-2">
-                    Add photos
-                  </button>
+              {(!preferences.cuisines && !preferences.priceRange && !preferences.atmosphere) && (
+                <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                  <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No preferences set</p>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {/* My Photos */}
+        <div className="col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-medium text-slate-500">Photos</h2>
+            <button className="text-xs text-slate-500 hover:text-slate-900 transition-colors">
+              View all →
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {photos.length > 0 ? (
+              photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="relative rounded-lg overflow-hidden aspect-square cursor-pointer group"
+                >
+                  <img
+                    src={photo.url}
+                    alt={`Photo ${photo.id}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Heart className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-4 text-center py-8 text-[hsl(var(--muted-foreground))]">
+                <Heart className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No photos yet</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-  )
+    </div>
+  );
 }

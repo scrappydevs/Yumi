@@ -1,13 +1,22 @@
+<<<<<<< HEAD
 """
 Aegis Backend API
 FastAPI application for handling infrastructure issue submissions.
 """
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
+=======
+# Load environment variables FIRST, before any imports that need them
+from contextlib import asynccontextmanager
+>>>>>>> 083f619e1afc9fd6fef236bc23166e753fa6a82b
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+from fastapi import FastAPI
+from supabase_client import SupabaseClient
+from routers import issues, ai, audio, config, reservations, twilio_webhooks
 import os
 import subprocess
+from dotenv import load_dotenv
 
+<<<<<<< HEAD
 # Import services and utilities
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
@@ -19,33 +28,27 @@ from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config
 import asyncio
+=======
+>>>>>>> 083f619e1afc9fd6fef236bc23166e753fa6a82b
 
-# In-memory cache for AI-suggested restaurants (temporary until user submits review)
-# Key: image_id, Value: restaurant_name
-restaurant_suggestions_cache = {}
-
-# Auto-sync secrets from Infisical before starting
 def sync_secrets():
+    """Sync secrets from Infisical to .env file before loading environment variables"""
     try:
-        # Get the directory where this script is located
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        env_path = os.path.join(script_dir, '.env')
-
         print("🔄 Syncing secrets from Infisical to .env...")
-        # Updated command for newer Infisical CLI
         result = subprocess.run(
-            ["infisical", "export", "--format=dotenv"],
+            ["infisical", "export", "--env=dev", "--format=dotenv"],
             capture_output=True,
             text=True,
-            cwd=script_dir
+            cwd=os.path.dirname(os.path.abspath(__file__))
         )
         if result.returncode == 0:
-            # Write the output to .env file in the same directory as this script
-            with open(env_path, 'w') as f:
+            # Write the output to .env file
+            with open('.env', 'w') as f:
                 f.write(result.stdout)
-            print(f"✅ Secrets synced to {env_path} successfully!")
+            print("✅ Secrets synced to .env successfully!")
         else:
-            print("⚠️  Could not sync from Infisical. Using existing .env file if available")
+            print(
+                "⚠️  Could not sync from Infisical. Using existing .env file if available")
             if result.stderr:
                 print(f"   Error: {result.stderr.strip()}")
     except FileNotFoundError:
@@ -55,48 +58,81 @@ def sync_secrets():
         print(f"⚠️  Could not sync secrets: {e}")
         print("   Using existing .env file if available")
 
-# Sync secrets on startup
+
+# Sync and load secrets BEFORE importing modules that need environment variables
 sync_secrets()
+load_dotenv()
 
-# Load environment variables from the backend directory
-script_dir = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(script_dir, '.env'))
+# Now import modules that depend on environment variables
 
-# Initialize FastAPI
+
+# Lifespan context manager for startup/shutdown events
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        SupabaseClient.initialize()
+        print("✅ Supabase client initialized")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not initialize Supabase: {e}")
+    
+    try:
+        from services.twilio_service import TwilioService
+        TwilioService.initialize()
+    except Exception as e:
+        print(f"⚠️  Warning: Could not initialize Twilio: {e}")
+    
+    print("✅ Application startup complete")
+
+    yield
+
+    # Shutdown
+    print("🔄 Application shutdown")
+
 app = FastAPI(
-    title="Aegis Backend API",
-    description="Backend API for Aegis infrastructure issue reporting",
-    version="1.0.0"
+    title="Aegis Infrastructure API",
+    description="Backend API for Aegis Civic Infrastructure Intelligence Platform",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS configuration - allow all origins for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development; restrict in production
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers for dashboard/civic infrastructure features
+# Include routers
 app.include_router(issues.router)
 app.include_router(ai.router)
 app.include_router(audio.router)
 app.include_router(config.router)
+app.include_router(reservations.router, prefix="/api")
+app.include_router(twilio_webhooks.router, prefix="/api")
 
 
 @app.get("/")
 async def root():
-    """Health check endpoint."""
     return {
-        "message": "Aegis API is running",
-        "status": "healthy",
-        "version": "1.0.0"
+        "message": "Welcome to Aegis Infrastructure API",
+        "version": "1.0.0",
+        "docs": "/docs"
     }
 
 
 @app.get("/health")
 async def health_check():
+<<<<<<< HEAD
     """Detailed health check with service status."""
     status = {"status": "healthy", "services": {}}
     
@@ -613,6 +649,9 @@ async def get_food_graph(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to generate food graph: {str(e)}")
+=======
+    return {"status": "healthy", "service": "aegis-api"}
+>>>>>>> 083f619e1afc9fd6fef236bc23166e753fa6a82b
 
 
 @app.post("/api/restaurants/search/test")
@@ -727,18 +766,10 @@ async def search_restaurants(
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8000"))
-    
-    print(f"\n{'='*60}")
-    print(f"🚀 Starting Aegis Backend API")
-    print(f"{'='*60}")
-    print(f"📍 Server: http://{host}:{port}")
-    print(f"📚 Docs: http://{host}:{port}/docs")
-    print(f"🔍 Health: http://{host}:{port}/health")
-    print(f"{'='*60}\n")
-    
+
     uvicorn.run(
         "main:app",
         host=host,
