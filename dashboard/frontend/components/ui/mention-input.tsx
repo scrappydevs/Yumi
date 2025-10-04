@@ -142,27 +142,36 @@ export function MentionInput({
 
   // Keyboard navigation in dropdown
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    // If dropdown is showing, prevent Enter from submitting the form
+    if (showDropdown && e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Only select friend if we have one selected
+      if (filteredFriends.length > 0 && filteredFriends[selectedIndex]) {
+        selectFriend(filteredFriends[selectedIndex]);
+      }
+      return;
+    }
+
     if (!showDropdown || filteredFriends.length === 0) return;
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex(prev => 
           prev < filteredFriends.length - 1 ? prev + 1 : prev
         );
         break;
       case 'ArrowUp':
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
-        break;
-      case 'Enter':
-        if (showDropdown) {
-          e.preventDefault();
-          selectFriend(filteredFriends[selectedIndex]);
-        }
         break;
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation();
         setShowDropdown(false);
         break;
     }
@@ -195,7 +204,6 @@ export function MentionInput({
     }
   }, [selectedIndex, showDropdown]);
 
-  console.log('[MENTION] Render state:', { showDropdown, friendsCount: filteredFriends.length, loading });
 
   return (
     <div className="relative w-full flex items-center gap-2">

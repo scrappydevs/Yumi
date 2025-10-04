@@ -907,14 +907,25 @@ async def search_restaurants(
         }
     """
     try:
-        print(f"[SEARCH RESTAURANTS] Request from user: {user_id}")
+        import time
+        start_time = time.time()
+        
+        print(f"\n{'='*80}")
+        print(f"[SEARCH RESTAURANTS] 🔍 NEW SEARCH REQUEST")
+        print(f"{'='*80}")
+        print(f"[SEARCH RESTAURANTS] User: {user_id[:8]}...")
         print(f"[SEARCH RESTAURANTS] Query: '{query}'")
         print(f"[SEARCH RESTAURANTS] Location: ({latitude}, {longitude})")
+        print(f"[SEARCH RESTAURANTS] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
 
         # Get restaurant search service
+        print(f"[SEARCH RESTAURANTS] Step 1/3: Getting search service...")
         search_service = get_restaurant_search_service()
+        print(f"[SEARCH RESTAURANTS] ✅ Search service ready")
 
         # Execute search (currently Stage 1 - tool testing only)
+        print(f"[SEARCH RESTAURANTS] Step 2/3: Calling search_restaurants method...")
         results = await search_service.search_restaurants(
             query=query,
             user_id=user_id,
@@ -922,7 +933,11 @@ async def search_restaurants(
             longitude=longitude
         )
 
-        print(f"[SEARCH RESTAURANTS] ✅ Search completed")
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(f"[SEARCH RESTAURANTS] Step 3/3: ✅ SEARCH COMPLETED in {elapsed:.2f}s")
+        print(f"[SEARCH RESTAURANTS] Results: {len(results.get('top_restaurants', []))} top restaurants")
+        print(f"{'='*80}\n")
         return results
 
     except HTTPException:
@@ -1128,5 +1143,6 @@ if __name__ == "__main__":
         host=host,
         port=port,
         reload=True,
-        log_level="info"
+        log_level="info",
+        timeout_keep_alive=120  # 2 minutes for long LLM calls
     )

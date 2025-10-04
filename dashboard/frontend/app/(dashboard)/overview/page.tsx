@@ -476,6 +476,10 @@ export default function DiscoverPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🚀🚀🚀 HANDLE SUBMIT CALLED 🚀🚀🚀');
+    console.log('🚀 Query:', prompt);
+    console.log('🚀 Mentions:', mentions);
+    
     // Check if prompt is empty
     if (!prompt.trim()) {
       // If we have mentions but no text, show specific message
@@ -506,9 +510,11 @@ export default function DiscoverPage() {
     // Note: The rotating phrases with voice are handled by the useEffect hook
     // No need to speak here to avoid voice overlap
     
-    // Set up 30-second timeout
+    // Set up 60-second timeout (LLM can be slow)
     const timeoutId = setTimeout(() => {
-      const timeoutText = 'No results found';
+      console.error('⏰⏰⏰ 60-SECOND TIMEOUT FIRED! ⏰⏰⏰');
+      console.error('⏰ Backend took longer than 60 seconds to respond');
+      const timeoutText = 'Search is taking longer than expected. Try again.';
       setCurrentPhrase(timeoutText);
       setSearchError(timeoutText);
       setIsThinking(false);
@@ -517,7 +523,7 @@ export default function DiscoverPage() {
       if (!isMuted) {
         speak(timeoutText);
       }
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds
     
     try {
       // Get coordinates - use actual user location if available, otherwise use selected city
@@ -569,7 +575,11 @@ export default function DiscoverPage() {
           index
         }));
       
+      console.log(`📊 Mapped ${allImages.length} images from nearby restaurants`);
+      console.log(`📊 First few images:`, allImages.slice(0, 3));
+      
       if (allImages.length > 0) {
+        console.log('✅ allImages.length > 0, proceeding with LLM call...');
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
@@ -581,18 +591,16 @@ export default function DiscoverPage() {
         // Wait for "Finding restaurants nearby" speech to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Step 2: Analyzing food preferences
+        // Step 2: Analyzing food preferences (don't await - let it happen in parallel)
         const step2Text = isGroupSearch 
           ? "Analyzing everyone's food preferences"
           : 'Analyzing your food preferences';
         setCurrentPhrase(step2Text);
         if (!isMuted) {
-          await speak(step2Text);
+          speak(step2Text);  // No await - don't block LLM call!
         }
         
-        // Wait for step 2 speech to complete before continuing
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
+        // Don't wait for TTS - proceed immediately to LLM call
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
         console.log(`   Query: "${searchQuery}"`);
@@ -619,6 +627,9 @@ export default function DiscoverPage() {
           : '/api/restaurants/search';
 
         console.log(`📡 Calling ${searchEndpoint}...`);
+        console.log(`📡 Fetch URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`);
+        console.log(`📡 Starting fetch at: ${new Date().toISOString()}`);
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
@@ -627,21 +638,38 @@ export default function DiscoverPage() {
           body: searchFormData,
         });
 
+        console.log(`📡 Fetch completed at: ${new Date().toISOString()}`);
         console.log(`📡 Response status: ${response.status}`);
+        console.log(`📡 Response ok: ${response.ok}`);
+        
         if (!response.ok) {
+          console.error('❌ Response not OK, trying to parse error...');
           const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
           console.error('❌ Search failed:', errorData);
           throw new Error(errorData.detail || 'Failed to search restaurants');
         }
 
+        console.log('📡 Parsing JSON response...');
         const data = await response.json();
-        console.log('✅ LLM analysis complete');
-        console.log(`📊 Received ${data.top_restaurants?.length || 0} top restaurants`);
-        console.log(`📊 Received ${data.all_nearby_restaurants?.length || 0} nearby restaurants`);
+        console.log('✅ JSON parsed successfully');
+        console.log('📊 Full response data:', JSON.stringify(data, null, 2));
+        console.log(`📊 data.status: ${data.status}`);
+        console.log(`📊 data.top_restaurants exists: ${!!data.top_restaurants}`);
+        console.log(`📊 data.top_restaurants length: ${data.top_restaurants?.length || 0}`);
+        console.log(`📊 data.all_nearby_restaurants length: ${data.all_nearby_restaurants?.length || 0}`);
         
         // PHASE 3: Show final results
+        console.log('🔍 Checking if we have top_restaurants...');
+        console.log(`🔍 data.top_restaurants truthy: ${!!data.top_restaurants}`);
+        console.log(`🔍 data.top_restaurants.length > 0: ${data.top_restaurants && data.top_restaurants.length > 0}`);
+        
         if (data.top_restaurants && data.top_restaurants.length > 0) {
+          console.log(`✅✅✅ ENTERING SUCCESS BLOCK ✅✅✅`);
           console.log(`✅ Received ${data.top_restaurants.length} restaurants from LLM`);
+          
+          // Clear timeout IMMEDIATELY - we have results!
+          console.log('⏰ Clearing timeout - results received');
+          clearTimeout(timeoutId);
           
           // Filter to only restaurants with place_ids (photos have fallbacks now)
           const restaurantsWithIds = data.top_restaurants.filter((r: SearchResult) => r.place_id);
@@ -789,6 +817,11 @@ export default function DiscoverPage() {
           }
         } else {
           // No recommendations from LLM
+          console.error('❌ ENTERED NO RESULTS BLOCK');
+          console.error('❌ data.top_restaurants:', data.top_restaurants);
+          console.error('❌ data.top_restaurants type:', typeof data.top_restaurants);
+          console.error('❌ data.top_restaurants length:', data.top_restaurants?.length);
+          
           const noResultsText = 'No restaurants found. Try a different query or location.';
           setSearchError(noResultsText);
           setCurrentPhrase(noResultsText);
@@ -799,13 +832,34 @@ export default function DiscoverPage() {
             await speak(noResultsText);
           }
         }
+      } else {
+        // No images from nearby restaurants - this shouldn't happen
+        console.error('❌❌ allImages.length is 0! No images to show.');
+        console.error('❌❌ nearbyData.restaurants:', nearbyData.restaurants);
+        console.error('❌❌ This means ensureImageUrl() returned empty for all restaurants');
+        
+        const noImagesText = 'No restaurant images found. Try a different location.';
+        setSearchError(noImagesText);
+        setCurrentPhrase(noImagesText);
+        setIsThinking(false);
+        setShowingResults(false);
+        setMentionedFriendsData([]);
+        if (!isMuted) {
+          await speak(noImagesText);
+        }
       }
       
-      // Clear timeout on successful completion
+      // Clear timeout on successful completion (safety net)
+      console.log('⏰ Clearing timeout at end of try block (safety net)');
       clearTimeout(timeoutId);
       
     } catch (error) {
+      console.error('❌❌❌ ENTERED CATCH BLOCK ❌❌❌');
       console.error('Search error:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      
       const errorText = error instanceof Error ? error.message : 'Failed to search restaurants';
       setSearchError(errorText);
       setCurrentPhrase('Sorry, something went wrong');
@@ -1198,7 +1252,8 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              const baseRadius = (isThinking || showingResults) ? 420 : 300;  // Larger radius when thinking/showing results
+              // Different radius for each state: thinking (420), results (200), latent (300)
+              const baseRadius = isThinking ? 420 : showingResults ? 300 : 300;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               

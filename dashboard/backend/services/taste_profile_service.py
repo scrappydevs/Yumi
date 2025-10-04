@@ -60,6 +60,114 @@ class TasteProfileService:
                 f"[TASTE PROFILE ERROR] Failed to fetch preferences text: {str(e)}")
             return ""
 
+    def get_current_preferences(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get user's current preferences as a structured dict.
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Preferences dict with cuisines, atmosphere, price range, flavor notes
+        """
+        try:
+            # Get the natural language preferences text
+            pref_text = self.get_current_preferences_text(user_id)
+            
+            if not pref_text:
+                # Return empty structure
+                return {
+                    "cuisines": [],
+                    "priceRange": "",
+                    "atmosphere": [],
+                    "flavorNotes": []
+                }
+            
+            # For now, return the text as-is in a structured format
+            # The LLM can interpret the natural language directly
+            return {
+                "preferences_text": pref_text,
+                "cuisines": [],
+                "priceRange": "",
+                "atmosphere": [],
+                "flavorNotes": []
+            }
+
+        except Exception as e:
+            print(f"[TASTE PROFILE ERROR] Failed to fetch preferences: {str(e)}")
+            return {
+                "cuisines": [],
+                "priceRange": "",
+                "atmosphere": [],
+                "flavorNotes": []
+            }
+
+    def merge_multiple_user_preferences(self, user_ids: list[str]) -> str:
+        """
+        Merge preferences from multiple users for group dining recommendations.
+
+        Args:
+            user_ids: List of user UUIDs
+
+        Returns:
+            Merged natural language preferences text suitable for group search
+        """
+        try:
+            print(f"[TASTE PROFILE] Merging preferences for {len(user_ids)} users")
+            
+            # Fetch preferences for all users
+            individual_prefs = []
+            for user_id in user_ids:
+                pref_text = self.get_current_preferences_text(user_id)
+                if pref_text:
+                    individual_prefs.append(pref_text)
+            
+            if not individual_prefs:
+                print("[TASTE PROFILE] No preferences found for any user in group")
+                return "Group of diners with varied tastes looking for a restaurant that can accommodate different preferences."
+            
+            # If only one person has preferences, use theirs
+            if len(individual_prefs) == 1:
+                return individual_prefs[0]
+            
+            # Merge multiple preferences using LLM
+            print(f"[TASTE PROFILE] Merging {len(individual_prefs)} preference profiles...")
+            merge_prompt = f"""You are merging dining preferences for a group of {len(user_ids)} people.
+
+Here are the individual preferences:
+
+{chr(10).join([f"Person {i+1}: {pref}" for i, pref in enumerate(individual_prefs)])}
+
+Task: Create a single, concise group preference profile (2-3 sentences) that:
+1. Identifies common preferences across the group
+2. Notes any diverse tastes that need accommodation
+3. Suggests suitable restaurant types that would work for everyone
+
+Example output:
+"This group has a shared love for Asian cuisines, particularly sushi and Korean BBQ. While most prefer vibrant, casual atmospheres, one member appreciates quieter settings. They're comfortable with mid to high price ranges and enjoy trying new restaurants together. A versatile Asian fusion restaurant or a popular ramen spot with varied options would satisfy the entire group."
+
+Return ONLY the merged preference text (no markdown, no explanations).
+"""
+            
+            response = self.gemini_service.model.generate_content(merge_prompt)
+            merged_text = response.text.strip()
+            
+            # Clean up markdown if present
+            if merged_text.startswith("```"):
+                lines = merged_text.split('\n')
+                merged_text = '\n'.join(lines[1:-1] if len(lines) > 2 else lines)
+                merged_text = merged_text.strip()
+            
+            print(f"[TASTE PROFILE] Merged preferences: {merged_text}")
+            return merged_text
+            
+        except Exception as e:
+            print(f"[TASTE PROFILE ERROR] Failed to merge preferences: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Return generic group text on error
+            return f"Group of {len(user_ids)} diners with varied tastes looking for a versatile restaurant."
+
     def save_preferences(self, user_id: str, preferences_text: str) -> None:
         """
         Save natural language preferences to profiles.preferences column.
