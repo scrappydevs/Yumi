@@ -725,22 +725,8 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-white">
       
-      {/* Test Button & Mute - Top Left */}
-      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
-        <motion.button
-          onClick={() => setIsThinking(!isThinking)}
-          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-xs font-medium">
-            {isThinking ? 'Thinking...' : 'Test AI'}
-          </span>
-        </motion.button>
-
-        <div className="flex items-center gap-2">
+      {/* Sound Controls - Top Left */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
         <motion.button
           onClick={() => {
             setIsMuted(!isMuted);
@@ -758,27 +744,42 @@ export default function DiscoverPage() {
           )}
         </motion.button>
 
-          {!isMuted && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 100, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="glass-layer-1 px-3 py-2 rounded-full shadow-soft"
-            >
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume * 100}
-                onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
-                className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
-                }}
-              />
-            </motion.div>
-          )}
-        </div>
+        {!isMuted && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 100, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="glass-layer-1 px-3 py-2.5 rounded-full shadow-soft flex items-center"
+          >
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume * 100}
+              onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
+              className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+              }}
+            />
+          </motion.div>
+        )}
+      </div>
+
+      {/* Test AI Button - Bottom Left */}
+      <div className="absolute bottom-6 left-6 z-10">
+        <motion.button
+          onClick={() => setIsThinking(!isThinking)}
+          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
+          <span className="text-xs font-medium">
+            {isThinking ? 'Thinking...' : 'Test AI'}
+          </span>
+        </motion.button>
       </div>
 
       {/* Location Tagger - Top Right */}
