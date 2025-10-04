@@ -69,7 +69,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS configuration
+# CORS configuration - allow all origins for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

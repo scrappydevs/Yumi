@@ -3,15 +3,15 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { createClient } from '@/lib/supabase/client';
 import {
   Utensils,
   Compass,
   Users,
-  MessageCircle,
   User,
   Settings,
   ChevronLeft,
@@ -19,6 +19,7 @@ import {
   Sparkles,
   BookHeart,
   Activity,
+  LogOut,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -39,7 +40,6 @@ type NavigationItem = {
 const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
   { name: 'Friends', icon: Users, href: '/friends' },
-  { name: 'Messages', icon: MessageCircle, href: '/messages' },
   { name: 'Favorites', icon: BookHeart, href: '/favorites' },
 ];
 
@@ -50,11 +50,18 @@ const secondaryNav: NavigationItem[] = [
 
 export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
+  const supabase = createClient();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+  };
   
   return (
     <aside
@@ -166,24 +173,29 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       <div className="border-t border-[hsl(var(--border))] p-2.5">
         {!isCollapsed ? (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full justify-start gap-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 h-8"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Log out</span>
+            </Button>
+            <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] pt-1.5 border-t border-[hsl(var(--border))]">
               <Activity className="h-3 w-3 text-[hsl(var(--success))]" />
               <span className="uppercase tracking-wider text-[10px]">Online</span>
             </div>
-            <div className="pt-1.5 border-t border-[hsl(var(--border))]">
-              <div className="flex items-center gap-1 text-[10px] text-[hsl(var(--muted-foreground))]">
-                <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
-                  ⌘
-                </kbd>
-                <kbd className="px-1 py-0.5 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded text-[9px] font-mono">
-                  B
-                </kbd>
-                <span className="ml-0.5">Toggle</span>
-              </div>
-            </div>
           </div>
         ) : (
-          <div className="flex justify-center">
+          <div className="space-y-2 flex flex-col items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
             <Activity className="h-4 w-4 text-[hsl(var(--success))]" />
           </div>
         )}

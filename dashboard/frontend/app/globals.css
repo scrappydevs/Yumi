@@ -92,7 +92,11 @@ body {
   background: hsl(var(--muted-foreground) / 0.3);
 }
 
-/* Liquid Glass Material Effect */
+/* ========================================
+   LIQUID GLASS UI SYSTEM
+   ======================================== */
+
+/* Base liquid glass effect */
 .liquid-glass {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px) saturate(180%);
@@ -107,6 +111,181 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Enhanced backdrop utilities */
+.glass-backdrop {
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+.glass-backdrop-xl {
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+}
+
+.glass-backdrop-2xl {
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+}
+
+/* Glass panel component */
+.panel-glass {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: filter, transform, opacity;
+}
+
+/* Glass button component */
+.btn-glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  transition: all 0.3s cubic-bezier(0.17, 0.67, 0.27, 1);
+  will-change: transform, filter, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transform: translateZ(0) scale(1.01);
+}
+
+.btn-glass:active {
+  transform: translateZ(0) scale(0.98);
+  box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.28);
+}
+
+/* Glass container with SVG filter */
+.glass-container {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  filter: url(#container-glass);
+  overflow: hidden;
+}
+
+/* Glass button with SVG filter */
+.glass-button {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  filter: url(#btn-glass);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: scale(1.02);
+}
+
+.glass-button:active {
+  transform: scale(0.98);
+}
+
+/* Animated highlight sweep for glass surfaces */
+.glass-highlight {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -33.333%;
+  width: 33.333%;
+  background: rgba(255, 255, 255, 0.1);
+  filter: blur(40px);
+  animation: shimmer 2.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+/* Glass ring/border accents */
+.glass-ring {
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.glass-ring-sm {
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 0 1.5px rgba(0, 0, 0, 0.2);
+}
+
+/* GPU acceleration utilities */
+.gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.no-tap {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Enhanced drop shadows for glass */
+.drop-shadow-glass {
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.35));
+}
+
+.drop-shadow-glass-sm {
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.28));
+}
+
+.drop-shadow-glass-inset {
+  filter: drop-shadow(inset 0 0 24px rgba(255, 255, 255, 0.25));
+}
+
+/* Inner glow effect */
+.shadow-inner-glow {
+  box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.28);
+}
+
+/* Panel shadow */
+.shadow-panel {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Liquid ease timing function */
+.ease-liquid {
+  transition-timing-function: cubic-bezier(0.17, 0.67, 0.27, 1);
+}
+
+/* Moving background animation */
+.animate-move-background {
+  animation: moveBackground 60s linear infinite;
+}
+
+@keyframes moveBackground {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 0% -1000%;
+  }
+}
+
+/* Existing gradients */
 .gradient-purple-blue {
   background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
 }
@@ -124,6 +303,58 @@ body {
   border-radius: 8px;
 }
 
+/* Fix autofill background issue */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: hsl(var(--foreground));
+  transition: background-color 5000s ease-in-out 0s;
+  box-shadow: inset 0 0 20px 20px transparent;
+}
+
+/* Ensure input backgrounds stay transparent/white */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"] {
+  background-clip: padding-box;
+}
+
+/* Fix focus ring corner fill issue */
+input:focus,
+input:focus-visible {
+  background-clip: padding-box !important;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Remove any dark backgrounds from inputs */
+input {
+  background-color: transparent !important;
+}
+
+input.bg-white\/60,
+input[class*="bg-white"] {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Prevent input shape changes on focus - but preserve existing shadows */
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  outline: none !important;
+  transform: none !important;
+}
+
+/* Keep rounded corners consistent */
+input.rounded-2xl,
+input[class*="rounded-2xl"] {
+  border-radius: 1rem !important;
+}
+
 /* Smooth animations */
 * {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -136,4 +367,12 @@ body {
 
 .concentric-card > * {
   border-radius: 12px;
+}
+
+/* Respect motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-move-background,
+  .glass-highlight {
+    animation: none !important;
+  }
 }

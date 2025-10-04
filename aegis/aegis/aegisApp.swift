@@ -1,14 +1,14 @@
 //
-//  iFixApp.swift
-//  iFix
+//  aegisApp.swift
+//  aegis
 //
-//  Created by David Jr on 10/1/25.
+//  Created by David Jr on 10/2/25.
 //
 
 import SwiftUI
 
 @main
-struct iFixApp: App {
+struct aegisApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

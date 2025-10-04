@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { GlassFilters } from "@/components/glass-filters";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
         style={{ fontFamily: 'var(--font-inter)' }}
       >
         {children}
+        <GlassFilters />
       </body>
     </html>
   );
