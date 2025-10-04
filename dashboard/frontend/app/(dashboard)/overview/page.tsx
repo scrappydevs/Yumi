@@ -723,7 +723,7 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
+    <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-white">
       
       {/* Test Button & Mute - Top Left */}
       <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
@@ -1243,7 +1243,7 @@ export default function DiscoverPage() {
       </AnimatePresence>
                 
       {/* Compact Search Bar - Minimal */}
-      <div className="w-full max-w-3xl mb-8 z-10">
+      <div className="w-full max-w-3xl mb-6 z-10">
         <motion.div
           className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative flex items-center gap-3"
           initial={{ y: 20, opacity: 0 }}
