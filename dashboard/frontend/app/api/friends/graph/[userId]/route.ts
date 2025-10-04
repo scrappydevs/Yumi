@@ -6,9 +6,12 @@ export async function GET(
 ) {
   const { userId } = await params;
 
+  console.log(`🔄 Recomputing social network graph for user ${userId}`);
+
   try {
+    // Always force refresh to recompute graph on load
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/friends/graph/${userId}`,
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/friends/graph/${userId}?force_refresh=true`,
       {
         headers: {
           'Content-Type': 'application/json',

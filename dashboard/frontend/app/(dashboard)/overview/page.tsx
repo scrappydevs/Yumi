@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -173,6 +174,7 @@ export default function DiscoverPage() {
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const rotationCyclesRef = useRef(0);  // Use ref for real-time access in interval
   const [location, setLocation] = useState('Boston');  // Default to Boston
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
@@ -204,6 +206,8 @@ export default function DiscoverPage() {
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(false);
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const [volume, setVolume] = useState(0.8); // 80% default volume
+  const [friendsData, setFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string, recent_activity?: string}>>([]);
+  const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, recentReviews?: any[], favoriteRestaurants?: any[]} | null>(null);
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
   
@@ -246,11 +250,30 @@ export default function DiscoverPage() {
 
   useEffect(() => {
     setMounted(true);
+    console.log('🎬 Orbit animation started! Initial cycles:', rotationCyclesRef.current);
     
     // Orbit animation - smooth rotation at all times
     const interval = setInterval(() => {
-      const speed = isThinking ? 1.2 : (showingResults ? 0.6 : 0.8);  // Slightly faster during thinking, but smooth
-      setRotation((prev) => (prev + speed) % 360);
+      // Dynamic speed based on state and cycle count
+      let speed;
+      if (isThinking) {
+        speed = 1.2;  // Faster during thinking
+      } else if (showingResults) {
+        speed = 0.6;  // Slower when showing results
+      } else {
+        // Latent state: SUPER fast for first 2 cycles, then slow down
+        speed = rotationCyclesRef.current < 1 ? 5.0 : 0.8;
+      }
+      
+      setRotation((prev) => {
+        const newRotation = (prev + speed) % 360;
+        // Track complete cycles (when we pass 360/0 degrees)
+        if (prev > newRotation && !isThinking && !showingResults) {
+          rotationCyclesRef.current += 1;
+          console.log(`🔄 Rotation cycle complete! Count: ${rotationCyclesRef.current}, Speed will be: ${rotationCyclesRef.current < 1 ? 5.0 : 0.8}`);
+        }
+        return newRotation;
+      });
     }, 50);
     
     // Get user's actual geolocation
@@ -300,6 +323,39 @@ export default function DiscoverPage() {
       loadDefaultRecommendations();
     }
   }, [user, mounted, location, isLoadingDefaults, isThinking, lastLoadedLocation]); // location change triggers reload
+
+  // Load friends data for profile pictures
+  useEffect(() => {
+    if (!user || !mounted) return;
+
+    async function loadFriends() {
+      try {
+        const supabase = createClient();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('friends')
+          .eq('id', user!.id)
+          .single();
+
+        if (profile?.friends && profile.friends.length > 0) {
+          // Fetch friend profiles (limit to 6 for cleaner orbit)
+          const { data: friends } = await supabase
+            .from('profiles')
+            .select('id, username, display_name, avatar_url')
+            .in('id', profile.friends.slice(0, 6));
+
+          if (friends) {
+            setFriendsData(friends);
+            console.log(`👥 Loaded ${friends.length} friends for orbit`);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading friends:', error);
+      }
+    }
+
+    loadFriends();
+  }, [user, mounted]);
 
   // Rotate phrases while thinking/loading
   useEffect(() => {
@@ -387,6 +443,7 @@ export default function DiscoverPage() {
     setSearchResults([]);
     setAllNearbyImages([]); // Reset images for new search
     setVisibleImageIds([]);
+    rotationCyclesRef.current = 0;  // Reset rotation cycles for next latent state
     
     // Check if this is a group search (has mentions)
     const isGroupSearch = mentions.length > 0;
@@ -689,7 +746,7 @@ export default function DiscoverPage() {
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
-      formData.append('limit', '10');  // Only fetch 10 for latent state
+      formData.append('limit', '15');  // Fetch 20 for latent state
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -998,12 +1055,12 @@ export default function DiscoverPage() {
               }}
             />
             
-            <div className="w-24 h-24 relative">
+            <div className="w-24 h-24 relative ml-3">
               <MetallicSphereComponent isActive={false} />
             </div>
             
             <motion.p
-              className="mt-6 text-sm font-semibold whitespace-nowrap text-center text-gray-400"
+              className="mt-6 text-md font-bold whitespace-nowrap text-center bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 bg-clip-text text-transparent"
               animate={{
                 opacity: [0.5, 1, 0.5],
               }}
@@ -1035,7 +1092,7 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              const baseRadius = (isThinking || showingResults) ? 420 : 280;  // Larger radius when thinking/showing results
+              const baseRadius = (isThinking || showingResults) ? 420 : 300;  // Larger radius when thinking/showing results
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1048,15 +1105,15 @@ export default function DiscoverPage() {
                   className="absolute"
                   initial={{ 
                     opacity: 0, 
-                    scale: 0.3,  // Less dramatic for smoother initial load
-                    left: '50%',  // Start at center (inside blob)
-                    top: '50%'    // Start at center (inside blob)
+                    scale: 0.3,  // Start small
+                    left: '50%',  // Start at center
+                    top: '50%'    // Start at center
                   }}
                   animate={{
                     left: x,
                     top: y,
                     opacity: isFadingOut ? 0 : 1,  // Fade to completely invisible
-                    scale: 1,  // Keep scale constant - NO POSITION CHANGE
+                    scale: 1,  // Expand to full size
                   }}
                   exit={{
                     // Fade out in place
@@ -1065,11 +1122,12 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    left: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
-                    top: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
-                    opacity: { duration: 0.4, ease: 'easeInOut' },  // Smooth fade in/out
+                    // Instant movement during fast rotation (< 2 cycles), smooth during slow rotation
+                    left: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    top: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    opacity: { duration: 0.4, ease: 'easeInOut' },
                     scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
-                    delay: visibleIndex * 0.03,  // Stagger initial load
+                    // No delay - all images appear at once to prevent repositioning
                   }}
                   style={{
                     x: '-50%',
@@ -1163,9 +1221,225 @@ export default function DiscoverPage() {
             });
           })()}
           </AnimatePresence>
+
+          {/* Orbiting Friend Avatars - Between center and restaurants */}
+          <AnimatePresence>
+          {friendsData.length > 0 && !isThinking && !showingResults && friendsData.map((friend, index) => {
+            // Calculate position on inner circle (radius 150)
+            const angle = ((index / friendsData.length) * 360 + rotation * 0.7) * (Math.PI / 180); // Slower rotation
+            const friendRadius = 150;
+            const x = 350 + Math.cos(angle) * friendRadius;
+            const y = 350 + Math.sin(angle) * friendRadius;
+            
+            return (
+              <motion.div
+                key={friend.id}
+                className="absolute"
+                initial={{ scale: 0.3, left: '50%', top: '50%', opacity: 0 }}
+                animate={{
+                  left: `${x}px`,
+                  top: `${y}px`,
+                  scale: 1,
+                  opacity: 1,
+                }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{
+                  left: { duration: 0, ease: 'linear' },
+                  top: { duration: 0, ease: 'linear' },
+                  opacity: { duration: 0.4, ease: 'easeInOut' },
+                  scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
+                }}
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  marginLeft: '-32px',
+                  marginTop: '-32px',
+                  zIndex: 5,
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={async () => {
+                  // Fetch friend's recent activity
+                  try {
+                    const supabase = createClient();
+                    
+                    // Get recent reviews
+                    const { data: reviews } = await supabase
+                      .from('reviews')
+                      .select('restaurant_name, rating, comment, created_at')
+                      .eq('user_id', friend.id)
+                      .order('created_at', { ascending: false })
+                      .limit(3);
+                    
+                    console.log(`👤 Loaded activity for ${friend.display_name || friend.username}: ${reviews?.length || 0} reviews`);
+                    
+                    setHoveredFriend({
+                      ...friend,
+                      recentReviews: reviews || [],
+                    });
+                  } catch (error) {
+                    console.error('Error loading friend activity:', error);
+                    setHoveredFriend({...friend});
+                  }
+                }}
+                onMouseLeave={() => setHoveredFriend(null)}
+              >
+                <div className="relative w-full h-full">
+                  {/* Liquid glass container with gradient border */}
+                  <div 
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(155, 135, 245, 0.6), rgba(99, 102, 241, 0.6))',
+                      padding: '2px',
+                    }}
+                  >
+                    <div 
+                      className="w-full h-full rounded-full overflow-hidden relative"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(10px)',
+                      }}
+                    >
+                      <NextImage
+                        src={friend.avatar_url || '/default-avatar.png'}
+                        alt={friend.display_name || friend.username}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Small name label on hover */}
+                  {hoveredFriend?.id === friend.id && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-xl whitespace-nowrap pointer-events-none"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        border: '0.5px solid rgba(255, 255, 255, 0.8)',
+                        boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 8px 24px rgba(0, 0, 0, 0.12)',
+                      }}
+                    >
+                      <div className="text-xs font-semibold text-gray-900">
+                        {friend.display_name || friend.username}
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+          </AnimatePresence>
                   </div>
                 </div>
                 
+      {/* Friend Activity Panel - Appears on right when hovering over a friend */}
+      <AnimatePresence>
+        {hoveredFriend && !isThinking && !showingResults && (
+          <motion.div
+            key="friend-panel"
+            className="fixed right-8 top-1/4 w-96 pointer-events-none z-50"
+            initial={{ opacity: 0, x: 50, y: '-50%' }}
+            animate={{ opacity: 1, x: 0, y: '-50%' }}
+            exit={{ opacity: 0, x: 50, y: '-50%' }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div 
+              className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden"
+              style={{
+                backdropFilter: 'blur(40px) saturate(180%)',
+                background: 'rgba(255, 255, 255, 0.5)',
+                border: '0.5px solid rgba(255, 255, 255, 0.6)',
+                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 20px 60px rgba(0, 0, 0, 0.15), 0 30px 80px rgba(155, 135, 245, 0.2)',
+                filter: 'drop-shadow(0 20px 40px rgba(99, 102, 241, 0.25)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1))',
+              }}
+            >
+              {/* Specular highlight */}
+              <div 
+                className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-3xl"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 100%)',
+                }}
+              />
+              
+              <div className="relative space-y-4">
+                {/* Friend Header */}
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-16 h-16 rounded-full overflow-hidden relative"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(155, 135, 245, 0.6), rgba(99, 102, 241, 0.6))',
+                      padding: '2px',
+                    }}
+                  >
+                    <div className="w-full h-full rounded-full overflow-hidden relative bg-white">
+                      <NextImage
+                        src={hoveredFriend.avatar_url || '/default-avatar.png'}
+                        alt={hoveredFriend.display_name || hoveredFriend.username}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {hoveredFriend.display_name || hoveredFriend.username}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      @{hoveredFriend.username}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Recent Reviews */}
+                {hoveredFriend.recentReviews && hoveredFriend.recentReviews.length > 0 ? (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <p className="text-sm font-medium text-gray-700 mb-3">
+                      Recent Activity
+                    </p>
+                    <div className="space-y-3">
+                      {hoveredFriend.recentReviews.map((review: any, idx: number) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {review.restaurant_name}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span className="text-sm font-medium text-gray-700">
+                                {review.rating}
+                              </span>
+                            </div>
+                          </div>
+                          {review.comment && (
+                            <p className="text-xs text-gray-600 line-clamp-2">
+                              "{review.comment}"
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-400">
+                            {new Date(review.created_at).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <p className="text-sm text-gray-500 italic">
+                      No recent activity yet
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hover Panel - Appears on right when hovering over a restaurant */}
       <AnimatePresence>
         {hoveredRestaurant && showingResults && (

@@ -96,8 +96,9 @@ function FriendsGraphFlow() {
   );
 
   const onPaneClick = useCallback(() => {
-    console.log('🖱️ Pane clicked - clearing selection');
+    console.log('🖱️ Pane clicked - clearing selections');
     setSelectedNode(null);
+    // Note: Edge selections are managed internally by each edge component
   }, []);
 
   if (isLoading) {
@@ -122,37 +123,39 @@ function FriendsGraphFlow() {
   }
 
   return (
-    <div className="h-full w-full relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        connectionLineType={ConnectionLineType.Bezier}
-        proOptions={proOptions}
-        fitView
-        className="liquid-glass"
-      >
-        <Background className="opacity-50" />
-        <Controls className="glass-panel" />
-        <MiniMap 
-          nodeComponent={GraphMinimap}
-          className="glass-panel rounded-lg"
-          maskColor="rgba(248, 250, 252, 0.4)"
-        />
-      </ReactFlow>
+    <>
+      <div className="h-full w-full relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          connectionLineType={ConnectionLineType.Bezier}
+          proOptions={proOptions}
+          fitView
+          className="liquid-glass"
+        >
+          <Background className="opacity-50" />
+          <Controls className="glass-panel" />
+          <MiniMap 
+            nodeComponent={GraphMinimap}
+            className="glass-panel rounded-lg"
+            maskColor="rgba(248, 250, 252, 0.4)"
+          />
+        </ReactFlow>
+      </div>
       
-      {/* User detail panel overlay */}
+      {/* User detail panel overlay - fixed positioning, outside ReactFlow */}
       <UserDetailPanel
         userId={selectedNode}
         currentUserId={userId}
         onClose={() => setSelectedNode(null)}
       />
-    </div>
+    </>
   );
 }
 

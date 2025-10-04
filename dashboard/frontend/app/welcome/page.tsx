@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { motion } from 'framer-motion';
 import { Loader2, ArrowRight } from 'lucide-react';
-import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
+import { DemoSocialGraph } from '@/components/DemoSocialGraph';
 import Image from 'next/image';
 
 export default function WelcomePage() {
@@ -95,17 +95,10 @@ export default function WelcomePage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0 pointer-events-none">
-        <LiquidGlassBlob 
-          isAnimating={true}
-          className="absolute top-20 left-20 w-[300px] h-[300px]"
-        />
-        <LiquidGlassBlob 
-          isAnimating={true}
-          className="absolute bottom-20 right-20 w-[400px] h-[400px]"
-        />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
+      {/* Demo Social Network Graph Background - takes up most of the page */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-25">
+        <DemoSocialGraph className="w-full h-full" />
       </div>
 
       <motion.div
