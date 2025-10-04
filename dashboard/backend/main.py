@@ -14,6 +14,7 @@ from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
 from services.embedding_service import get_embedding_service
 from services.taste_profile_service import get_taste_profile_service
+from services.restaurant_search_service import get_restaurant_search_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config
@@ -612,6 +613,116 @@ async def get_food_graph(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to generate food graph: {str(e)}")
+
+
+@app.post("/api/restaurants/search/test")
+async def search_restaurants_test(
+    query: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    user_id: str = Form("test-user-123")  # Optional test user ID
+):
+    """
+    TEST ENDPOINT (No Auth) - Natural language restaurant search using LLM with tool calls.
+    Use this for Stage 1 testing without authentication.
+    
+    Args:
+        query: User's natural language query (e.g., "Quiet Italian spot with outdoor seating")
+        latitude: User's current latitude
+        longitude: User's current longitude
+        user_id: Optional test user ID (defaults to "test-user-123")
+        
+    Returns:
+        Search results with top restaurants matching query and user preferences
+        
+    Example:
+        POST /api/restaurants/search/test
+        Form data:
+            query=Italian restaurant near me
+            latitude=40.7580
+            longitude=-73.9855
+    """
+    try:
+        print(f"[SEARCH RESTAURANTS TEST] Request from user: {user_id}")
+        print(f"[SEARCH RESTAURANTS TEST] Query: '{query}'")
+        print(f"[SEARCH RESTAURANTS TEST] Location: ({latitude}, {longitude})")
+        
+        # Get restaurant search service
+        search_service = get_restaurant_search_service()
+        
+        # Execute search (currently Stage 1 - tool testing only)
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        print(f"[SEARCH RESTAURANTS TEST] ✅ Search completed")
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SEARCH RESTAURANTS TEST ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
+
+
+@app.post("/api/restaurants/search")
+async def search_restaurants(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    Natural language restaurant search using LLM with tool calls.
+    
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        query: User's natural language query (e.g., "Quiet Italian spot with outdoor seating")
+        latitude: User's current latitude
+        longitude: User's current longitude
+        
+    Returns:
+        Search results with top restaurants matching query and user preferences
+        
+    Example query:
+        POST /api/restaurants/search
+        {
+            "query": "Italian restaurant near me",
+            "latitude": 40.7580,
+            "longitude": -73.9855
+        }
+    """
+    try:
+        print(f"[SEARCH RESTAURANTS] Request from user: {user_id}")
+        print(f"[SEARCH RESTAURANTS] Query: '{query}'")
+        print(f"[SEARCH RESTAURANTS] Location: ({latitude}, {longitude})")
+        
+        # Get restaurant search service
+        search_service = get_restaurant_search_service()
+        
+        # Execute search (currently Stage 1 - tool testing only)
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        print(f"[SEARCH RESTAURANTS] ✅ Search completed")
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SEARCH RESTAURANTS ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
 
 
 if __name__ == "__main__":
