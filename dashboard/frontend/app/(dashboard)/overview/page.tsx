@@ -191,7 +191,7 @@ const SAMPLE_RESTAURANTS = [
 
 // City coordinates mapping
 const CITY_COORDINATES: { [key: string]: { lat: number; lng: number } } = {
-  'Boston': { lat: 42.3601, lng: -71.0589 },
+  'Boston': { lat: 42.373050, lng: -71.120472 },  // Harvard Square area
   'New York City': { lat: 40.7580, lng: -73.9855 },
   'San Francisco': { lat: 37.7749, lng: -122.4194 },
   'Los Angeles': { lat: 34.0522, lng: -118.2437 },

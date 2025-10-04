@@ -83,15 +83,19 @@ class RestaurantSearchService:
             restaurants = []
             
             if self.use_database:
-                # Use database for restaurant search with automatic radius expansion
+                # Use database for restaurant search with smart radius expansion
                 print(f"[TOOL] Using database for restaurant search")
                 
-                # Try increasing radii until we find restaurants
+                # First, try to detect cuisine from context (if available)
+                # This will be set by the parent search_restaurants method
+                requested_cuisine = getattr(self, '_current_search_cuisine', None)
+                
+                # Try increasing radii, but check for cuisine matches
                 search_radii = [radius, 5000, 10000, 20000]  # 1km, 5km, 10km, 20km
                 
                 for search_radius in search_radii:
                     if search_radius != radius:
-                        print(f"[TOOL] No results at {radius}m, expanding to {search_radius}m...")
+                        print(f"[TOOL] No matching cuisine at {radius}m, expanding to {search_radius}m...")
                     
                     restaurants = self.restaurant_db_service.get_nearby_restaurants(
                         latitude=latitude,
@@ -101,8 +105,21 @@ class RestaurantSearchService:
                     )
                     
                     if restaurants:
-                        print(f"[TOOL] Found {len(restaurants)} restaurants at {search_radius}m radius")
-                        break
+                        # Check if we found matching cuisines
+                        if requested_cuisine:
+                            matching = [r for r in restaurants if requested_cuisine.lower() in (r.get('cuisine') or '').lower()]
+                            if matching:
+                                print(f"[TOOL] Found {len(matching)} {requested_cuisine} restaurants at {search_radius}m radius")
+                                restaurants = matching[:limit]  # Prioritize matching cuisine
+                                break
+                            elif search_radius == search_radii[-1]:
+                                # Last radius, return what we have
+                                print(f"[TOOL] No {requested_cuisine} restaurants found, returning {len(restaurants)} other options")
+                                break
+                        else:
+                            # No cuisine filter, just return results
+                            print(f"[TOOL] Found {len(restaurants)} restaurants at {search_radius}m radius")
+                            break
                 
                 if not restaurants:
                     print(f"[TOOL] No restaurants found even with 20km radius")
@@ -206,6 +223,21 @@ class RestaurantSearchService:
             # Step 1: Get user preferences
             print(f"[RESTAURANT SEARCH] Step 1: Getting user preferences...")
             preferences = self.get_user_preferences_tool(user_id)
+            
+            # Step 1.5: Detect cuisine from query for smart radius expansion
+            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian', 
+                              'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
+                              'sushi', 'ramen', 'tacos', 'burgers', 'seafood']
+            detected_cuisine = None
+            query_lower = query.lower()
+            for cuisine in cuisine_keywords:
+                if cuisine in query_lower:
+                    detected_cuisine = cuisine
+                    print(f"[RESTAURANT SEARCH] Detected cuisine in query: {detected_cuisine}")
+                    break
+            
+            # Set on instance for the tool to use
+            self._current_search_cuisine = detected_cuisine
             
             # Step 2: Get nearby restaurants
             print(f"[RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
@@ -356,9 +388,15 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             }
             
             print(f"[RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants")
+            
+            # Clean up
+            self._current_search_cuisine = None
+            
             return result
             
         except Exception as e:
+            # Clean up on error too
+            self._current_search_cuisine = None
             print(f"[RESTAURANT SEARCH ERROR] {str(e)}")
             import traceback
             traceback.print_exc()
