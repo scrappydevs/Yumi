@@ -153,8 +153,7 @@ export default function GlassExamplesPage() {
           z-index: 0;
           overflow: hidden;
           border-radius: 30px;
-          background-color: rgba(255, 255, 255, 0.01);
-          box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.2);
+          background-color: transparent;
         }
 
         .glass-container::after {
@@ -205,8 +204,7 @@ export default function GlassExamplesPage() {
           z-index: 0;
           overflow: hidden;
           border-radius: 9999px;
-          box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.25);
-          background-color: rgba(255, 255, 255, 0.02);
+          background-color: transparent;
         }
 
         .glass-btn::after {
@@ -264,8 +262,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 9999px;
-          box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.2);
-          background-color: rgba(255, 255, 255, 0.015);
+          background-color: transparent;
         }
 
         .glass-btn-sm::after {
@@ -306,8 +303,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 30px;
-          background-color: rgba(255, 255, 255, 0.01);
-          box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.2);
+          background-color: transparent;
         }
 
         .glass-panel::after {
@@ -347,8 +343,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 30px;
-          background-color: rgba(255, 255, 255, 0.015);
-          box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.25);
+          background-color: transparent;
         }
 
         .glass-card::after {
@@ -400,8 +395,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 9999px;
-          box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.25);
-          background-color: rgba(255, 255, 255, 0.02);
+          background-color: transparent;
         }
 
         .glass-btn-inline::after {
