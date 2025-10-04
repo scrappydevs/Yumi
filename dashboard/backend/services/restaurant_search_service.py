@@ -206,8 +206,12 @@ class RestaurantSearchService:
 - Flavor Notes: {', '.join(preferences.get('flavorNotes', [])) or 'No preference'}
 """
             
-            # Create LLM prompt
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the user's query and preferences.
+            # Check if preferences are empty
+            has_preferences = bool(preferences.get('cuisines') or preferences.get('priceRange') or 
+                                 preferences.get('atmosphere') or preferences.get('flavorNotes'))
+            
+            # Create LLM prompt with edge case handling
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the user's query.
 
 USER'S QUERY: "{query}"
 
@@ -216,11 +220,24 @@ USER'S PREFERENCES:{prefs_text}
 AVAILABLE RESTAURANTS:
 {restaurants_text}
 
+RANKING RULES (PRIORITY ORDER):
+1. **QUERY OVERRIDE**: If the query explicitly mentions a cuisine/food type (e.g., "Chinese food", "Italian restaurant"), ONLY recommend that type regardless of stored preferences.
+2. **EMPTY PREFERENCES**: If preferences are empty or minimal, rely HEAVILY on the query and prioritize highly-rated restaurants.
+3. **VAGUE QUERIES**: If query is vague (e.g., "food near me", "somewhere to eat"), use preferences as primary guide. If both are vague, prioritize highest ratings and variety.
+4. **EXPLICIT REQUIREMENTS**: Always respect explicit query requirements (e.g., "outdoor seating", "cheap eats", "fancy dinner").
+5. **PREFERENCES AS SECONDARY**: Use stored preferences only when query doesn't specify or contradict them.
+
+EXAMPLES:
+- Query "I want Chinese food" + Preferences "Italian, French" → Recommend ONLY Chinese (query wins)
+- Query "somewhere good" + No preferences → Recommend top-rated, diverse options
+- Query "romantic dinner" + Preferences "Casual" → Recommend romantic places (query wins)
+- Query "food" + Preferences "Mexican, Spicy" → Recommend Mexican restaurants (preferences guide)
+
 TASK:
-1. Analyze how well each restaurant matches the query "{query}"
-2. Consider the user's preferences (cuisines, price, atmosphere)
-3. Select the TOP 3 best matches
-4. Provide BRIEF reasoning (1-2 sentences max per restaurant)
+1. Identify if query has specific requirements (cuisine, atmosphere, price, etc.)
+2. Apply ranking rules above
+3. Select TOP 3 matches
+4. Provide BRIEF reasoning explaining your choice
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {{
@@ -232,7 +249,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
       "address": "Full address",
       "price_level": 2,
       "match_score": 0.95,
-      "reasoning": "Brief 1-2 sentence explanation of why this matches"
+      "reasoning": "Brief 1-2 sentence explanation"
     }},
     {{
       "name": "Second Restaurant",
@@ -253,11 +270,13 @@ Return ONLY valid JSON (no markdown, no code blocks):
       "reasoning": "Brief reason"
     }}
   ],
-  "query_analysis": "One sentence about what the user wants",
-  "preference_matching": "One sentence about preference alignment"
+  "query_analysis": "What did the user explicitly ask for?",
+  "preference_matching": "How did you balance query vs preferences?"
 }}
 
-IMPORTANT: Keep all reasoning CONCISE - maximum 1-2 sentences each."""
+USER HAS {'MINIMAL' if not has_preferences else 'FULL'} PREFERENCES - adjust weighting accordingly.
+
+IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
             # Call Gemini
             model = self.gemini_service.model
@@ -384,23 +403,53 @@ IMPORTANT: Keep all reasoning CONCISE - maximum 1-2 sentences each."""
 - Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
 """
             
-            # Create LLM prompt (similar to individual but emphasizes group dining)
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 that best match the GROUP's query and merged preferences.
+            # Check if merged preferences are substantial
+            has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or 
+                                       merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+            
+            # Create LLM prompt with edge case handling for groups
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 for a GROUP of {len(user_ids)} people dining together.
 
 USER'S QUERY: "{query}"
 
 GROUP'S MERGED PREFERENCES:{prefs_text}
 
-NOTE: These are MERGED preferences from {len(user_ids)} people dining together. The restaurants should accommodate the group and match their combined tastes.
-
 AVAILABLE RESTAURANTS:
 {restaurants_text}
 
+GROUP RANKING RULES (PRIORITY ORDER):
+1. **QUERY OVERRIDE**: If the query explicitly mentions cuisine/food type (e.g., "Chinese food"), ONLY recommend that type regardless of group preferences.
+2. **EMPTY GROUP PREFERENCES**: If group has minimal/no preferences, rely on query and prioritize:
+   - Highly-rated restaurants
+   - Diverse menu options (good for groups with varied tastes)
+   - Group-friendly atmosphere (casual, spacious)
+3. **VAGUE QUERIES**: If query is vague (e.g., "food for group"), use merged preferences. If both vague, prioritize:
+   - Highest ratings
+   - Restaurants that can accommodate groups
+   - Diverse cuisines from merged preferences
+4. **EXPLICIT GROUP NEEDS**: Respect requirements like "vegetarian options", "large tables", "family-friendly", "cheap eats"
+5. **CONFLICT RESOLUTION**: When group has diverse preferences (e.g., "Italian + Japanese + Mexican"), look for:
+   - Fusion restaurants
+   - Places with varied menu
+   - Or pick best-rated from each cuisine type
+6. **PREFERENCES AS SECONDARY**: Use merged preferences only when query doesn't override
+
+EXAMPLES:
+- Query "Chinese food" + Group wants "Italian, French" → ONLY Chinese (query wins)
+- Query "where should we eat?" + Group wants "Mexican, Spicy" → Mexican restaurants
+- Query "lunch spot" + No group preferences → High-rated, group-friendly, diverse menus
+- Query "vegan options" + Group wants "Steakhouse" → Vegan-friendly places (query wins)
+
+GROUP CONTEXT:
+- Dining with {len(user_ids)} people - ensure restaurants can accommodate
+- Merged preferences represent ALL members - aim to satisfy everyone
+- Group dynamics matter - consider noise level, seating, varied menu
+
 TASK:
-1. Analyze how well each restaurant matches the query "{query}"
-2. Consider the GROUP's merged preferences (cuisines, price, atmosphere)
-3. Select the TOP 3 best matches for GROUP DINING
-4. Provide BRIEF reasoning (1-2 sentences max per restaurant)
+1. Identify if query has specific requirements
+2. Apply ranking rules above
+3. Select TOP 3 that work for the ENTIRE group
+4. Explain your reasoning
 
 Return ONLY valid JSON (no markdown, no code blocks):
 {{
@@ -412,13 +461,33 @@ Return ONLY valid JSON (no markdown, no code blocks):
       "address": "Full address",
       "price_level": 2,
       "match_score": 0.95,
-      "reason": "Brief reason why this matches"
+      "reason": "Brief reason (mention query override if applied, note group suitability)"
+    }},
+    {{
+      "name": "Second Restaurant",
+      "cuisine": "Cuisine",
+      "rating": 4.3,
+      "address": "Address",
+      "price_level": 2,
+      "match_score": 0.85,
+      "reason": "Brief reason"
+    }},
+    {{
+      "name": "Third Restaurant",
+      "cuisine": "Cuisine",
+      "rating": 4.2,
+      "address": "Address",
+      "price_level": 3,
+      "match_score": 0.78,
+      "reason": "Brief reason"
     }}
   ],
-  "overall_reasoning": "1-2 sentences about the selection strategy"
+  "overall_reasoning": "How you balanced query vs group preferences"
 }}
 
-Return TOP 3 restaurants in order of best match."""
+GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - adjust accordingly.
+
+IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
             # Call Gemini
             response = self.gemini_service.model.generate_content(prompt)
