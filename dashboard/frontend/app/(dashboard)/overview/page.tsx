@@ -20,6 +20,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
 import { useVoiceOutput } from '@/hooks/use-voice-output';
+import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase/client';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -185,6 +187,26 @@ const SAMPLE_RESTAURANTS = [
   },
 ];
 
+// City coordinates mapping
+const CITY_COORDINATES: { [key: string]: { lat: number; lng: number } } = {
+  'New York City': { lat: 40.7580, lng: -73.9855 },
+  'San Francisco': { lat: 37.7749, lng: -122.4194 },
+  'Los Angeles': { lat: 34.0522, lng: -118.2437 },
+  'Chicago': { lat: 41.8781, lng: -87.6298 },
+  'Miami': { lat: 25.7617, lng: -80.1918 },
+  'Austin': { lat: 30.2672, lng: -97.7431 },
+};
+
+interface SearchResult {
+  name: string;
+  cuisine: string;
+  rating: number;
+  address: string;
+  price_level: number;
+  match_score: number;
+  reasoning: string;
+}
+
 export default function DiscoverPage() {
   const [prompt, setPrompt] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState<number | null>(null);
@@ -198,7 +220,10 @@ export default function DiscoverPage() {
   const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { speak, isSpeaking, stop } = useVoiceOutput();
+  const { user } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -250,6 +275,8 @@ export default function DiscoverPage() {
     if (!prompt.trim()) return;
     
     setIsThinking(true);
+    setSearchError(null);
+    setSearchResults([]);
     
     const thinkingPhrases = [
       "Finding restaurants",
@@ -268,9 +295,62 @@ export default function DiscoverPage() {
       await speak(randomPhrase);
     }
     
-    setTimeout(() => {
+    try {
+      // Get coordinates for selected location
+      const coords = CITY_COORDINATES[location] || CITY_COORDINATES['New York City'];
+      
+      // Get auth session for JWT token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated. Please sign in.');
+      }
+      
+      // Call backend API
+      const formData = new FormData();
+      formData.append('query', prompt);
+      formData.append('latitude', coords.lat.toString());
+      formData.append('longitude', coords.lng.toString());
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/search`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
+        throw new Error(errorData.detail || 'Failed to search restaurants');
+      }
+      
+      const data = await response.json();
+      
+      // Update results
+      if (data.top_restaurants && data.top_restaurants.length > 0) {
+        setSearchResults(data.top_restaurants);
+        
+        // Speak result if not muted
+        if (!isMuted) {
+          const resultPhrase = `Found ${data.top_restaurants.length} great options for you`;
+          await speak(resultPhrase);
+        }
+      } else {
+        setSearchError('No restaurants found. Try a different query or location.');
+      }
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
+      
+      if (!isMuted) {
+        await speak('Sorry, something went wrong');
+      }
+    } finally {
       setIsThinking(false);
-    }, 2000);
+    }
   };
 
   const toggleVoiceRecording = () => {
@@ -788,6 +868,87 @@ export default function DiscoverPage() {
           </form>
         </motion.div>
       </div>
+
+      {/* Search Results Panel */}
+      <AnimatePresence>
+        {searchResults.length > 0 && (
+          <motion.div
+            className="w-full max-w-4xl mb-8 z-10"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+              
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                Top Recommendations for you
+              </h3>
+              
+              <div className="space-y-4">
+                {searchResults.map((restaurant, index) => (
+                  <motion.div
+                    key={index}
+                    className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                    
+                    <div className="flex items-start justify-between relative">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl font-bold text-purple-600">#{index + 1}</span>
+                          <div>
+                            <h4 className="text-lg font-bold">{restaurant.name}</h4>
+                            <p className="text-sm text-gray-600">{restaurant.cuisine} • {'$'.repeat(restaurant.price_level)}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 mb-2">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                            <span className="font-semibold">{restaurant.rating}</span>
+                          </div>
+                          <div className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
+                            {Math.round(restaurant.match_score * 100)}% match
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-gray-700 mb-2">{restaurant.reasoning}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {restaurant.address}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error Message */}
+      <AnimatePresence>
+        {searchError && (
+          <motion.div
+            className="w-full max-w-4xl mb-8 z-10"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+          >
+            <div className="glass-layer-1 rounded-2xl p-4 border-2 border-red-300 bg-red-50/50">
+              <p className="text-red-700 font-medium">{searchError}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Selected Restaurant Details Modal - Minimalist */}
       <AnimatePresence>
