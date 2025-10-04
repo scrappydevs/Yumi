@@ -13,13 +13,17 @@ import subprocess
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
-from services.embedding_service import get_embedding_service
 from services.taste_profile_service import get_taste_profile_service
 from services.restaurant_search_service import get_restaurant_search_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config, reservations, twilio_webhooks
 import asyncio
+
+# Lazy import for embedding service (heavy memory usage)
+def get_embedding_service():
+    from services.embedding_service import get_embedding_service as _get_embedding_service
+    return _get_embedding_service()
 
 # In-memory cache for AI-suggested restaurants (temporary until user submits review)
 # Key: image_id, Value: restaurant_name
