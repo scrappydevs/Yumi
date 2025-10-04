@@ -77,7 +77,7 @@ class DataPipelineOrchestrator:
 
     def run_command(self, command: list, step_name: str) -> bool:
         """
-        Run a subprocess command and handle its output.
+        Run a subprocess command and stream its output in real-time.
 
         Args:
             command: Command and arguments as list
@@ -86,28 +86,39 @@ class DataPipelineOrchestrator:
         Returns:
             True if command succeeded, False otherwise
         """
+        # Add -u flag to Python commands for unbuffered output
+        if len(command) > 0 and 'python' in command[0].lower():
+            command.insert(1, '-u')
+
         logger.info(f"Running: {' '.join(command)}")
 
         try:
-            result = subprocess.run(
+            # Use Popen to stream output in real-time
+            process = subprocess.Popen(
                 command,
                 cwd=self.script_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                check=False
+                bufsize=1,  # Line buffered
+                universal_newlines=True,
+                # Ensure Python unbuffered mode
+                env={**os.environ, 'PYTHONUNBUFFERED': '1'}
             )
 
-            # Stream output to console and log
-            if result.stdout:
-                print(result.stdout)
+            # Stream output line by line as it's produced
+            for line in process.stdout:
+                print(line, end='', flush=True)
 
-            if result.returncode == 0:
+            # Wait for process to complete
+            returncode = process.wait()
+
+            if returncode == 0:
                 logger.info(f"✅ {step_name} completed successfully")
                 return True
             else:
                 logger.error(
-                    f"❌ {step_name} failed with exit code {result.returncode}")
+                    f"❌ {step_name} failed with exit code {returncode}")
                 return False
 
         except Exception as e:

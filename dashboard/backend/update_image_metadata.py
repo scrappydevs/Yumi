@@ -62,13 +62,16 @@ load_dotenv()
 
 # Now import modules that depend on environment variables
 
-# Configure logging
+# Configure logging with flushing to ensure real-time output
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.flush = lambda: sys.stdout.flush()
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('image_metadata_update.log'),
-        logging.StreamHandler()
+        stream_handler
     ]
 )
 logger = logging.getLogger(__name__)
