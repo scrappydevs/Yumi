@@ -346,8 +346,10 @@ export default function DiscoverPage() {
             .in('id', profile.friends.slice(0, 6));
 
           if (friends) {
-            setFriendsData(friends);
-            console.log(`👥 Loaded ${friends.length} friends for orbit`);
+            // Sort by ID to maintain consistent positioning (prevent random swaps)
+            const sortedFriends = [...friends].sort((a, b) => a.id.localeCompare(b.id));
+            setFriendsData(sortedFriends);
+            console.log(`👥 Loaded ${sortedFriends.length} friends for orbit (sorted by ID)`);
           }
         }
       } catch (error) {
@@ -376,8 +378,10 @@ export default function DiscoverPage() {
           .in('id', mentionIds);
 
         if (mentionedProfiles) {
-          setMentionedFriendsData(mentionedProfiles);
-          console.log(`👤 Loaded ${mentionedProfiles.length} mentioned friends`);
+          // Sort by ID to maintain consistent positioning
+          const sortedMentioned = [...mentionedProfiles].sort((a, b) => a.id.localeCompare(b.id));
+          setMentionedFriendsData(sortedMentioned);
+          console.log(`👤 Loaded ${sortedMentioned.length} mentioned friends (sorted by ID)`);
         }
       } catch (error) {
         console.error('Error loading mentioned friends:', error);
