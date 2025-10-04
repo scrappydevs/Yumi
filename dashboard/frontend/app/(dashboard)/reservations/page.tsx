@@ -45,9 +45,44 @@ export default function ReservationsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'view'>('create')
   const [selectedReservationId, setSelectedReservationId] = useState<string | undefined>()
+  const [prefillRestaurant, setPrefillRestaurant] = useState<{ name?: string; address?: string; place_id?: string } | undefined>()
 
   useEffect(() => {
     setMounted(true)
+    
+    // Check if we should auto-open the reservation modal
+    const params = new URLSearchParams(window.location.search)
+    const shouldAutoOpen = params.get('autoOpen') === 'true'
+    
+    if (shouldAutoOpen) {
+      // Extract restaurant data from URL params
+      const restaurantName = params.get('restaurant_name')
+      const restaurantAddress = params.get('restaurant_address')
+      const placeId = params.get('place_id')
+      
+      console.log('🔗 URL params:', { restaurantName, restaurantAddress, placeId })
+      
+      if (restaurantName) {
+        const restaurantData = {
+          name: restaurantName,
+          address: restaurantAddress || undefined,
+          place_id: placeId || undefined
+        }
+        console.log('📝 Setting prefillRestaurant:', restaurantData)
+        setPrefillRestaurant(restaurantData)
+      }
+      
+      setModalMode('create')
+      setModalOpen(true)
+      
+      // Clean up URL by removing the parameters
+      const url = new URL(window.location.href)
+      url.searchParams.delete('autoOpen')
+      url.searchParams.delete('restaurant_name')
+      url.searchParams.delete('restaurant_address')
+      url.searchParams.delete('place_id')
+      window.history.replaceState({}, '', url.toString())
+    }
   }, [])
 
   useEffect(() => {
@@ -300,6 +335,7 @@ export default function ReservationsPage() {
         isOpen={modalOpen}
         onClose={() => {
           setModalOpen(false)
+          setPrefillRestaurant(undefined) // Clear prefill data
           // Reload reservations after modal closes
           if (currentUserId) {
             loadReservations()
@@ -307,6 +343,7 @@ export default function ReservationsPage() {
         }}
         mode={modalMode}
         reservationId={selectedReservationId}
+        prefillRestaurant={prefillRestaurant}
       />
     </div>
   )

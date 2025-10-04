@@ -24,7 +24,8 @@ class PlacesService:
         latitude: float, 
         longitude: float, 
         radius: int = 1000,
-        limit: int = 25
+        limit: int = 25,
+        keyword: str = None
     ) -> List[Dict[str, any]]:
         """
         Find nearby restaurants using Google Places API.
@@ -34,6 +35,7 @@ class PlacesService:
             longitude: Longitude coordinate
             radius: Search radius in meters (default 1000m = 1km)
             limit: Maximum number of results (default 25)
+            keyword: Optional keyword to filter restaurants (e.g., "Chinese", "Italian")
 
         Returns:
             List of restaurant dictionaries with: name, cuisine, distance, rating, address
@@ -43,6 +45,8 @@ class PlacesService:
         """
         try:
             print(f"[PLACES] Searching for restaurants near ({latitude}, {longitude})")
+            if keyword:
+                print(f"[PLACES] 🔍 Filtering by keyword: '{keyword}'")
             
             # Nearby Search endpoint
             url = f"{self.base_url}/nearbysearch/json"
@@ -53,6 +57,10 @@ class PlacesService:
                 "type": "restaurant",
                 "key": self.api_key
             }
+            
+            # Add keyword filter if provided
+            if keyword:
+                params["keyword"] = keyword
             
             response = requests.get(url, params=params, timeout=10)
             
@@ -76,7 +84,28 @@ class PlacesService:
             # Parse and format results
             restaurants = []
             for place in results[:limit]:
+                # Get photo URL - try multiple sources
+                photo_url = None
+                photos = place.get("photos", [])
+                
+                # Try to get the best photo (prefer photos with higher indices as they might be food photos)
+                if photos and len(photos) > 0:
+                    # Try up to 3 photos to find a good one
+                    for i in range(min(3, len(photos))):
+                        photo_reference = photos[i].get("photo_reference")
+                        if photo_reference:
+                            photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference={photo_reference}&key={self.api_key}"
+                            break
+                
+                # Try to infer cuisine type from types (needed for fallback)
+                cuisine = self._infer_cuisine_from_types(place.get("types", []))
+                
+                # If no photo found, use cuisine-based fallback
+                if not photo_url:
+                    photo_url = self._get_cuisine_fallback_image(cuisine)
+                
                 restaurant = {
+                    "place_id": place.get("place_id", ""),
                     "name": place.get("name", "Unknown"),
                     "rating": place.get("rating", 0),
                     "address": place.get("vicinity", ""),
@@ -84,10 +113,9 @@ class PlacesService:
                     "types": place.get("types", []),
                     "latitude": place.get("geometry", {}).get("location", {}).get("lat"),
                     "longitude": place.get("geometry", {}).get("location", {}).get("lng"),
+                    "photo_url": photo_url,
                 }
                 
-                # Try to infer cuisine type from types
-                cuisine = self._infer_cuisine_from_types(place.get("types", []))
                 restaurant["cuisine"] = cuisine
                 
                 # Calculate approximate distance (in place results, but we'll use the order)
@@ -160,6 +188,41 @@ class PlacesService:
             return "Fast Food"
         
         return "General"
+
+    def _get_cuisine_fallback_image(self, cuisine: str) -> str:
+        """
+        Get a cuisine-appropriate fallback image URL when restaurant has no photos.
+        
+        Args:
+            cuisine: The cuisine type of the restaurant
+            
+        Returns:
+            URL to a relevant food image
+        """
+        # Cuisine-specific Unsplash image URLs (high quality food photos)
+        cuisine_images = {
+            "Chinese": "https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=400&h=400&fit=crop",  # Chinese dumplings
+            "Japanese": "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=400&fit=crop",  # Sushi
+            "Japanese/Sushi": "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=400&fit=crop",  # Sushi
+            "Italian": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop",  # Pizza
+            "Italian/Pizza": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop",  # Pizza
+            "Mexican": "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&h=400&fit=crop",  # Tacos
+            "Indian": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&h=400&fit=crop",  # Indian curry
+            "Thai": "https://images.unsplash.com/photo-1559314809-0d155014e29e?w=400&h=400&fit=crop",  # Pad Thai
+            "French": "https://images.unsplash.com/photo-1604152135912-04a022e23696?w=400&h=400&fit=crop",  # French cuisine
+            "American": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=400&h=400&fit=crop",  # Burger
+            "Fast Food": "https://images.unsplash.com/photo-1550547660-d9450f859349?w=400&h=400&fit=crop",  # Burger
+            "Steakhouse": "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=400&h=400&fit=crop",  # Steak
+            "Seafood": "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=400&fit=crop",  # Seafood
+            "Cafe": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop",  # Coffee
+            "Bakery": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop",  # Bread
+            "Bar & Grill": "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=400&fit=crop",  # Bar food
+            "Vegetarian": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop",  # Salad
+            "Vegan": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop",  # Salad
+        }
+        
+        # Return cuisine-specific image or default food image
+        return cuisine_images.get(cuisine, "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop")  # Default: general food
 
     def format_restaurants_for_ai(self, restaurants: List[Dict[str, any]]) -> str:
         """

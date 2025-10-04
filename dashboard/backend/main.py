@@ -735,6 +735,70 @@ async def search_restaurants_test(
         raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
 
 
+@app.post("/api/restaurants/nearby")
+async def get_nearby_restaurants(
+    user_id: str = Depends(get_user_id_from_token),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    radius: int = Form(2000),
+    limit: int = Form(20)
+):
+    """
+    Fetch nearby restaurants immediately without LLM analysis.
+    This is fast and allows UI to show restaurants while LLM thinks.
+
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        latitude: User's current latitude
+        longitude: User's current longitude
+        radius: Search radius in meters (default: 2000m)
+        limit: Maximum number of restaurants (default: 20)
+
+    Returns:
+        List of nearby restaurants with photos
+    """
+    try:
+        print(f"[NEARBY RESTAURANTS] Request from user: {user_id}")
+        print(f"[NEARBY RESTAURANTS] Location: ({latitude}, {longitude})")
+        print(f"[NEARBY RESTAURANTS] Radius: {radius}m, Limit: {limit}")
+
+        # Get places service
+        places_service = get_places_service()
+
+        # Fetch nearby restaurants
+        restaurants = places_service.find_nearby_restaurants(
+            latitude=latitude,
+            longitude=longitude,
+            radius=radius,
+            limit=limit
+        )
+
+        # Filter to only those with photos
+        restaurants_with_photos = [
+            {
+                'name': r['name'],
+                'photo_url': r.get('photo_url'),
+                'place_id': r.get('place_id'),
+                'rating': r.get('rating', 0),
+                'cuisine': r.get('cuisine', 'Unknown'),
+                'address': r.get('address', ''),
+                'price_level': r.get('price_level', 2)
+            }
+            for r in restaurants if r.get('photo_url')
+        ]
+
+        print(f"[NEARBY RESTAURANTS] ✅ Found {len(restaurants_with_photos)} restaurants with photos")
+        return {
+            "status": "success",
+            "restaurants": restaurants_with_photos,
+            "count": len(restaurants_with_photos)
+        }
+
+    except Exception as e:
+        print(f"[NEARBY RESTAURANTS ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch nearby restaurants: {str(e)}")
 @app.get("/api/friends/search")
 async def search_friends(
     user_id: str = Depends(get_user_id_from_token),
