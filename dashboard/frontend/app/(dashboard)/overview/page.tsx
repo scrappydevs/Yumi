@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -21,7 +21,7 @@ import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
 import { MentionInput } from '@/components/ui/mention-input';
 import { Mention } from '@/hooks/use-friend-mentions';
-import { useVoiceOutput } from '@/hooks/use-voice-output';
+import { useSimpleTTS } from '@/hooks/use-simple-tts';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 
@@ -184,14 +184,27 @@ export default function DiscoverPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [currentPhrase, setCurrentPhrase] = useState('Finding Restaurants');
+  const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+
+  // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
+  const loadingPhrases = useMemo(() => [
+    'Finding the perfect spot for you',
+    'Reading the culinary landscape',
+    'Consulting the food gods',
+    'Matching your vibe',
+    'Uncovering hidden gems',
+    'Decoding your taste DNA',
+    'Scanning the flavor matrix',
+    'Channeling your cravings',
+  ], []);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [allNearbyImages, setAllNearbyImages] = useState<Array<{url: string, name: string, id: string, index?: number}>>([]);
   const [visibleImageIds, setVisibleImageIds] = useState<string[]>([]);
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(false);
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
-  const { speak, isSpeaking, stop } = useVoiceOutput();
+  const [volume, setVolume] = useState(0.8); // 80% default volume
+  const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
   
   // Derived state: is this a group search?
@@ -253,6 +266,36 @@ export default function DiscoverPage() {
       loadDefaultRecommendations();
     }
   }, [user, mounted, location, isLoadingDefaults, isThinking, lastLoadedLocation]); // location change triggers reload
+
+  // Rotate phrases while thinking/loading
+  useEffect(() => {
+    if (!isThinking) {
+      setCurrentPhrase(loadingPhrases[0]); // Reset to first phrase
+      return;
+    }
+
+    let phraseIndex = 0;
+    
+    // Speak the first phrase when thinking starts (always say the exact text)
+    console.log('[Overview] Starting thinking, first phrase:', loadingPhrases[0]);
+    if (!isMuted && speak) {
+      speak(loadingPhrases[0]).catch(err => console.error('Speak error:', err));
+    }
+
+    const interval = setInterval(() => {
+      phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+      const newPhrase = loadingPhrases[phraseIndex];
+      console.log('[Overview] Rotating to phrase:', newPhrase);
+      setCurrentPhrase(newPhrase);
+      
+      // Speak each new phrase if not muted (exact text match)
+      if (!isMuted && speak) {
+        speak(newPhrase).catch(err => console.error('Speak error:', err));
+      }
+    }, 3000); // Change phrase every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [isThinking, loadingPhrases, isMuted, speak]); // Added speak back with proper handling
 
   useEffect(() => {
     if (isThinking) {
@@ -379,28 +422,8 @@ export default function DiscoverPage() {
     // Check if this is a group search (has mentions)
     const isGroupSearch = mentions.length > 0;
     
-    const thinkingPhrases = isGroupSearch
-      ? [
-          `Finding restaurants for you and ${mentions.length} ${mentions.length === 1 ? 'friend' : 'friends'}`,
-          "Looking for perfect group dining spots",
-          "Searching for places you'll all love",
-        ]
-      : [
-          "Finding restaurants",
-          "Hang on tight",
-          "Looking for the perfect spot",
-          "Searching nearby",
-          "Let me check what's available",
-          "One moment please",
-          "Analyzing your options",
-        ];
-    
-    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
-    setCurrentPhrase(randomPhrase);
-    
-    if (!isMuted) {
-      await speak(randomPhrase);
-    }
+    // Note: The rotating phrases with voice are handled by the useEffect hook
+    // No need to speak here to avoid voice overlap
     
     try {
       // Get coordinates - use actual user location if available, otherwise use selected city
@@ -719,11 +742,12 @@ export default function DiscoverPage() {
             id: r.place_id || `restaurant-${r.name}`
           }));
         
-        if (images.length > 0) {
-          console.log(`🖼️ Displaying ${images.length} restaurant images`);
-          setAllNearbyImages(images);
-          setVisibleImageIds(images.map((img: {id: string}) => img.id));
-          setLastLoadedLocation(location); // Mark this location as loaded
+        // Speak result if not muted
+        if (!isMuted) {
+          const resultPhrase = isGroupSearch
+            ? `Found ${data.top_restaurants.length} great options for your group`
+            : `Found ${data.top_restaurants.length} great options for you`;
+          await speak(resultPhrase, volume);
         }
         
         // Don't show results panel for default view
@@ -733,8 +757,12 @@ export default function DiscoverPage() {
       console.log('✅ Nearby restaurants loaded successfully');
       
     } catch (error) {
-      console.error('Error loading default recommendations:', error);
-      // Fail silently - not critical to page load
+      console.error('Search error:', error);
+      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
+      
+      if (!isMuted) {
+        await speak('Sorry, something went wrong', volume);
+      }
     } finally {
       setIsLoadingDefaults(false);
     }
@@ -782,22 +810,45 @@ export default function DiscoverPage() {
           </span>
         </motion.button>
 
-        <motion.button
-          onClick={() => {
-            setIsMuted(!isMuted);
-            if (!isMuted && isSpeaking) stop();
-          }}
-          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          {isMuted ? (
-            <VolumeX className="w-5 h-5 text-red-500" />
-          ) : (
-            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+        <div className="flex items-center gap-2">
+          <motion.button
+            onClick={() => {
+              setIsMuted(!isMuted);
+              if (!isMuted && isSpeaking) stop();
+            }}
+            className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-red-500" />
+            ) : (
+              <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+            )}
+          </motion.button>
+
+          {!isMuted && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 100, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              className="glass-layer-1 px-3 py-2 rounded-full shadow-soft"
+            >
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={volume * 100}
+                onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
+                className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+                }}
+              />
+            </motion.div>
           )}
-        </motion.button>
+        </div>
       </div>
 
       {/* Location Tagger - Top Right */}

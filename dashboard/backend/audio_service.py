@@ -3,7 +3,7 @@ Audio Service for TTS (Text-to-Speech) and STT (Speech-to-Text)
 
 This module provides modular functions for:
 - ElevenLabs: Text-to-Speech with streaming and conversion
-- Whisper: Speech-to-Text transcription
+- Whisper: Speech-to-Text transcription (optional)
 """
 import os
 import base64
@@ -11,7 +11,14 @@ import tempfile
 import requests
 from typing import Optional, Dict, Any, Iterator
 from elevenlabs import ElevenLabs
-import whisper
+
+# Optional whisper import
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+    print("[AUDIO] Warning: openai-whisper not installed. Speech-to-text disabled.")
 
 
 class AudioService:
@@ -41,6 +48,8 @@ class AudioService:
     @property
     def whisper_model(self):
         """Lazy load Whisper model"""
+        if not WHISPER_AVAILABLE:
+            raise RuntimeError("Whisper not installed. Install with: pip install openai-whisper")
         if self._whisper_model is None:
             self._whisper_model = whisper.load_model(self._whisper_model_size)
         return self._whisper_model
@@ -128,7 +137,8 @@ class AudioService:
         """
         vid = voice_id or self.default_voice_id
 
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{vid}/stream"
+        # Use NON-STREAMING endpoint for complete audio (no /stream suffix)
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{vid}"
         headers = {
             "xi-api-key": self.elevenlabs_api_key,
             "Accept": "audio/mpeg",
@@ -136,18 +146,23 @@ class AudioService:
         }
         payload = {
             "text": text,
-            "model_id": "eleven_multilingual_v2",
+            "model_id": "eleven_multilingual_v2",  # Best quality for natural pacing
             "voice_settings": {
                 "stability": stability,
-                "similarity_boost": similarity_boost
-            }
+                "similarity_boost": similarity_boost,
+            },
+            "output_format": "mp3_44100_128"
         }
 
-        with requests.post(url, headers=headers, json=payload, stream=True) as r:
-            r.raise_for_status()
-            for chunk in r.iter_content(chunk_size=4096):
-                if chunk:
-                    yield chunk
+        # Get COMPLETE audio buffer first, then stream it
+        r = requests.post(url, headers=headers, json=payload)
+        r.raise_for_status()
+        
+        # Yield the complete audio in chunks
+        audio_data = r.content
+        chunk_size = 4096
+        for i in range(0, len(audio_data), chunk_size):
+            yield audio_data[i:i+chunk_size]
 
     # ==================== Voice Management ====================
 
