@@ -372,12 +372,31 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # Parse JSON
             import json
             result = json.loads(response_text)
-            
+
             # Log what LLM recommended
             print(f"[RESTAURANT SEARCH] LLM recommendations:")
             for i, rec in enumerate(result.get('top_restaurants', []), 1):
                 print(f"  {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}")
-            
+
+            # CRITICAL: Enrich LLM results with full restaurant data (place_id, photo_url, etc.)
+            # Match by name and merge fields from original restaurants list
+            enriched_restaurants = []
+            for llm_rec in result.get('top_restaurants', []):
+                # Find matching restaurant from original list by name
+                matching = next((r for r in restaurants if r['name'] == llm_rec['name']), None)
+                if matching:
+                    # Merge: LLM fields (reasoning, match_score) + original fields (place_id, photo_url, etc.)
+                    enriched = {**matching, **llm_rec}
+                    enriched_restaurants.append(enriched)
+                    print(f"  ✓ Enriched {llm_rec['name']} with place_id: {matching.get('place_id', 'N/A')}")
+                else:
+                    # Fallback: keep LLM result as-is (shouldn't happen, but safety)
+                    print(f"  ⚠️ No match found for {llm_rec['name']}, keeping LLM data only")
+                    enriched_restaurants.append(llm_rec)
+
+            result['top_restaurants'] = enriched_restaurants
+            result['all_nearby_restaurants'] = restaurants  # Include all nearby for frontend fallback
+
             # Add metadata
             result["status"] = "success"
             result["stage"] = "4 - LLM analysis"
@@ -593,7 +612,22 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # Parse JSON
             import json
             result = json.loads(response_text)
-            
+
+            # CRITICAL: Enrich LLM results with full restaurant data (place_id, photo_url, etc.)
+            enriched_restaurants = []
+            for llm_rec in result.get('top_restaurants', []):
+                matching = next((r for r in restaurants if r['name'] == llm_rec['name']), None)
+                if matching:
+                    enriched = {**matching, **llm_rec}
+                    enriched_restaurants.append(enriched)
+                    print(f"  ✓ Enriched {llm_rec['name']} with place_id: {matching.get('place_id', 'N/A')}")
+                else:
+                    print(f"  ⚠️ No match found for {llm_rec['name']}, keeping LLM data only")
+                    enriched_restaurants.append(llm_rec)
+
+            result['top_restaurants'] = enriched_restaurants
+            result['all_nearby_restaurants'] = restaurants
+
             # Add metadata
             result["status"] = "success"
             result["stage"] = "group - LLM analysis"
@@ -604,7 +638,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 "latitude": latitude,
                 "longitude": longitude
             }
-            
+
             print(f"[GROUP RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants for group")
             return result
             
