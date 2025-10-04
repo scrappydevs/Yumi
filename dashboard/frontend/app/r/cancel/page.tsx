@@ -1,12 +1,12 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { apiRequest, API_CONFIG } from '@/lib/api-config'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
-export default function CancelReservationPage() {
+function CancelReservationContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
   
@@ -131,6 +131,23 @@ export default function CancelReservationPage() {
         </p>
       </Card>
     </div>
+  )
+}
+
+export default function CancelReservationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="p-6 max-w-md w-full">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </Card>
+      </div>
+    }>
+      <CancelReservationContent />
+    </Suspense>
   )
 }
 

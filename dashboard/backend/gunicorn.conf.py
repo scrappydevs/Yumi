@@ -1,13 +1,12 @@
 # Gunicorn configuration file for production deployment
-import multiprocessing
 import os
 
-# Server socket
+# Server socket - bind to PORT environment variable
 bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
 backlog = 2048
 
-# Worker processes
-workers = int(os.getenv('WEB_CONCURRENCY', multiprocessing.cpu_count() * 2 + 1))
+# Worker processes - use 2 workers (good for Render Starter plan)
+workers = int(os.getenv('WEB_CONCURRENCY', '2'))
 worker_class = 'uvicorn.workers.UvicornWorker'
 worker_connections = 1000
 timeout = 120  # Increased timeout for AI processing
@@ -31,8 +30,4 @@ pidfile = None
 user = None
 group = None
 tmp_upload_dir = None
-
-# SSL (if needed in the future)
-# keyfile = None
-# certfile = None
 

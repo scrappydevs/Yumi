@@ -13,13 +13,17 @@ import subprocess
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
-from services.embedding_service import get_embedding_service
 from services.taste_profile_service import get_taste_profile_service
 from services.restaurant_search_service import get_restaurant_search_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config, reservations, twilio_webhooks
 import asyncio
+
+# Lazy import for embedding service (heavy memory usage)
+def get_embedding_service():
+    from services.embedding_service import get_embedding_service as _get_embedding_service
+    return _get_embedding_service()
 
 # In-memory cache for AI-suggested restaurants (temporary until user submits review)
 # Key: image_id, Value: restaurant_name
@@ -795,6 +799,77 @@ async def get_nearby_restaurants(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch nearby restaurants: {str(e)}")
+@app.get("/api/friends/search")
+async def search_friends(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = ""
+):
+    """
+    Get user's friends list, optionally filtered by username.
+    Used for @ mention autocomplete.
+    
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        query: Optional search query to filter friends by username or display name
+    
+    Returns:
+        List of friends with id, username, display_name, avatar_url
+    
+    Example:
+        GET /api/friends/search?query=jul
+        Returns friends whose username or display_name contains "jul"
+    """
+    try:
+        print(f"[FRIENDS SEARCH] Request from user: {user_id}")
+        print(f"[FRIENDS SEARCH] Query: '{query}'")
+        
+        # Get Supabase service
+        supabase_service = get_supabase_service()
+        
+        # Step 1: Get current user's friends array
+        user_response = supabase_service.client.table("profiles")\
+            .select("friends")\
+            .eq("id", user_id)\
+            .single()\
+            .execute()
+        
+        if not user_response.data:
+            return {"friends": []}
+        
+        friend_ids = user_response.data.get("friends", [])
+        
+        if not friend_ids:
+            return {"friends": []}
+        
+        print(f"[FRIENDS SEARCH] User has {len(friend_ids)} friends")
+        
+        # Step 2: Get friend profiles
+        friends_query = supabase_service.client.table("profiles")\
+            .select("id, username, display_name, avatar_url")\
+            .in_("id", friend_ids)
+        
+        # Apply search filter if query provided
+        if query.strip():
+            # Search in both username and display_name
+            friends_query = friends_query.or_(
+                f"username.ilike.%{query}%,display_name.ilike.%{query}%"
+            )
+        
+        friends_response = friends_query.execute()
+        
+        friends = friends_response.data or []
+        
+        print(f"[FRIENDS SEARCH] ✅ Returning {len(friends)} friends")
+        
+        return {"friends": friends}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[FRIENDS SEARCH ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Friends search failed: {str(e)}")
 
 
 @app.post("/api/restaurants/search")
@@ -850,6 +925,73 @@ async def search_restaurants(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
+
+
+@app.post("/api/restaurants/search-group")
+async def search_restaurants_group(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = Form(...),
+    friend_ids: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    Search restaurants for a group of users with merged preferences.
+    
+    Args:
+        user_id: Requesting user (from JWT token, automatic)
+        query: Natural language query (e.g., "I want lunch with @julian")
+        friend_ids: Comma-separated friend UUIDs (e.g., "uuid1,uuid2,uuid3")
+        latitude: User's current latitude
+        longitude: User's current longitude
+    
+    Returns:
+        Top 3 restaurants matching merged group preferences
+    
+    Example:
+        POST /api/restaurants/search-group
+        {
+            "query": "I want lunch with @julian",
+            "friend_ids": "694e85e9-bb28-4139-9110-429d20a67b93",
+            "latitude": 40.7580,
+            "longitude": -73.9855
+        }
+    """
+    try:
+        print(f"[GROUP SEARCH] Request from user: {user_id}")
+        print(f"[GROUP SEARCH] Query: '{query}'")
+        print(f"[GROUP SEARCH] Friend IDs: '{friend_ids}'")
+        print(f"[GROUP SEARCH] Location: ({latitude}, {longitude})")
+        
+        # Parse friend IDs (comma-separated string to list)
+        friend_id_list = [fid.strip() for fid in friend_ids.split(",") if fid.strip()]
+        
+        # Create complete user list (requesting user + friends)
+        all_user_ids = [user_id] + friend_id_list
+        
+        print(f"[GROUP SEARCH] Total users in group: {len(all_user_ids)}")
+        
+        # Get restaurant search service
+        search_service = get_restaurant_search_service()
+        
+        # Execute group search
+        results = await search_service.search_restaurants_for_group(
+            query=query,
+            user_ids=all_user_ids,
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        print(f"[GROUP SEARCH] ✅ Group search completed")
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[GROUP SEARCH ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Group restaurant search failed: {str(e)}")
 
 
 if __name__ == "__main__":

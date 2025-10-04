@@ -5,7 +5,7 @@ services:
     runtime: python
     region: oregon  # Choose closest to your users: oregon, ohio, virginia, frankfurt, singapore
     buildCommand: cd dashboard/backend && pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: cd dashboard/backend && gunicorn main:app --bind 0.0.0.0:$PORT --workers 2 --worker-class uvicorn.workers.UvicornWorker --timeout 120 --log-level info
+    startCommand: cd dashboard/backend && gunicorn main:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

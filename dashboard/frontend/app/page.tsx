@@ -22,7 +22,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Only redirect if we're done loading and have a user
     if (!loading && user) {
+      console.log('User authenticated, redirecting to /overview');
       router.push('/overview');
     }
   }, [user, loading, router]);

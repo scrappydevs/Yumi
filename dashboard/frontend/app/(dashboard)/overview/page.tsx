@@ -19,6 +19,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
+import { MentionInput } from '@/components/ui/mention-input';
+import { Mention } from '@/hooks/use-friend-mentions';
 import { useVoiceOutput } from '@/hooks/use-voice-output';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
@@ -167,10 +169,12 @@ export default function DiscoverPage() {
   const [prompt, setPrompt] = useState('');
   const [selectedRestaurant, setSelectedRestaurant] = useState<SearchResult | null>(null);
   const [hoveredRestaurant, setHoveredRestaurant] = useState<SearchResult | null>(null);
+  const [mentions, setMentions] = useState<Mention[]>([]);
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [location, setLocation] = useState('Boston');  // Default to Boston
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [showingResults, setShowingResults] = useState(false);  // New state for showing results
   const [isNarrowing, setIsNarrowing] = useState(false);  // New state for narrowing phase
@@ -190,6 +194,9 @@ export default function DiscoverPage() {
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const { speak, isSpeaking, stop } = useVoiceOutput();
   const { user } = useAuth();
+  
+  // Derived state: is this a group search?
+  const isGroupSearch = mentions.length > 0;
 
   useEffect(() => {
     setMounted(true);
@@ -338,6 +345,32 @@ export default function DiscoverPage() {
     setSearchResults([]);
     setAllNearbyImages([]); // Reset images for new search
     setVisibleImageIds([]);
+    
+    // Check if this is a group search (has mentions)
+    const isGroupSearch = mentions.length > 0;
+    
+    const thinkingPhrases = isGroupSearch
+      ? [
+          `Finding restaurants for you and ${mentions.length} ${mentions.length === 1 ? 'friend' : 'friends'}`,
+          "Looking for perfect group dining spots",
+          "Searching for places you'll all love",
+        ]
+      : [
+          "Finding restaurants",
+          "Hang on tight",
+          "Looking for the perfect spot",
+          "Searching nearby",
+          "Let me check what's available",
+          "One moment please",
+          "Analyzing your options",
+        ];
+    
+    const randomPhrase = thinkingPhrases[Math.floor(Math.random() * thinkingPhrases.length)];
+    setCurrentPhrase(randomPhrase);
+    
+    if (!isMuted) {
+      await speak(randomPhrase);
+    }
     
     try {
       // Get coordinates - use actual user location if available, otherwise use selected city
@@ -604,13 +637,24 @@ export default function DiscoverPage() {
       console.log(`📍 Loading nearby restaurants for ${location}...`);
       
       // Use the FAST nearby endpoint (no LLM, just Google Places)
+      // Build form data
       const formData = new FormData();
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
       formData.append('limit', '10');  // Only fetch 10 for latent state
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
+      // Determine endpoint based on mentions
+      let endpoint = '/api/restaurants/search';
+      
+      if (isGroupSearch) {
+        // Group search - add friend IDs
+        const friendIds = mentions.map(m => m.id).join(',');
+        formData.append('friend_ids', friendIds);
+        endpoint = '/api/restaurants/search-group';
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -734,7 +778,13 @@ export default function DiscoverPage() {
         >
           <motion.button
             className="glass-layer-1 pl-4 pr-5 py-3 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2.5"
-            onClick={() => setShowLocationPicker(!showLocationPicker)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const spaceBelow = window.innerHeight - rect.bottom;
+              const dropdownHeight = 180; // Approximate height for 6 items
+              setDropdownPositionAbove(spaceBelow < dropdownHeight);
+              setShowLocationPicker(!showLocationPicker);
+            }}
             whileHover={{
               scale: 1.05,
               boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)',
@@ -767,12 +817,12 @@ export default function DiscoverPage() {
           <AnimatePresence>
             {showLocationPicker && (
               <motion.div
-                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-layer-1 rounded-2xl shadow-strong overflow-hidden"
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                className={`absolute ${dropdownPositionAbove ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} right-0 glass-layer-1 rounded-xl shadow-strong overflow-hidden`}
+                initial={{ opacity: 0, y: dropdownPositionAbove ? 10 : -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                exit={{ opacity: 0, y: dropdownPositionAbove ? 10 : -10, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                style={{ minWidth: '200px' }}
+                style={{ width: '110px' }}
               >
                 {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
@@ -781,12 +831,12 @@ export default function DiscoverPage() {
                   {['Boston', 'New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
                     <motion.button
                       key={loc}
-                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-white/40 transition-colors"
+                      className="w-full px-2 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
                       onClick={() => {
                         setLocation(loc);
                         setShowLocationPicker(false);
                       }}
-                      whileHover={{ x: 4 }}
+                      whileHover={{ x: 2 }}
                       style={{
                         background: location === loc ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' : 'transparent',
                       }}
@@ -1189,7 +1239,7 @@ export default function DiscoverPage() {
       {/* Compact Search Bar - Minimal */}
       <div className="w-full max-w-3xl mb-8 z-10">
         <motion.div
-          className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative overflow-hidden flex items-center gap-3"
+          className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative flex items-center gap-3"
           initial={{ y: 20, opacity: 0 }}
           animate={{ 
             y: 0, 
@@ -1203,7 +1253,7 @@ export default function DiscoverPage() {
         >
           {/* Animated specular highlight */}
           <motion.div 
-            className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-full"
+            className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-full overflow-hidden"
             style={{
               background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%)',
             }}
@@ -1217,14 +1267,13 @@ export default function DiscoverPage() {
             }}
           />
           
-          <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative">
-            <input
-              type="text"
+          <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative z-10">
+            <MentionInput
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={isThinking ? "AI is thinking..." : "Where should we eat tonight?"}
-              disabled={isThinking}
-              className="flex-1 bg-transparent border-0 outline-none focus:outline-none text-sm placeholder:text-[hsl(var(--muted-foreground))] disabled:opacity-50 disabled:cursor-not-allowed"
+              onChange={setPrompt}
+              onMentionsChange={(newMentions) => setMentions(newMentions)}
+              placeholder="Where should we eat? (Type @ to mention friends)"
+              className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
             />
             
             <div className="flex items-center gap-2">
@@ -1303,6 +1352,73 @@ export default function DiscoverPage() {
       </div>
 
       {/* Search Results Panel - Removed, now only showing modal on image click */}
+      {/* Search Results Panel */}
+      <AnimatePresence>
+        {searchResults.length > 0 && (
+          <motion.div
+            className="w-full max-w-4xl mb-8 z-10"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+              
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                {mentions.length > 0 
+                  ? `Top Recommendations for you & ${mentions.map(m => m.display_name || m.username).join(', ')}`
+                  : 'Top Recommendations for you'
+                }
+              </h3>
+              
+              <div className="space-y-4">
+                {searchResults.map((restaurant, index) => (
+                  <motion.div
+                    key={index}
+                    className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
+                    
+                    <div className="flex items-start justify-between relative">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-2xl font-bold text-purple-600">#{index + 1}</span>
+                          <div>
+                            <h4 className="text-lg font-bold">{restaurant.name}</h4>
+                            <p className="text-sm text-gray-600">{restaurant.cuisine} • {'$'.repeat(restaurant.price_level)}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 mb-2">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                            <span className="font-semibold">{restaurant.rating}</span>
+                          </div>
+                          <div className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
+                            {Math.round(restaurant.match_score * 100)}% match
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-gray-700 mb-2">{restaurant.reasoning}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {restaurant.address}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Error Message */}
       <AnimatePresence>
