@@ -82,10 +82,11 @@ async def send_reservation(request: SendReservationRequest):
     """
     try:
         supabase = get_supabase()
-        app_base_url = os.getenv("APP_BASE_URL")
+        # Use FRONTEND_URL for invite links (falls back to APP_BASE_URL for backwards compatibility)
+        app_base_url = os.getenv("FRONTEND_URL") or os.getenv("APP_BASE_URL")
         
         if not app_base_url:
-            raise HTTPException(status_code=500, detail="APP_BASE_URL not configured")
+            raise HTTPException(status_code=500, detail="FRONTEND_URL not configured")
         
         # Validate organizer exists and has phone number
         organizer_result = supabase.table("profiles").select("id, phone").eq("id", request.organizer_id).limit(1).execute()
