@@ -161,6 +161,24 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       scrollwheel: true, // Enable scroll zoom
       clickableIcons: false, // Disable default POI clicks for better performance
       isFractionalZoomEnabled: true, // Smoother zoom transitions
+      // Performance optimizations
+      renderingType: window.google.maps.RenderingType.VECTOR, // Vector rendering for smoother performance
+      controlSize: 32, // Smaller controls for better performance
+      // Smooth animation settings
+      animationDuration: 300, // Smooth pan/zoom animations (300ms)
+      // Reduce map features for better performance
+      mapTypeControlOptions: {
+        mapTypeIds: ['roadmap', 'satellite'],
+      },
+      restriction: {
+        latLngBounds: {
+          north: 85,
+          south: -85,
+          west: -180,
+          east: 180,
+        },
+        strictBounds: false,
+      },
     });
 
     setMap(newMap);
@@ -518,15 +536,22 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
   }, [map, searchResults, handleSelectPlace]);
 
-  // Listen for map bounds changes
+  // Listen for map bounds changes with debouncing for smoother scrolling
   useEffect(() => {
     if (!map) return;
     
+    let debounceTimer: NodeJS.Timeout;
+    
     const listener = map.addListener('idle', () => {
-      updateVisibleResults();
+      // Debounce updates to reduce processing during smooth scrolling
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        updateVisibleResults();
+      }, 100); // 100ms debounce for smooth scrolling
     });
     
     return () => {
+      clearTimeout(debounceTimer);
       window.google.maps.event.removeListener(listener);
     };
   }, [map, updateVisibleResults]);
@@ -771,6 +796,12 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             style={{ 
               touchAction: 'pan-x pan-y',
               willChange: 'transform',
+              transform: 'translateZ(0)', // Force GPU acceleration
+              WebkitTransform: 'translateZ(0)', // Safari GPU acceleration
+              backfaceVisibility: 'hidden', // Improve rendering performance
+              WebkitBackfaceVisibility: 'hidden',
+              perspective: 1000, // Enable 3D rendering context
+              WebkitPerspective: 1000,
             }} 
           />
         </div>

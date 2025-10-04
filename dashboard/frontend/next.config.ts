@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'pravatar.cc',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+      },
     ],
     // Optimize images for production
     formats: ['image/avif', 'image/webp'],
