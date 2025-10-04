@@ -2,6 +2,8 @@
 Aegis Backend API
 FastAPI application for handling infrastructure issue submissions.
 """
+from routers import invites
+from routers import voice
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -15,28 +17,34 @@ from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
 from services.taste_profile_service import get_taste_profile_service
 from services.restaurant_search_service import get_restaurant_search_service
+from services.restaurant_db_service import get_restaurant_db_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph
 import asyncio
 
 # Lazy import for embedding service (heavy memory usage)
+
+
 def get_embedding_service():
     from services.embedding_service import get_embedding_service as _get_embedding_service
     return _get_embedding_service()
+
 
 # In-memory cache for AI-suggested restaurants (temporary until user submits review)
 # Key: image_id, Value: restaurant_name
 restaurant_suggestions_cache = {}
 
 # Auto-sync secrets from Infisical before starting (only in development)
+
+
 def sync_secrets():
     """Sync secrets from Infisical to .env file before loading environment variables"""
     # Skip in production (Render will provide env vars directly)
     if os.getenv('ENVIRONMENT') == 'production':
         print("✅ Production environment detected - using system environment variables")
         return
-    
+
     try:
         # Get the directory where this script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -56,7 +64,8 @@ def sync_secrets():
                 f.write(result.stdout)
             print(f"✅ Secrets synced to {env_path} successfully!")
         else:
-            print("⚠️  Could not sync from Infisical. Using existing .env file if available")
+            print(
+                "⚠️  Could not sync from Infisical. Using existing .env file if available")
             if result.stderr:
                 print(f"   Error: {result.stderr.strip()}")
     except FileNotFoundError:
@@ -66,6 +75,7 @@ def sync_secrets():
         print(f"⚠️  Could not sync secrets: {e}")
         print("   Using existing .env file if available")
 
+
 # Sync secrets on startup
 sync_secrets()
 
@@ -74,6 +84,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(script_dir, '.env'))
 
 # Lifespan context manager for startup/shutdown events
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -142,11 +154,9 @@ app.include_router(reservations.router, prefix="/api")
 app.include_router(twilio_webhooks.router, prefix="/api")
 
 # Import and include voice router
-from routers import voice
 app.include_router(voice.router, prefix="/api")
 
 # Import and include invites router
-from routers import invites
 app.include_router(invites.router, prefix="/api")
 
 # Import and include friends graph router
@@ -203,7 +213,8 @@ async def analyze_and_update_description(image_id: int, image_bytes: bytes, lati
         # Find nearby restaurants if we have coordinates
         nearby_restaurants = []
         if latitude is not None and longitude is not None:
-            print(f"[BACKGROUND AI] Finding restaurants near ({latitude}, {longitude})...")
+            print(
+                f"[BACKGROUND AI] Finding restaurants near ({latitude}, {longitude})...")
             try:
                 nearby_restaurants = places_service.find_nearby_restaurants(
                     latitude=latitude,
@@ -211,16 +222,20 @@ async def analyze_and_update_description(image_id: int, image_bytes: bytes, lati
                     radius=1000,  # 1km radius
                     limit=25
                 )
-                print(f"[BACKGROUND AI] Found {len(nearby_restaurants)} nearby restaurants")
+                print(
+                    f"[BACKGROUND AI] Found {len(nearby_restaurants)} nearby restaurants")
             except Exception as e:
-                print(f"[BACKGROUND AI] Warning: Could not fetch nearby restaurants: {str(e)}")
+                print(
+                    f"[BACKGROUND AI] Warning: Could not fetch nearby restaurants: {str(e)}")
                 # Continue without restaurants - AI can still analyze the food
         else:
-            print(f"[BACKGROUND AI] No coordinates provided, skipping restaurant search")
+            print(
+                f"[BACKGROUND AI] No coordinates provided, skipping restaurant search")
 
         # Analyze with Gemini AI
         if nearby_restaurants:
-            analysis = gemini_service.analyze_food_with_restaurant_matching(image_bytes, nearby_restaurants)
+            analysis = gemini_service.analyze_food_with_restaurant_matching(
+                image_bytes, nearby_restaurants)
             print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
             print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
             print(f"[BACKGROUND AI] Restaurant: {analysis['restaurant']}")
@@ -234,7 +249,8 @@ async def analyze_and_update_description(image_id: int, image_bytes: bytes, lati
         # Cache the AI-suggested restaurant (temporary, for auto-fill)
         if analysis.get('restaurant') and analysis['restaurant'] != 'Unknown':
             restaurant_suggestions_cache[image_id] = analysis['restaurant']
-            print(f"[BACKGROUND AI] Cached restaurant suggestion: {analysis['restaurant']}")
+            print(
+                f"[BACKGROUND AI] Cached restaurant suggestion: {analysis['restaurant']}")
 
         # Update the images table with AI analysis (dish & cuisine only)
         supabase_service.update_image_description(
@@ -246,7 +262,8 @@ async def analyze_and_update_description(image_id: int, image_bytes: bytes, lati
         print(f"[BACKGROUND AI] Updated image {image_id} with AI analysis")
 
     except Exception as e:
-        print(f"[BACKGROUND AI ERROR] Failed to analyze image {image_id}: {str(e)}")
+        print(
+            f"[BACKGROUND AI ERROR] Failed to analyze image {image_id}: {str(e)}")
 
 
 @app.post("/api/images/upload")
@@ -275,9 +292,11 @@ async def upload_image(
     """
     try:
         print(f"[UPLOAD IMAGE] Request from user: {user_id}")
-        print(f"[UPLOAD IMAGE] Location: {geolocation} (lat: {latitude}, lon: {longitude})")
+        print(
+            f"[UPLOAD IMAGE] Location: {geolocation} (lat: {latitude}, lon: {longitude})")
         print(f"[UPLOAD IMAGE] Time: {timestamp}")
-        print(f"[UPLOAD IMAGE] Image: {image.filename}, Type: {image.content_type}")
+        print(
+            f"[UPLOAD IMAGE] Image: {image.filename}, Type: {image.content_type}")
 
         # Validate image type
         if not image.content_type or not image.content_type.startswith("image/"):
@@ -300,7 +319,8 @@ async def upload_image(
 
         # 1. Upload image to storage
         print(f"[UPLOAD IMAGE] Uploading to storage...")
-        image_url = supabase_service.upload_image(user_id, image_bytes, extension)
+        image_url = supabase_service.upload_image(
+            user_id, image_bytes, extension)
         print(f"[UPLOAD IMAGE] Uploaded: {image_url}")
 
         # 2. Create entry in images table (with placeholder description)
@@ -333,7 +353,8 @@ async def upload_image(
         raise
     except Exception as e:
         print(f"[UPLOAD IMAGE ERROR] {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Image upload failed: {str(e)}")
 
 
 async def update_taste_profile_background(user_id: str, review_id: str):
@@ -346,7 +367,8 @@ async def update_taste_profile_background(user_id: str, review_id: str):
         review_id: Review UUID that was just created
     """
     try:
-        print(f"[TASTE PROFILE] Starting background update for user {user_id}, review {review_id}")
+        print(
+            f"[TASTE PROFILE] Starting background update for user {user_id}, review {review_id}")
 
         # Get services
         supabase_service = get_supabase_service()
@@ -356,7 +378,8 @@ async def update_taste_profile_background(user_id: str, review_id: str):
         review_data = supabase_service.get_review_with_image(review_id)
 
         if not review_data:
-            print(f"[TASTE PROFILE] Review {review_id} not found, skipping profile update")
+            print(
+                f"[TASTE PROFILE] Review {review_id} not found, skipping profile update")
             return
 
         # Update taste profile
@@ -405,19 +428,23 @@ async def submit_review(
     try:
         print(f"[SUBMIT REVIEW] Request from user: {user_id}")
         print(f"[SUBMIT REVIEW] Image ID: {image_id}")
-        print(f"[SUBMIT REVIEW] Restaurant: {restaurant_name}, Rating: {rating}/5")
+        print(
+            f"[SUBMIT REVIEW] Restaurant: {restaurant_name}, Rating: {rating}/5")
         print(f"[SUBMIT REVIEW] User Review: {user_review}")
 
         # Validate rating
         if rating < 1 or rating > 5:
-            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+            raise HTTPException(
+                status_code=400, detail="Rating must be between 1 and 5")
 
         # Validate required fields
         if not restaurant_name.strip():
-            raise HTTPException(status_code=400, detail="Restaurant name is required")
+            raise HTTPException(
+                status_code=400, detail="Restaurant name is required")
 
         if not user_review.strip():
-            raise HTTPException(status_code=400, detail="Review text is required")
+            raise HTTPException(
+                status_code=400, detail="Review text is required")
 
         # Get Supabase service
         supabase_service = get_supabase_service()
@@ -448,7 +475,8 @@ async def submit_review(
         raise
     except Exception as e:
         print(f"[SUBMIT REVIEW ERROR] {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Review submission failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Review submission failed: {str(e)}")
 
 
 @app.get("/api/images/{image_id}")
@@ -477,7 +505,8 @@ async def get_image(image_id: int, user_id: str = Depends(get_user_id_from_token
         suggested_restaurant = restaurant_suggestions_cache.get(image_id)
         if suggested_restaurant:
             image['suggested_restaurant'] = suggested_restaurant
-            print(f"[GET_IMAGE] Including suggested restaurant: {suggested_restaurant}")
+            print(
+                f"[GET_IMAGE] Including suggested restaurant: {suggested_restaurant}")
         else:
             image['suggested_restaurant'] = None
 
@@ -487,7 +516,8 @@ async def get_image(image_id: int, user_id: str = Depends(get_user_id_from_token
         raise
     except Exception as e:
         print(f"[GET_IMAGE ERROR] {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch image: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch image: {str(e)}")
 
 
 @app.get("/api/reviews")
@@ -518,7 +548,8 @@ async def get_reviews(user_id: str = Depends(get_user_id_from_token)):
         raise
     except Exception as e:
         print(f"[GET_REVIEWS ERROR] {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
 
 
 @app.get("/api/reviews/all")
@@ -544,7 +575,8 @@ async def get_all_reviews():
 
     except Exception as e:
         print(f"[GET_ALL_REVIEWS ERROR] {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch reviews: {str(e)}")
 
 
 @app.get("/api/food-graph")
@@ -587,11 +619,13 @@ async def get_food_graph(
         }
     """
     try:
-        print(f"[FOOD_GRAPH] Request from user: {user_id}, min_similarity: {min_similarity}")
+        print(
+            f"[FOOD_GRAPH] Request from user: {user_id}, min_similarity: {min_similarity}")
 
         # Validate min_similarity
         if min_similarity < 0.0 or min_similarity > 1.0:
-            raise HTTPException(status_code=400, detail="min_similarity must be between 0.0 and 1.0")
+            raise HTTPException(
+                status_code=400, detail="min_similarity must be between 0.0 and 1.0")
 
         # Get services
         supabase_service = get_supabase_service()
@@ -629,7 +663,8 @@ async def get_food_graph(
             rating = review.get('overall_rating', 0)
 
             # Generate embedding from food data
-            embedding = embedding_service.generate_food_embedding(dish, cuisine, description)
+            embedding = embedding_service.generate_food_embedding(
+                dish, cuisine, description)
 
             node = {
                 "id": image_id,
@@ -652,7 +687,8 @@ async def get_food_graph(
 
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
-                similarity = embedding_service.calculate_similarity(embeddings[i], embeddings[j])
+                similarity = embedding_service.calculate_similarity(
+                    embeddings[i], embeddings[j])
 
                 if similarity >= min_similarity:
                     edge = {
@@ -662,7 +698,8 @@ async def get_food_graph(
                     }
                     edges.append(edge)
 
-        print(f"[FOOD_GRAPH] Found {len(edges)} edges (min_similarity={min_similarity})")
+        print(
+            f"[FOOD_GRAPH] Found {len(edges)} edges (min_similarity={min_similarity})")
 
         return {
             "nodes": nodes,
@@ -680,7 +717,8 @@ async def get_food_graph(
         print(f"[FOOD_GRAPH ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to generate food graph: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate food graph: {str(e)}")
 
 
 @app.post("/api/restaurants/search/test")
@@ -735,7 +773,8 @@ async def search_restaurants_test(
         print(f"[SEARCH RESTAURANTS TEST ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Restaurant search failed: {str(e)}")
 
 
 @app.post("/api/restaurants/nearby")
@@ -748,7 +787,7 @@ async def get_nearby_restaurants(
 ):
     """
     Fetch nearby restaurants immediately without LLM analysis.
-    This is fast and allows UI to show restaurants while LLM thinks.
+    Returns highest rated and most reviewed restaurants from database.
 
     Args:
         user_id: Extracted from JWT token (automatic)
@@ -758,50 +797,51 @@ async def get_nearby_restaurants(
         limit: Maximum number of restaurants (default: 20)
 
     Returns:
-        List of nearby restaurants with photos
+        List of nearby high-quality restaurants sorted by quality score
     """
     try:
         print(f"[NEARBY RESTAURANTS] Request from user: {user_id}")
         print(f"[NEARBY RESTAURANTS] Location: ({latitude}, {longitude})")
         print(f"[NEARBY RESTAURANTS] Radius: {radius}m, Limit: {limit}")
 
-        # Get places service
-        places_service = get_places_service()
+        # Get database service
+        restaurant_db_service = get_restaurant_db_service()
 
-        # Fetch nearby restaurants
-        restaurants = places_service.find_nearby_restaurants(
+        # Fetch nearby restaurants with quality filter
+        restaurants = restaurant_db_service.get_nearby_restaurants(
             latitude=latitude,
             longitude=longitude,
-            radius=radius,
-            limit=limit
+            radius_meters=radius,
+            limit=limit * 2,  # Get more for quality sorting
+            min_rating=3.5,  # Reasonable minimum
+            min_reviews=10  # Filter out unproven spots
         )
 
-        # Filter to only those with photos
-        restaurants_with_photos = [
-            {
-                'name': r['name'],
-                'photo_url': r.get('photo_url'),
-                'place_id': r.get('place_id'),
-                'rating': r.get('rating', 0),
-                'cuisine': r.get('cuisine', 'Unknown'),
-                'address': r.get('address', ''),
-                'price_level': r.get('price_level', 2)
-            }
-            for r in restaurants if r.get('photo_url')
-        ]
+        # Sort by quality score: rating * log(reviews + 1)
+        import math
+        for r in restaurants:
+            review_count = r.get('user_ratings_total', 0) or 0
+            r['quality_score'] = r['rating'] * math.log(review_count + 1)
 
-        print(f"[NEARBY RESTAURANTS] ✅ Found {len(restaurants_with_photos)} restaurants with photos")
+        restaurants.sort(key=lambda r: r['quality_score'], reverse=True)
+        restaurants = restaurants[:limit]
+
+        print(
+            f"[NEARBY RESTAURANTS] ✅ Found {len(restaurants)} high-quality restaurants")
         return {
             "status": "success",
-            "restaurants": restaurants_with_photos,
-            "count": len(restaurants_with_photos)
+            "restaurants": restaurants,
+            "count": len(restaurants)
         }
 
     except Exception as e:
         print(f"[NEARBY RESTAURANTS ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to fetch nearby restaurants: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch nearby restaurants: {str(e)}")
+
+
 @app.get("/api/friends/search")
 async def search_friends(
     user_id: str = Depends(get_user_id_from_token),
@@ -810,14 +850,14 @@ async def search_friends(
     """
     Get user's friends list, optionally filtered by username.
     Used for @ mention autocomplete.
-    
+
     Args:
         user_id: Extracted from JWT token (automatic)
         query: Optional search query to filter friends by username or display name
-    
+
     Returns:
         List of friends with id, username, display_name, avatar_url
-    
+
     Example:
         GET /api/friends/search?query=jul
         Returns friends whose username or display_name contains "jul"
@@ -825,54 +865,55 @@ async def search_friends(
     try:
         print(f"[FRIENDS SEARCH] Request from user: {user_id}")
         print(f"[FRIENDS SEARCH] Query: '{query}'")
-        
+
         # Get Supabase service
         supabase_service = get_supabase_service()
-        
+
         # Step 1: Get current user's friends array
         user_response = supabase_service.client.table("profiles")\
             .select("friends")\
             .eq("id", user_id)\
             .single()\
             .execute()
-        
+
         if not user_response.data:
             return {"friends": []}
-        
+
         friend_ids = user_response.data.get("friends", [])
-        
+
         if not friend_ids:
             return {"friends": []}
-        
+
         print(f"[FRIENDS SEARCH] User has {len(friend_ids)} friends")
-        
+
         # Step 2: Get friend profiles
         friends_query = supabase_service.client.table("profiles")\
             .select("id, username, display_name, avatar_url")\
             .in_("id", friend_ids)
-        
+
         # Apply search filter if query provided
         if query.strip():
             # Search in both username and display_name
             friends_query = friends_query.or_(
                 f"username.ilike.%{query}%,display_name.ilike.%{query}%"
             )
-        
+
         friends_response = friends_query.execute()
-        
+
         friends = friends_response.data or []
-        
+
         print(f"[FRIENDS SEARCH] ✅ Returning {len(friends)} friends")
-        
+
         return {"friends": friends}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"[FRIENDS SEARCH ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Friends search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Friends search failed: {str(e)}")
 
 
 @app.post("/api/restaurants/search")
@@ -927,7 +968,8 @@ async def search_restaurants(
         print(f"[SEARCH RESTAURANTS ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Restaurant search failed: {str(e)}")
 
 
 @app.post("/api/restaurants/search-group")
@@ -940,17 +982,17 @@ async def search_restaurants_group(
 ):
     """
     Search restaurants for a group of users with merged preferences.
-    
+
     Args:
         user_id: Requesting user (from JWT token, automatic)
         query: Natural language query (e.g., "I want lunch with @julian")
         friend_ids: Comma-separated friend UUIDs (e.g., "uuid1,uuid2,uuid3")
         latitude: User's current latitude
         longitude: User's current longitude
-    
+
     Returns:
         Top 3 restaurants matching merged group preferences
-    
+
     Example:
         POST /api/restaurants/search-group
         {
@@ -965,18 +1007,19 @@ async def search_restaurants_group(
         print(f"[GROUP SEARCH] Query: '{query}'")
         print(f"[GROUP SEARCH] Friend IDs: '{friend_ids}'")
         print(f"[GROUP SEARCH] Location: ({latitude}, {longitude})")
-        
+
         # Parse friend IDs (comma-separated string to list)
-        friend_id_list = [fid.strip() for fid in friend_ids.split(",") if fid.strip()]
-        
+        friend_id_list = [fid.strip()
+                          for fid in friend_ids.split(",") if fid.strip()]
+
         # Create complete user list (requesting user + friends)
         all_user_ids = [user_id] + friend_id_list
-        
+
         print(f"[GROUP SEARCH] Total users in group: {len(all_user_ids)}")
-        
+
         # Get restaurant search service
         search_service = get_restaurant_search_service()
-        
+
         # Execute group search
         results = await search_service.search_restaurants_for_group(
             query=query,
@@ -984,17 +1027,18 @@ async def search_restaurants_group(
             latitude=latitude,
             longitude=longitude
         )
-        
+
         print(f"[GROUP SEARCH] ✅ Group search completed")
         return results
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"[GROUP SEARCH ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Group restaurant search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Group restaurant search failed: {str(e)}")
 
 
 # ============================================================================

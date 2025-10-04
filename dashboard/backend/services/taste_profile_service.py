@@ -152,6 +152,74 @@ class TasteProfileService:
             # Return existing preferences on error
             return self.get_current_preferences_text(user_id)
 
+    def parse_preferences_to_structured(self, preferences_text: str) -> Dict[str, Any]:
+        """
+        Parse natural language preferences into structured data.
+
+        Args:
+            preferences_text: Natural language preference text from profiles.preferences
+
+        Returns:
+            Dict with structured preferences:
+            - cuisines: List[str]
+            - atmospheres: List[str]
+            - price_hints: List[str]
+        """
+        if not preferences_text or not preferences_text.strip():
+            print("[TASTE PROFILE] No preferences text, returning empty structure")
+            return {
+                "cuisines": [],
+                "atmospheres": [],
+                "price_hints": []
+            }
+
+        try:
+            print(
+                f"[TASTE PROFILE] Parsing preferences text ({len(preferences_text)} chars)")
+
+            prompt = f"""Extract structured data from this user preference text.
+
+PREFERENCE TEXT:
+{preferences_text}
+
+Extract and return ONLY JSON (no markdown, no explanations):
+{{
+  "cuisines": ["Italian", "Japanese", ...],  // All cuisine types mentioned
+  "atmospheres": ["vibrant", "casual", ...],  // Atmosphere/vibe keywords
+  "price_hints": ["$$", "$$$", ...]  // Price level indicators if mentioned
+}}
+
+If a category has no data, return empty array. Be thorough - extract all cuisines and vibes mentioned."""
+
+            response = self.gemini_service.model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # Clean markdown if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            import json
+            structured = json.loads(response_text)
+
+            print(f"[TASTE PROFILE] Parsed: {len(structured.get('cuisines', []))} cuisines, "
+                  f"{len(structured.get('atmospheres', []))} vibes")
+
+            return structured
+
+        except Exception as e:
+            print(
+                f"[TASTE PROFILE ERROR] Failed to parse preferences: {str(e)}")
+            return {
+                "cuisines": [],
+                "atmospheres": [],
+                "price_hints": []
+            }
+
     def _build_implicit_signals_prompt(
         self,
         summary: Dict[str, Any],
