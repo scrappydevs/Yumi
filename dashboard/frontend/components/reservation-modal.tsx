@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Plus, Trash2, Calendar as CalendarIcon, Users, MapPin, Clock, CheckCircle, XCircle, AlertCircle, Phone, ExternalLink, Star, DollarSign } from 'lucide-react'
+import { X, Plus, Trash2, Calendar as CalendarIcon, Users, MapPin, Clock, CheckCircle, XCircle, AlertCircle, Phone, ExternalLink, Star, DollarSign, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -602,28 +602,100 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
           {/* Success State - Open iMessage Card */}
           {mode === 'create' && success && inviteMessage && invitePhone && (
             <motion.div 
-              className="relative z-10"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+              className="space-y-6 relative z-10"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
             >
-              <OpenIMessageCard
-                toNumber={invitePhone}
-                presetBody={inviteMessage}
-                ctaText="Open iMessage"
-              />
-              
-              <div className="mt-6 text-center">
+              {/* Success Header */}
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-50 border-2 border-green-200 mb-2">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Reservation Created!</h3>
+                <p className="text-gray-600">Send this invitation to confirm your reservation</p>
+              </div>
+
+              {/* Phone Number */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Send to
+                </Label>
+                <div
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(invitePhone)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 1500)
+                  }}
+                  className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3.5 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200"
+                >
+                  <span className="font-mono text-sm text-gray-900">{invitePhone}</span>
+                  <div className="flex items-center gap-2">
+                    <AnimatePresence>
+                      {copied && (
+                        <motion.span
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="text-xs text-green-600 font-medium"
+                        >
+                          Copied
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                    {copied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Message */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Message
+                </Label>
+                <div
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(inviteMessage)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 1500)
+                  }}
+                  className="bg-gray-50 rounded-2xl px-4 py-3.5 cursor-pointer hover:bg-gray-100 transition-colors border border-gray-200 relative group"
+                >
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed pr-8">
+                    {inviteMessage}
+                  </p>
+                  <div className="absolute top-3 right-3">
+                    {copied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
                 <Button
                   onClick={() => {
                     onClose()
                     resetForm()
                   }}
-                  variant="ghost"
-                  className="text-gray-600 hover:text-black"
+                  variant="outline"
+                  className="flex-1 h-12"
                 >
                   Close
                 </Button>
+                <Button
+                  onClick={() => {
+                    const encoded = encodeURIComponent(inviteMessage)
+                    window.location.href = `sms:${invitePhone}?&body=${encoded}`
+                  }}
+                  className="flex-1 gradient-purple-blue text-white h-12"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Messages
+                </Button>
               </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                If the message isn't pre-filled, copy it from above and paste into Messages.
+              </p>
             </motion.div>
           )}
 

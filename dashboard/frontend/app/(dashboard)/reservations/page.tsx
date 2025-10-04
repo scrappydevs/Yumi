@@ -97,12 +97,30 @@ export default function ReservationsPage() {
         
         setCurrentUserId(user.id)
 
-        // Fetch reservations from backend
-        const data = await apiRequest<{ reservations: Reservation[] }>(
-          `/api/reservations/user/${user.id}`
-        )
+        // Check if we need to force refresh (cache-busting)
+        const params = new URLSearchParams(window.location.search)
+        const shouldRefresh = params.get('refresh') === 'true'
+        
+        // Fetch reservations from backend (with cache-busting if needed)
+        const endpoint = shouldRefresh 
+          ? `/api/reservations/user/${user.id}?t=${Date.now()}`
+          : `/api/reservations/user/${user.id}`
+        
+        const data = await apiRequest<{ reservations: Reservation[] }>(endpoint)
+        
+        if (shouldRefresh) {
+          console.log('✅ Refreshed reservations after accepting invite')
+          console.log('📊 Fetched reservations:', data.reservations)
+        }
         
         setReservations(data.reservations || [])
+        
+        if (shouldRefresh) {
+          // Clean up URL
+          const url = new URL(window.location.href)
+          url.searchParams.delete('refresh')
+          window.history.replaceState({}, '', url.toString())
+        }
       } catch (err) {
         console.error('Failed to load reservations:', err)
       } finally {

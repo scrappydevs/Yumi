@@ -80,7 +80,7 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/60 z-50 backdrop-blur-md"
           />
 
           {/* Modal */}
@@ -90,24 +90,21 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50"
           >
-            <div className="glass-card rounded-3xl p-6 shadow-strong relative overflow-hidden m-4">
-              {/* Specular highlight */}
-              <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
-              
-              <div className="relative">
+            <div className="bg-white rounded-3xl p-6 shadow-2xl m-4 border border-gray-100">
+              <div>
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-[hsl(var(--foreground))] mb-2">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
                       Phone Number Required
                     </h2>
-                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                    <p className="text-sm text-gray-600">
                       We need your phone number to send reservation invitations
                     </p>
                   </div>
                   <button
                     onClick={onClose}
-                    className="ml-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="ml-2 p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
                     disabled={submitting}
                   >
                     <X className="w-5 h-5" />
@@ -130,24 +127,21 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
                     <Label htmlFor="phone" className="text-sm font-medium">
                       Phone Number
                     </Label>
-                    <div className="glass-layer-1 rounded-2xl p-4 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
-                      <div className="relative flex items-center gap-3">
-                        <Phone className="w-5 h-5 text-[hsl(var(--muted-foreground))] flex-shrink-0" />
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="+1234567890"
-                          value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
-                          className="flex-1 bg-transparent border-0 focus:ring-0 focus-visible:ring-0 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))]"
-                          required
-                          disabled={submitting}
-                          autoFocus
-                        />
-                      </div>
+                    <div className="flex items-center gap-3 bg-gray-50 rounded-2xl p-4 border border-gray-200">
+                      <Phone className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="+1234567890"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="flex-1 bg-transparent border-0 focus:ring-0 focus-visible:ring-0 text-gray-900 placeholder:text-gray-400"
+                        required
+                        disabled={submitting}
+                        autoFocus
+                      />
                     </div>
-                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                    <p className="text-xs text-gray-500">
                       Enter your phone number in international format (e.g., +1234567890)
                     </p>
                   </div>

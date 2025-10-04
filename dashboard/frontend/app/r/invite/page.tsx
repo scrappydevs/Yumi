@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { decodeTokenUnsafe, isTokenExpired } from '@/lib/tokens'
+import { API_CONFIG } from '@/lib/api-config'
 import { format } from 'date-fns'
 import { Calendar, Users, MapPin, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -75,7 +76,7 @@ function InvitePageContent() {
       setTokenData({ ...decoded, rawToken: activeToken })
       
       // Fetch reservation details for preview
-      const response = await fetch(`http://localhost:8000/api/reservations/${decoded.resvId}`)
+      const response = await fetch(`${API_CONFIG.baseURL}/api/reservations/${decoded.resvId}`)
       if (response.ok) {
         const data = await response.json()
         setReservationInfo(data)
@@ -94,7 +95,9 @@ function InvitePageContent() {
     
     setAccepting(true)
     try {
-      const response = await fetch('http://localhost:8000/api/invites/accept', {
+      console.log('📤 Accepting invite...', { token: tokenData.rawToken, user_id: user.id })
+      
+      const response = await fetch(`${API_CONFIG.baseURL}/api/invites/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -103,21 +106,27 @@ function InvitePageContent() {
         })
       })
       
+      console.log('📥 Response status:', response.status)
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        console.error('❌ Error response:', errorData)
         throw new Error(errorData.detail || 'Failed to accept invitation')
       }
       
+      const data = await response.json()
+      console.log('✅ Invite accepted successfully:', data)
+      
       setResult('accepted')
       
-      // Redirect to reservations page after 2 seconds
+      // Redirect after a short delay to show success message
       setTimeout(() => {
-        router.push('/reservations')
-      }, 2000)
+        console.log('🔄 Redirecting to reservations...')
+        router.push('/reservations?refresh=true')
+      }, 1500)
     } catch (err) {
-      console.error('Error accepting invite:', err)
+      console.error('❌ Error accepting invite:', err)
       alert(err instanceof Error ? err.message : 'Failed to accept invitation. Please try again.')
-    } finally {
       setAccepting(false)
     }
   }
@@ -127,7 +136,7 @@ function InvitePageContent() {
     
     setDeclining(true)
     try {
-      const response = await fetch('http://localhost:8000/api/invites/decline', {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/invites/decline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
