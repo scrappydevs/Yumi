@@ -9,26 +9,35 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (error) {
+      console.error('Error exchanging code for session:', error)
+      // Redirect to home with error
+      return NextResponse.redirect(`${origin}/?error=auth_failed`)
+    }
     
     // Check if user has completed onboarding
     const { data: { user } } = await supabase.auth.getUser()
     
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('onboarded, phone')
         .eq('id', user.id)
         .single()
       
-      // If no phone or not onboarded, send to welcome page
-      if (!profile?.phone || !profile?.onboarded) {
+      // If profile doesn't exist or no phone/not onboarded, send to welcome
+      if (profileError || !profile?.phone || !profile?.onboarded) {
         return NextResponse.redirect(`${origin}/welcome`)
       }
+      
+      // User is fully set up, send to overview
+      return NextResponse.redirect(`${origin}/overview`)
     }
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(`${origin}/overview`)
+  // No code provided, redirect to home
+  return NextResponse.redirect(`${origin}/`)
 }
 

@@ -2,21 +2,39 @@
 Embedding service for generating and comparing food embeddings.
 Used to build the food similarity graph.
 """
-from sentence_transformers import SentenceTransformer
 import numpy as np
 from typing import List, Optional
+
+# Lazy import to avoid loading model at startup (saves memory)
+_sentence_transformer_model = None
+
+
+def _get_model():
+    """Lazy load the sentence transformer model only when needed."""
+    global _sentence_transformer_model
+    if _sentence_transformer_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            print("[EMBEDDING] Loading sentence transformer model...")
+            _sentence_transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
+            print("[EMBEDDING] Model loaded successfully (dim=384)")
+        except ImportError:
+            print("[EMBEDDING WARNING] sentence-transformers not installed. Food graph feature disabled.")
+            print("[EMBEDDING] Install with: pip install sentence-transformers")
+            return None
+        except Exception as e:
+            print(f"[EMBEDDING ERROR] Failed to load model: {e}")
+            return None
+    return _sentence_transformer_model
 
 
 class EmbeddingService:
     """Service for generating embeddings and calculating similarity."""
     
     def __init__(self):
-        """Initialize the sentence transformer model."""
-        # Using a lightweight but effective model
-        # all-MiniLM-L6-v2: Fast, good quality, 384 dimensions
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        """Initialize the embedding service (model loads on first use)."""
         self.embedding_dim = 384
-        print(f"[EMBEDDING] Initialized with model: all-MiniLM-L6-v2 (dim={self.embedding_dim})")
+        print("[EMBEDDING] Service initialized (model will load on first use)")
     
     def generate_embedding(self, text: str) -> List[float]:
         """
@@ -32,7 +50,13 @@ class EmbeddingService:
             # Return zero vector for empty text
             return [0.0] * self.embedding_dim
         
-        embedding = self.model.encode(text, show_progress_bar=False)
+        model = _get_model()  # Lazy load
+        if model is None:
+            # Model not available, return random vector for now
+            print("[EMBEDDING] Model not available, using fallback")
+            return (np.random.rand(self.embedding_dim) * 0.1).tolist()
+        
+        embedding = model.encode(text, show_progress_bar=False)
         return embedding.tolist()
     
     def generate_food_embedding(self, dish: str, cuisine: str, description: str) -> List[float]:

@@ -13,7 +13,6 @@ import subprocess
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.places_service import get_places_service
-from services.embedding_service import get_embedding_service
 from services.taste_profile_service import get_taste_profile_service
 from services.restaurant_search_service import get_restaurant_search_service
 from utils.auth import get_user_id_from_token
@@ -21,13 +20,23 @@ from supabase_client import SupabaseClient
 from routers import issues, ai, audio, config, reservations, twilio_webhooks
 import asyncio
 
+# Lazy import for embedding service (heavy memory usage)
+def get_embedding_service():
+    from services.embedding_service import get_embedding_service as _get_embedding_service
+    return _get_embedding_service()
+
 # In-memory cache for AI-suggested restaurants (temporary until user submits review)
 # Key: image_id, Value: restaurant_name
 restaurant_suggestions_cache = {}
 
-# Auto-sync secrets from Infisical before starting
+# Auto-sync secrets from Infisical before starting (only in development)
 def sync_secrets():
     """Sync secrets from Infisical to .env file before loading environment variables"""
+    # Skip in production (Render will provide env vars directly)
+    if os.getenv('ENVIRONMENT') == 'production':
+        print("✅ Production environment detected - using system environment variables")
+        return
+    
     try:
         # Get the directory where this script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -97,10 +106,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS configuration - allow all origins for development
+# CORS configuration
+# Get allowed origins from environment variable (comma-separated list)
+frontend_urls = os.getenv("FRONTEND_URL", "http://localhost:3000")
+allowed_origins = [url.strip() for url in frontend_urls.split(",")]
+
+# In development, allow all origins for convenience
+if os.getenv("ENVIRONMENT") != "production":
+    allowed_origins = ["*"]
+    print("⚠️  Development mode: Allowing all CORS origins")
+else:
+    # Always allow these production domains
+    production_origins = [
+        "https://findwithyummy.netlify.app",
+        "https://yummy-wehd.onrender.com"
+    ]
+    # Add any custom domains from env var
+    allowed_origins = list(set(production_origins + allowed_origins))
+    print(f"✅ Production mode: CORS restricted to {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development; restrict in production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -113,6 +140,14 @@ app.include_router(audio.router)
 app.include_router(config.router)
 app.include_router(reservations.router, prefix="/api")
 app.include_router(twilio_webhooks.router, prefix="/api")
+
+# Import and include voice router
+from routers import voice
+app.include_router(voice.router, prefix="/api")
+
+# Import and include invites router
+from routers import invites
+app.include_router(invites.router, prefix="/api")
 
 
 @app.get("/")

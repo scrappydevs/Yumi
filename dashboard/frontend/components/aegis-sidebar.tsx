@@ -23,6 +23,7 @@ import {
   Activity,
   MapPin,
   LogOut,
+  Calendar,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -42,6 +43,7 @@ type NavigationItem = {
 
 const navigation: NavigationItem[] = [
   { name: 'Discover', icon: Compass, href: '/overview' },
+  { name: 'Reservations', icon: Calendar, href: '/reservations' },
   { name: 'Explore', icon: MapPin, href: '/spatial' },
   { name: 'Friends', icon: Users, href: '/friends' },
   { name: 'Favorites', icon: BookHeart, href: '/favorites' },
@@ -49,7 +51,6 @@ const navigation: NavigationItem[] = [
 
 const secondaryNav: NavigationItem[] = [
   { name: 'Profile', icon: User, href: '/profile' },
-  { name: 'Settings', icon: Settings, href: '/settings' },
 ];
 
 export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
@@ -175,7 +176,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       </nav>
 
       {/* Footer - Logout Button */}
-      <div className="border-t border-[hsl(var(--border))] p-2.5">
+      <div className="relative z-50 border-t border-[hsl(var(--border))] p-2.5 bg-white/80 backdrop-blur-sm">
         <Button
           variant="ghost"
           size="sm"

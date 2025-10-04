@@ -238,7 +238,7 @@ export default function FavoritesPage() {
                 {restaurant.notes && (
                   <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-3">
                     <p className="text-xs text-[hsl(var(--muted-foreground))] italic">
-                      "{restaurant.notes}"
+                      &ldquo;{restaurant.notes}&rdquo;
                     </p>
                   </div>
                 )}

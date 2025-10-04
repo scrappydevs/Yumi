@@ -1,0 +1,36 @@
+# Render Ignore File
+# Files and directories to exclude from Render deployments
+
+# Frontend (not needed for backend deployment)
+dashboard/frontend/
+aegis/
+
+# Documentation
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Test files
+**/test_*.py
+**/*_test.py
+
+# SQL migration scripts (already applied)
+*.sql
+
+# Other configs
+package-lock.json
+.prettierrc
+.eslintrc
+

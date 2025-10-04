@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useParams } from 'next/navigation';
-import { SendReservationCard } from '@/components/send-reservation-card';
+import { ReservationModal } from '@/components/reservation-modal';
 
 type Profile = {
   id: string;
@@ -56,7 +56,8 @@ export default function UserProfilePage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [showMessageCard, setShowMessageCard] = useState(false);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
   const supabase = createClient();
   const { user: currentUser } = useAuth();
   const router = useRouter();
@@ -114,17 +115,27 @@ export default function UserProfilePage() {
       }
 
       // Load photos
-      const { data: photosData, error: photosError } = await supabase
+      const { data: photosData, error: photosError} = await supabase
         .from('photos')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false})
         .limit(8);
 
       if (photosError) {
         console.warn('⚠️ Error loading photos:', photosError);
       } else {
         setPhotos(photosData || []);
+      }
+
+      // Load followers count (how many people follow THIS user)
+      const { data: followersData, error: followersError } = await supabase
+        .from('profiles')
+        .select('id')
+        .contains('friends', [userId]);
+
+      if (!followersError) {
+        setFollowersCount(followersData?.length || 0);
       }
 
     } catch (error) {
@@ -167,6 +178,13 @@ export default function UserProfilePage() {
 
       if (!error) {
         setIsFollowing(!isFollowing);
+        
+        // Update followers count
+        if (isFollowing) {
+          setFollowersCount(prev => Math.max(0, prev - 1));
+        } else {
+          setFollowersCount(prev => prev + 1);
+        }
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
@@ -248,7 +266,7 @@ export default function UserProfilePage() {
             </motion.button>
             {currentUser && currentUser.id !== userId && (
               <motion.button
-                onClick={() => setShowMessageCard(true)}
+                onClick={() => setShowReservationModal(true)}
                 className="glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
@@ -311,8 +329,8 @@ export default function UserProfilePage() {
             <div className="text-sm font-medium text-slate-500 mb-4">Social</div>
             <div className="grid grid-cols-2 gap-6">
               {[
-                { label: 'Following', value: profile.friends?.length || 0, icon: Users },
-                { label: 'Photos', value: photos.length, icon: Heart },
+                { label: 'Followers', value: followersCount, icon: Users },
+                { label: 'Following', value: profile.friends?.length || 0, icon: UserPlus },
               ].map((stat) => (
                 <div key={stat.label} className="space-y-1">
                   <div className="flex items-center gap-2 text-slate-500">
@@ -467,44 +485,20 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* Message Modal */}
-      <AnimatePresence>
-        {showMessageCard && profile && currentUser && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/10 backdrop-blur-md z-50 flex items-center justify-center p-4"
-            onClick={() => setShowMessageCard(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SendReservationCard
-                friendId={profile.id}
-                friendName={profile.display_name || profile.username}
-                friendPhone="+17149410453"
-              />
-              
-              {/* Close button */}
-              <motion.button
-                onClick={() => setShowMessageCard(false)}
-                className="mt-4 w-full glass-layer-1 rounded-2xl h-12 text-sm font-semibold shadow-soft relative overflow-hidden"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                <span className="relative z-10">Close</span>
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Reservation Modal */}
+      {profile && (
+        <ReservationModal
+          isOpen={showReservationModal}
+          onClose={() => setShowReservationModal(false)}
+          mode="create"
+          showIntro={true}
+          prefillInvitee={{
+            id: profile.id,
+            name: profile.display_name || profile.username,
+            phone: "+17149410453" // TODO: Get from profile.phone when available
+          }}
+        />
+      )}
     </div>
   );
 }
