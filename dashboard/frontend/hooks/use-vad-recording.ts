@@ -21,8 +21,14 @@ interface VADRecordingOptions {
   speechThreshold?: number;
   /** Callback when transcription completes */
   onTranscriptionComplete?: (text: string) => void;
+  /** Callback for streaming partial transcriptions */
+  onPartialTranscription?: (text: string) => void;
   /** Callback when an error occurs */
   onError?: (error: Error) => void;
+  /** Enable streaming transcription (sends chunks while recording) */
+  enableStreaming?: boolean;
+  /** Interval (in ms) for sending audio chunks for transcription */
+  streamingInterval?: number;
 }
 
 interface VADRecordingState {
@@ -39,7 +45,10 @@ export function useVADRecording({
   checkInterval = 1000, // Check every 1 second
   speechThreshold = 0.5,
   onTranscriptionComplete,
+  onPartialTranscription,
   onError,
+  enableStreaming = false,
+  streamingInterval = 2000, // Send chunks every 2 seconds
 }: VADRecordingOptions = {}) {
   const [state, setState] = useState<VADRecordingState>({
     isRecording: false,
@@ -57,6 +66,17 @@ export function useVADRecording({
   const silenceStartRef = useRef<number | null>(null);
   const lastCheckTimeRef = useRef<number>(0);
   const hasDetectedSpeechRef = useRef<boolean>(false);
+  
+  // Streaming transcription refs
+  const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const streamingChunksRef = useRef<Blob[]>([]);
+  const accumulatedTranscriptionRef = useRef<string>('');
+  const onPartialTranscriptionRef = useRef(onPartialTranscription);
+  
+  // Update callback ref when it changes
+  useEffect(() => {
+    onPartialTranscriptionRef.current = onPartialTranscription;
+  }, [onPartialTranscription]);
 
   /**
    * Analyze audio chunk with backend VAD service
@@ -77,6 +97,80 @@ export function useVADRecording({
   }, []);
 
   /**
+   * Transcribe audio chunk for streaming
+   */
+  const transcribeChunk = async (audioChunks: Blob[]) => {
+    if (audioChunks.length === 0) return;
+
+    try {
+      // Combine chunks
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      
+      // Convert to base64
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const base64Audio = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          ''
+        )
+      );
+
+      // Call streaming transcription endpoint
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/audio/stt/transcribe-chunk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio_b64: base64Audio,
+          audio_format: 'webm',
+          language: 'en',
+          task: 'transcribe',
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn('Chunk transcription failed (non-critical)');
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.text && data.text.trim()) {
+        // Accumulate transcription
+        const newText = data.text.trim();
+        accumulatedTranscriptionRef.current += (accumulatedTranscriptionRef.current ? ' ' : '') + newText;
+        
+        console.log('📝 Partial transcription:', accumulatedTranscriptionRef.current);
+        
+        // Call partial transcription callback using ref (always has latest callback)
+        if (onPartialTranscriptionRef.current) {
+          onPartialTranscriptionRef.current(accumulatedTranscriptionRef.current);
+        }
+      }
+    } catch (error) {
+      console.warn('Chunk transcription error (non-critical):', error);
+    }
+  };
+
+  /**
+   * Process streaming chunks periodically
+   */
+  const processStreamingChunks = async () => {
+    if (streamingChunksRef.current.length > 0) {
+      console.log(`🔊 Processing ${streamingChunksRef.current.length} audio chunks for streaming transcription`);
+      
+      // Copy current chunks and clear for next batch
+      const chunksToProcess = [...streamingChunksRef.current];
+      streamingChunksRef.current = [];
+      
+      // Transcribe this batch
+      await transcribeChunk(chunksToProcess);
+    } else {
+      console.log('⏭️ No chunks to process yet');
+    }
+  };
+
+  /**
    * Start recording (VAD disabled - manual stop required)
    */
   const startRecording = useCallback(async () => {
@@ -86,6 +180,8 @@ export function useVADRecording({
       silenceStartRef.current = null;
       lastCheckTimeRef.current = 0;
       hasDetectedSpeechRef.current = false;
+      streamingChunksRef.current = [];
+      accumulatedTranscriptionRef.current = '';
 
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -103,6 +199,11 @@ export function useVADRecording({
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          
+          // Also collect for streaming if enabled
+          if (enableStreaming) {
+            streamingChunksRef.current.push(event.data);
+          }
         }
       };
 
@@ -112,6 +213,12 @@ export function useVADRecording({
         if (checkIntervalRef.current) {
           clearInterval(checkIntervalRef.current);
           checkIntervalRef.current = null;
+        }
+
+        // Clear streaming interval
+        if (streamingIntervalRef.current) {
+          clearInterval(streamingIntervalRef.current);
+          streamingIntervalRef.current = null;
         }
 
         // Stop all tracks
@@ -142,6 +249,14 @@ export function useVADRecording({
         isSpeechDetected: false,
       }));
 
+      // Set up streaming transcription if enabled
+      if (enableStreaming && onPartialTranscription) {
+        console.log('🎤 Streaming transcription enabled, sending chunks every', streamingInterval, 'ms');
+        streamingIntervalRef.current = setInterval(async () => {
+          await processStreamingChunks();
+        }, streamingInterval);
+      }
+
       // VAD disabled - no silence checking interval
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start recording';
@@ -150,7 +265,7 @@ export function useVADRecording({
         onError(error instanceof Error ? error : new Error(errorMessage));
       }
     }
-  }, [onError]);
+  }, [onError, enableStreaming, onPartialTranscription, streamingInterval]);
 
   /**
    * Stop recording manually
@@ -243,6 +358,9 @@ export function useVADRecording({
     return () => {
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current);
+      }
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
       }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
