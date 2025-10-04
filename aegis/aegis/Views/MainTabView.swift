@@ -12,35 +12,42 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
+            // Tab 0: Discover (Bottom Left)
+            DiscoverView()
+                .tabItem {
+                    Label("Discover", systemImage: "sparkles")
+                }
+                .tag(0)
+            
             // Tab 1: My Reviews
             HomeView()
                 .tabItem {
                     Label("Reviews", systemImage: "fork.knife")
                 }
-                .tag(0)
+                .tag(1)
             
             // Tab 2: Camera (Center)
             CameraTabView(selectedTab: $selectedTab)
                 .tabItem {
                     Label("Camera", systemImage: "camera.fill")
                 }
-                .tag(1)
+                .tag(2)
             
             // Tab 3: Friends
             FriendsView()
                 .tabItem {
                     Label("Friends", systemImage: "person.2.fill")
                 }
-                .tag(2)
+                .tag(3)
             
             // Tab 4: Taste Profile
             NavigationView {
                 TasteProfileView()
             }
             .tabItem {
-                Label("Taste Profile", systemImage: "chart.pie")
+                Label("Profile", systemImage: "chart.pie")
             }
-            .tag(3)
+            .tag(4)
         }
         .accentColor(.blue)
     }
@@ -70,7 +77,7 @@ struct CameraTabView: View {
                     }
                 } else {
                     // If no image captured, go back to Reviews tab
-                    selectedTab = 0
+                    selectedTab = 1
                 }
             }) {
                 CustomCameraView { image in
@@ -97,7 +104,7 @@ struct CameraTabView: View {
                 showCamera = false
                 
                 // Switch to Reviews tab to see the new review
-                selectedTab = 0
+                selectedTab = 1
             }) {
                 SheetContentView(capturedImage: $capturedImage, imageId: $uploadedImageId)
             }

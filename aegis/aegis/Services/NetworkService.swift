@@ -408,6 +408,59 @@ class NetworkService {
         let blendedPreferences = try decoder.decode(BlendedPreferences.self, from: data)
         return blendedPreferences
     }
+    
+    // MARK: - Discover Restaurants
+    func discoverRestaurants(
+        latitude: Double,
+        longitude: Double,
+        authToken: String
+    ) async throws -> DiscoverResponse {
+        let url = URL(string: "\(baseURL)/api/restaurants/discover")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // Add latitude
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"latitude\"\r\n\r\n".data(using: .utf8)!)
+        body.append(String(latitude).data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add longitude
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"longitude\"\r\n\r\n".data(using: .utf8)!)
+        body.append(String(longitude).data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        request.timeoutInterval = 30 // LLM can take time
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("❌ [DISCOVER] Server error: \(httpResponse.statusCode)")
+            if let responseText = String(data: data, encoding: .utf8) {
+                print("❌ [DISCOVER] Response: \(responseText)")
+            }
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        let discoverResponse = try decoder.decode(DiscoverResponse.self, from: data)
+        print("✅ [DISCOVER] Received \(discoverResponse.restaurants.count) restaurants")
+        return discoverResponse
+    }
 }
 
 // MARK: - Response Models

@@ -442,12 +442,13 @@ async def submit_review(
         print(f"[SUBMIT REVIEW] Review created: {review.get('id')}")
 
         # 🆕 Trigger background task to update taste profile
-        background_tasks.add_task(
-            update_taste_profile_background,
-            user_id=user_id,
-            review_id=review['id']
-        )
-        print(f"[SUBMIT REVIEW] ✅ Taste profile update queued")
+        # TODO: Re-enable when update_profile_from_review method is implemented
+        # background_tasks.add_task(
+        #     update_taste_profile_background,
+        #     user_id=user_id,
+        #     review_id=review['id']
+        # )
+        # print(f"[SUBMIT REVIEW] ✅ Taste profile update queued")
 
         return review
 
@@ -954,6 +955,89 @@ async def search_restaurants(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Restaurant search failed: {str(e)}")
+
+
+@app.post("/api/restaurants/discover")
+async def discover_restaurants(
+    user_id: str = Depends(get_user_id_from_token),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    Discover personalized restaurant recommendations.
+    Returns 2 restaurants based on user's preferences and location.
+    
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        latitude: User's current latitude
+        longitude: User's current longitude
+        
+    Returns:
+        { "status": "success", "restaurants": [...], "reasoning": "..." }
+    
+    Example:
+        POST /api/restaurants/discover
+        Form data:
+            latitude=40.4406
+            longitude=-79.9959
+    """
+    try:
+        import time
+        start_time = time.time()
+        
+        print(f"\n{'='*80}")
+        print(f"[DISCOVER] 🌟 NEW DISCOVER REQUEST")
+        print(f"{'='*80}")
+        print(f"[DISCOVER] User: {user_id[:8]}...")
+        print(f"[DISCOVER] Location: ({latitude}, {longitude})")
+        print(f"[DISCOVER] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
+
+        # Get restaurant search service
+        search_service = get_restaurant_search_service()
+        
+        # Use a neutral discovery query to get personalized recommendations
+        query = "restaurants that match my taste profile perfectly"
+        
+        print(f"[DISCOVER] Using query: '{query}'")
+        
+        # Execute search
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        # Return only top 2 restaurants for discover
+        top_restaurants = results.get('top_restaurants', [])[:2]
+        
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(f"[DISCOVER] ✅ COMPLETED in {elapsed:.2f}s")
+        print(f"[DISCOVER] Returning {len(top_restaurants)} restaurants")
+        print(f"{'='*80}\n")
+        
+        return {
+            "status": "success",
+            "restaurants": top_restaurants,
+            "reasoning": results.get('reasoning', ''),
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[DISCOVER ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to generate recommendations: {str(e)}"
+        )
 
 
 @app.post("/api/restaurants/search-group")
