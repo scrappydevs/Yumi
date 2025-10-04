@@ -970,6 +970,30 @@ async def search_restaurants(
             longitude=longitude
         )
 
+        # Track the search for implicit signals learning
+        try:
+            print(f"\n[SEARCH TRACKING] 🔍 Tracking search query...")
+            print(f"[SEARCH TRACKING] Query: '{query}'")
+            print(f"[SEARCH TRACKING] User: {user_id[:8]}...")
+            print(
+                f"[SEARCH TRACKING] Results: {len(results.get('top_restaurants', []))} restaurants")
+
+            from services.implicit_signals_service import get_implicit_signals_service
+            signals_service = get_implicit_signals_service()
+            signals_service.track_search(
+                user_id=user_id,
+                query=query,
+                latitude=latitude,
+                longitude=longitude,
+                metadata={'result_count': len(
+                    results.get('top_restaurants', []))}
+            )
+            print(f"[SEARCH TRACKING] ✅ Search tracked successfully\n")
+        except Exception as track_error:
+            print(
+                f"[SEARCH TRACKING] ❌ Warning: Failed to track search: {track_error}")
+            # Don't fail the search if tracking fails
+
         elapsed = time.time() - start_time
         print(f"\n{'='*80}")
         print(
@@ -1045,6 +1069,35 @@ async def search_restaurants_group(
             longitude=longitude
         )
 
+        # Track the group search for implicit signals learning
+        try:
+            print(f"\n[SEARCH TRACKING] 🔍 Tracking GROUP search query...")
+            print(f"[SEARCH TRACKING] Query: '{query}'")
+            print(f"[SEARCH TRACKING] User: {user_id[:8]}...")
+            print(f"[SEARCH TRACKING] Group size: {len(all_user_ids)} people")
+            print(
+                f"[SEARCH TRACKING] Results: {len(results.get('top_restaurants', []))} restaurants")
+
+            from services.implicit_signals_service import get_implicit_signals_service
+            signals_service = get_implicit_signals_service()
+            signals_service.track_search(
+                user_id=user_id,
+                query=query,
+                latitude=latitude,
+                longitude=longitude,
+                metadata={
+                    'search_type': 'group',
+                    'group_size': len(all_user_ids),
+                    'friend_ids': friend_id_list,
+                    'result_count': len(results.get('top_restaurants', []))
+                }
+            )
+            print(f"[SEARCH TRACKING] ✅ Group search tracked successfully\n")
+        except Exception as track_error:
+            print(
+                f"[SEARCH TRACKING] ❌ Warning: Failed to track group search: {track_error}")
+            # Don't fail the search if tracking fails
+
         print(f"[GROUP SEARCH] ✅ Group search completed")
         return results
 
@@ -1094,8 +1147,19 @@ async def track_interaction(
         Success confirmation
     """
     try:
+        print(f"\n{'='*80}")
+        print(f"[TRACK INTERACTION] 🎯 NEW INTERACTION")
+        print(f"{'='*80}")
+        print(f"[TRACK INTERACTION] User: {user_id[:8]}...")
+        print(f"[TRACK INTERACTION] Type: {interaction_type}")
+        print(f"[TRACK INTERACTION] Restaurant: {restaurant_name or 'N/A'}")
+        print(f"[TRACK INTERACTION] Place ID: {place_id or 'N/A'}")
+        print(f"[TRACK INTERACTION] Cuisine: {cuisine or 'N/A'}")
+        print(f"[TRACK INTERACTION] Atmosphere: {atmosphere or 'N/A'}")
         print(
-            f"[TRACK INTERACTION] {interaction_type} from user: {user_id[:8]}...")
+            f"[TRACK INTERACTION] Location: ({latitude}, {longitude})" if latitude and longitude else "[TRACK INTERACTION] Location: N/A")
+        print(f"[TRACK INTERACTION] Address: {address or 'N/A'}")
+        print(f"{'='*80}")
 
         from services.implicit_signals_service import get_implicit_signals_service
         signals_service = get_implicit_signals_service()
@@ -1113,7 +1177,8 @@ async def track_interaction(
             longitude=longitude
         )
 
-        print(f"[TRACK INTERACTION] ✅ Tracked successfully")
+        print(f"[TRACK INTERACTION] ✅ Successfully tracked and saved to database")
+        print(f"{'='*80}\n")
         return {"status": "success", "message": "Interaction tracked"}
 
     except Exception as e:
