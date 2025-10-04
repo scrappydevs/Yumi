@@ -453,7 +453,7 @@ export default function FriendsPage() {
                   </div>
                 )}
               </motion.div>
-            ) : (
+            ) : activeTab === 'discover' ? (
               <motion.div
                 key="discover"
                 initial={{ opacity: 0, y: 10 }}
@@ -590,7 +590,7 @@ export default function FriendsPage() {
                   )}
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
 

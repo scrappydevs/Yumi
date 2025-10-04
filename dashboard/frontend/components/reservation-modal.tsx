@@ -100,7 +100,7 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
   const [dateTime, setDateTime] = useState('')
-  const [partySize, setPartySize] = useState(2)
+  const [partySize, setPartySize] = useState(1)
   const [invitees, setInvitees] = useState<Invitee[]>([])
   const [success, setSuccess] = useState(false)
   const [inviteMessage, setInviteMessage] = useState('')
@@ -287,10 +287,11 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     setLoading(true)
 
     try {
-      const inviteesFormatted = invitees.map(inv => ({
+      // Format invitees (only if party size > 1)
+      const inviteesFormatted = partySize > 1 ? invitees.map(inv => ({
         phone_e164: inv.phone.startsWith('+') ? inv.phone : `+${inv.phone}`,
         profile_id: inv.profileId || null
-      }))
+      })) : []
 
       const payload = {
         organizer_id: currentUser,
@@ -307,7 +308,18 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
 
       console.log('✅ Reservation created:', response)
 
-      // Store invite message for user to send
+      // For party size 1, just show success and close (no invites to send)
+      if (partySize === 1) {
+        setSuccess(true)
+        // Auto-close after a brief success message
+        setTimeout(() => {
+          onClose()
+          resetForm()
+        }, 1500)
+        return
+      }
+
+      // Store invite message for user to send (party size > 1)
       const invites = response.invites || []
       
       if (invites.length > 0) {
@@ -344,7 +356,7 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const resetForm = () => {
     setSelectedRestaurant('')
     setDateTime('')
-    setPartySize(2)
+    setPartySize(1)
     setInvitees([])
     setSuccess(false)
     setInviteMessage('')
@@ -526,53 +538,55 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 />
               </div>
 
-              {/* Invitees */}
-              <div>
-                <Label className="text-sm font-semibold text-black mb-2 block">Invitees</Label>
-                <div className="space-y-3">
-                  {invitees.map((invitee, index) => (
-                    <div key={`invitee-${index}-${invitee.phone || index}`} className="flex gap-2">
-                      <Input
-                        placeholder="+17149410453"
-                        value={invitee.phone}
-                        onChange={(e) => updateInvitee(index, 'phone', e.target.value)}
-                        required
-                        className="flex-1 glass-layer-1 border-0 text-black shadow-soft"
-                      />
-                      <select
-                        value={invitee.profileId || ''}
-                        onChange={(e) => updateInvitee(index, 'profileId', e.target.value)}
-                        className="flex-1 p-3 glass-layer-1 rounded-xl border-0 text-black shadow-soft"
-                      >
-                        <option value="">Select profile (optional)</option>
-                        {profiles.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.display_name} (@{p.username})
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeInvitee(index)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addInvitee}
+              {/* Invitees (only show if party size > 1) */}
+              {partySize > 1 && (
+                <div>
+                  <Label className="text-sm font-semibold text-black mb-2 block">Invitees</Label>
+                  <div className="space-y-3">
+                    {invitees.map((invitee, index) => (
+                      <div key={`invitee-${index}-${invitee.phone || index}`} className="flex gap-2">
+                        <Input
+                          placeholder="+17149410453"
+                          value={invitee.phone}
+                          onChange={(e) => updateInvitee(index, 'phone', e.target.value)}
+                          required
+                          className="flex-1 glass-layer-1 border-0 text-black shadow-soft"
+                        />
+                        <select
+                          value={invitee.profileId || ''}
+                          onChange={(e) => updateInvitee(index, 'profileId', e.target.value)}
+                          className="flex-1 p-3 glass-layer-1 rounded-xl border-0 text-black shadow-soft"
+                        >
+                          <option value="">Select profile (optional)</option>
+                          {profiles.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.display_name} (@{p.username})
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeInvitee(index)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addInvitee}
                   className="mt-3 w-full glass-layer-1 border-0 shadow-soft hover:shadow-md text-black"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Invitee
                 </Button>
-              </div>
+                </div>
+              )}
 
               {/* Submit */}
               <Button

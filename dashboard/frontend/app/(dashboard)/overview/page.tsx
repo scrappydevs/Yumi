@@ -185,6 +185,7 @@ export default function DiscoverPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [glowingIndices, setGlowingIndices] = useState<Set<number>>(new Set());
 
   // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
   const loadingPhrases = useMemo(() => [
@@ -335,6 +336,32 @@ export default function DiscoverPage() {
     }
     // No swapping animation during thinking - just let them spin!
   }, [isThinking, isNarrowing]);
+
+  // Random glow effect while thinking (but not during narrowing phase)
+  useEffect(() => {
+    if (!isThinking || isNarrowing) {
+      setGlowingIndices(new Set());
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const numImages = allNearbyImages.length;
+      if (numImages === 0) return;
+
+      // Randomly select 2-4 images to glow
+      const numToGlow = Math.floor(Math.random() * 3) + 2; // 2 to 4 images
+      const newGlowing = new Set<number>();
+      
+      while (newGlowing.size < Math.min(numToGlow, numImages)) {
+        const randomIndex = Math.floor(Math.random() * numImages);
+        newGlowing.add(randomIndex);
+      }
+      
+      setGlowingIndices(newGlowing);
+    }, 1500); // Change glowing images every 1.5 seconds
+
+    return () => clearInterval(interval);
+  }, [isThinking, isNarrowing, allNearbyImages.length]);
 
   // VAD recording now handled by useVADRecording hook above
 
@@ -1049,8 +1076,18 @@ export default function DiscoverPage() {
                       boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                       transformStyle: 'preserve-3d',
                     }}
-                    animate={{}}  // No wiggle animation - just smooth spinning
-                    transition={{}}
+                    animate={isThinking && glowingIndices.has(visibleIndex) ? {
+                      boxShadow: [
+                        'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                        `inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 0 40px 8px rgba(139, 92, 246, 0.6), 0 0 60px 12px rgba(59, 130, 246, 0.4)`,
+                        'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                      ],
+                    } : {}}
+                    transition={isThinking && glowingIndices.has(visibleIndex) ? {
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    } : {}}
                     whileHover={{ 
                       scale: 1.1,
                       zIndex: 50,

@@ -38,7 +38,7 @@ class SendReservationRequest(BaseModel):
     restaurant_id: str
     starts_at_iso: str
     party_size: int = Field(..., ge=1, le=50)
-    invitees: List[InviteeInput] = Field(..., min_items=1)
+    invitees: List[InviteeInput] = Field(default=[], min_items=0)
 
 
 class InviteLink(BaseModel):

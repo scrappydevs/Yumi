@@ -6,24 +6,19 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/supabase/client';
 import {
   Utensils,
   Compass,
   Users,
-  MessageCircle,
   User,
-  Settings,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
-  BookHeart,
-  Activity,
   MapPin,
   LogOut,
   Calendar,
+  Network,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -46,6 +41,7 @@ const navigation: NavigationItem[] = [
   { name: 'Reservations', icon: Calendar, href: '/reservations' },
   { name: 'Explore', icon: MapPin, href: '/spatial' },
   { name: 'Friends', icon: Users, href: '/friends' },
+  { name: 'Social Network', icon: Network, href: '/social-network' },
 ];
 
 const secondaryNav: NavigationItem[] = [
@@ -69,18 +65,31 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
   return (
     <aside
       className={cn(
-        'relative h-screen transition-all duration-300 ease-in-out flex flex-col glass-layer-1 border-r border-white/20 overflow-hidden z-[1000]',
+        'relative h-screen transition-all duration-300 ease-in-out flex flex-col z-[1000]',
         isCollapsed ? 'w-[60px]' : 'w-[240px]'
       )}
       style={{
         width: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED,
+        borderRadius: 0,
+        background: 'rgba(248, 250, 252, 0.25)',
+        backdropFilter: 'blur(40px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+        border: '0.25px solid rgba(148, 163, 184, 0.15)',
+        boxShadow: 'inset 0 0 40px -10px rgba(155, 135, 245, 0.1), 0 8px 32px rgba(71, 85, 105, 0.08)',
       }}
     >
-      {/* Specular highlight */}
-      <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+      {/* Specular highlight - softer purple/blue tint */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none"
+        style={{
+          background: 'linear-gradient(180deg, rgba(155, 135, 245, 0.08) 0%, transparent 100%)',
+        }}
+      />
       
       {/* Header */}
-      <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-center px-4">
+      <div className="relative h-16 flex items-center justify-center px-4" style={{
+        borderBottom: '0.5px solid rgba(148, 163, 184, 0.15)',
+      }}>
         <div className="flex items-center justify-center">
           <Utensils className="w-7 h-7" style={{
             background: 'linear-gradient(135deg, #9B87F5 0%, #7B61FF 100%)',
@@ -98,14 +107,18 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
             variant="ghost"
             size="sm"
             onClick={onToggle}
-            className={cn(
-              'absolute -right-3 top-1/2 -translate-y-1/2 z-[9999] h-6 w-6 rounded-sm border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-0 opacity-60 hover:opacity-100 hover:bg-[hsl(var(--muted))] transition-opacity duration-200'
-            )}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 z-[9999] h-6 w-6 rounded-full p-0 opacity-80 hover:opacity-100 transition-all duration-200 overflow-hidden"
+            style={{
+              backdropFilter: 'blur(24px) saturate(180%)',
+              background: 'rgba(248, 250, 252, 0.2)',
+              border: '0.25px solid rgba(148, 163, 184, 0.2)',
+              boxShadow: 'inset 0 0 20px -6px rgba(155, 135, 245, 0.15), 0 4px 12px rgba(71, 85, 105, 0.12)',
+            }}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight className="h-3 w-3 text-gray-700" />
             ) : (
-              <ChevronLeft className="h-3 w-3" />
+              <ChevronLeft className="h-3 w-3 text-gray-700" />
             )}
           </Button>
         </TooltipTrigger>
@@ -119,7 +132,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       </Tooltip>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto relative z-10">
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = mounted && pathname === item.href;
@@ -128,19 +141,24 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
               key={item.name}
               href={item.href}
               className={cn(
-                'group flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm font-medium transition-all hover:bg-[hsl(var(--muted))]',
+                'group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all relative overflow-hidden',
                 isActive
-                  ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
-                  : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]',
+                  ? 'text-[hsl(var(--primary))]'
+                  : 'text-slate-700 hover:text-slate-900',
                 isCollapsed && 'justify-center'
               )}
+              style={isActive ? {
+                backdropFilter: 'blur(24px) saturate(180%)',
+                background: 'rgba(155, 135, 245, 0.15)',
+                boxShadow: 'inset 0 0 24px -6px rgba(155, 135, 245, 0.2), 0 4px 12px rgba(155, 135, 245, 0.15)',
+              } : {}}
             >
-              <Icon className="h-4 w-4 flex-shrink-0" />
+              <Icon className="h-4 w-4 flex-shrink-0 relative z-10" />
               {!isCollapsed && (
                 <>
-                  <span className="flex-1">{item.name}</span>
+                  <span className="flex-1 relative z-10">{item.name}</span>
                   {item.badge && (
-                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-sm bg-[hsl(var(--danger))] px-1.5 text-xs font-semibold text-white">
+                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white relative z-10">
                       {item.badge}
                     </span>
                   )}
@@ -150,7 +168,9 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
           );
         })}
 
-        <Separator className="my-2 bg-[hsl(var(--border))]" />
+        <div className="my-2 h-[0.5px]" style={{
+          background: 'rgba(148, 163, 184, 0.15)',
+        }} />
 
         {secondaryNav.map((item) => {
           const Icon = item.icon;
@@ -160,30 +180,53 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
               key={item.name}
               href={item.href}
               className={cn(
-                'group flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm font-medium transition-all hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]',
+                'group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all relative overflow-hidden',
                 isActive
-                  ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
-                  : 'text-[hsl(var(--muted-foreground))]',
+                  ? 'text-[hsl(var(--primary))]'
+                  : 'text-slate-700 hover:text-slate-900',
                 isCollapsed && 'justify-center'
               )}
+              style={isActive ? {
+                backdropFilter: 'blur(24px) saturate(180%)',
+                background: 'rgba(155, 135, 245, 0.15)',
+                boxShadow: 'inset 0 0 24px -6px rgba(155, 135, 245, 0.2), 0 4px 12px rgba(155, 135, 245, 0.15)',
+              } : {}}
             >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {!isCollapsed && <span className="flex-1">{item.name}</span>}
+              <Icon className="h-4 w-4 flex-shrink-0 relative z-10" />
+              {!isCollapsed && <span className="flex-1 relative z-10">{item.name}</span>}
             </Link>
           );
         })}
       </nav>
 
       {/* Footer - Logout Button */}
-      <div className="relative z-50 border-t border-[hsl(var(--border))] p-2.5 bg-white/80 backdrop-blur-sm">
+      <div 
+        className="relative z-50 p-2.5"
+        style={{
+          borderTop: '0.5px solid rgba(148, 163, 184, 0.15)',
+          background: 'rgba(248, 250, 252, 0.15)',
+          backdropFilter: 'blur(30px) saturate(180%)',
+        }}
+      >
         <Button
           variant="ghost"
           size="sm"
           onClick={handleLogout}
           className={cn(
-            'w-full text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10 hover:text-[hsl(var(--destructive))]',
+            'w-full text-red-600 hover:text-red-700 rounded-xl transition-all relative overflow-hidden',
             isCollapsed ? 'justify-center px-0' : 'justify-start gap-2'
           )}
+          style={{
+            backdropFilter: 'blur(16px) saturate(160%)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+            e.currentTarget.style.boxShadow = 'inset 0 0 20px -4px rgba(239, 68, 68, 0.15), 0 4px 12px rgba(239, 68, 68, 0.12)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '';
+            e.currentTarget.style.boxShadow = '';
+          }}
         >
           <LogOut className="h-4 w-4 flex-shrink-0" />
           {!isCollapsed && <span className="text-sm font-medium">Logout</span>}
