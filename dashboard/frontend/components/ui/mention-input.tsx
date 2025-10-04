@@ -12,6 +12,7 @@ interface MentionInputProps {
   onMentionsChange: (mentions: Mention[]) => void;
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function MentionInput({
@@ -20,6 +21,7 @@ export function MentionInput({
   onMentionsChange,
   placeholder = 'Type @ to mention friends...',
   className = '',
+  disabled = false,
 }: MentionInputProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -230,7 +232,8 @@ export function MentionInput({
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className={`flex-1 w-full ${className}`}
+        disabled={disabled}
+        className={`flex-1 w-full ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
       />
 
       {/* Mention Dropdown - Slack Style */}

@@ -210,6 +210,13 @@ export default function DiscoverPage() {
   // Derived state: is this a group search?
   const isGroupSearch = mentions.length > 0;
 
+  // Sync volume with audio output
+  useEffect(() => {
+    if (setAudioVolume) {
+      setAudioVolume(volume);
+    }
+  }, [volume, setAudioVolume]);
+
   useEffect(() => {
     setMounted(true);
     
@@ -303,81 +310,14 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
-  // Simple thinking animation - fade out images completely and replace with new ones
+  // During thinking - just keep images spinning in a constant circle (no swapping)
   useEffect(() => {
-    if (!isThinking || isNarrowing || allNearbyImages.length === 0 || visibleImageIds.length === 0) {
+    // Clear any fade animations when thinking starts/stops
+    if (!isThinking || isNarrowing) {
       setAbsorbedIndices([]);
-      return;
     }
-    
-    const cycleAnimation = () => {
-      const numImages = allNearbyImages.length;
-      const numVisible = visibleImageIds.length;
-      if (numImages === 0 || numVisible === 0) return;
-      
-      // Pick 2-3 random VISIBLE images to fade out and replace
-      const numToSwap = Math.floor(Math.random() * 2) + 2; // 2 or 3 images
-      const visibleIndicesToSwap: number[] = [];
-      
-      while (visibleIndicesToSwap.length < Math.min(numToSwap, numVisible)) {
-        const randomVisibleIdx = Math.floor(Math.random() * numVisible);
-        if (!visibleIndicesToSwap.includes(randomVisibleIdx)) {
-          visibleIndicesToSwap.push(randomVisibleIdx);
-        }
-      }
-      
-      // Convert to original image indices for fade tracking
-      const originalIndices = visibleIndicesToSwap.map(visIdx => {
-        const imageId = visibleImageIds[visIdx];
-        return allNearbyImages.findIndex(img => img.id === imageId);
-      });
-      
-      // Start fade out
-      setAbsorbedIndices(originalIndices);
-      
-      // After halfway through fade (when opacity hits 0), swap the images
-      setTimeout(() => {
-        // Get all available image IDs that aren't currently visible
-        const availableIds = allNearbyImages
-          .map(img => img.id)
-          .filter(id => !visibleImageIds.includes(id));
-        
-        if (availableIds.length === 0) {
-          // If no images available to swap, just fade back in
-          setAbsorbedIndices([]);
-          return;
-        }
-        
-        // Create new visible array with swapped images
-        const newVisibleIds = [...visibleImageIds];
-        visibleIndicesToSwap.forEach(visIdx => {
-          // Pick a random image from available pool
-          const randomAvailableIdx = Math.floor(Math.random() * availableIds.length);
-          const newImageId = availableIds[randomAvailableIdx];
-          
-          // Swap the image
-          newVisibleIds[visIdx] = newImageId;
-          
-          // Remove from available pool so we don't pick it again
-          availableIds.splice(randomAvailableIdx, 1);
-        });
-        
-        // Update visible images
-        setVisibleImageIds(newVisibleIds);
-        
-        // Clear fade indices to fade in the new images
-        setAbsorbedIndices([]);
-      }, 300); // Halfway through the 600ms fade
-    };
-    
-    // Initial cycle
-    cycleAnimation();
-    
-    // Repeat cycle every 1.5 seconds
-    const flowInterval = setInterval(cycleAnimation, 1500);
-
-    return () => clearInterval(flowInterval);
-  }, [isThinking, isNarrowing, allNearbyImages, visibleImageIds]);
+    // No swapping animation during thinking - just let them spin!
+  }, [isThinking, isNarrowing]);
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -498,7 +438,7 @@ export default function DiscoverPage() {
         
         // Wait for step 2 speech to complete before continuing
         await new Promise(resolve => setTimeout(resolve, 800));
-
+        
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
         console.log(`   Query: "${searchQuery}"`);
@@ -748,13 +688,12 @@ export default function DiscoverPage() {
             id: r.place_id || `restaurant-${r.name}`
           }));
         
-        // Speak result if not muted
-        if (!isMuted) {
-          const count = data.top_restaurants?.length || data.restaurants?.length || 0;
-          const resultPhrase = isGroupSearch
-            ? `Found ${count} great options for your group`
-            : `Found ${count} great options for you`;
-          await speak(resultPhrase, volume);
+        // Set all nearby images and visible images
+        if (images.length > 0) {
+          console.log(`🖼️ Displaying ${images.length} restaurant images`);
+          setAllNearbyImages(images);
+          setVisibleImageIds(images.map((img: {id: string}) => img.id));
+          setLastLoadedLocation(location); // Mark this location as loaded
         }
         
         // Don't show results panel for default view
@@ -764,12 +703,8 @@ export default function DiscoverPage() {
       console.log('✅ Nearby restaurants loaded successfully');
       
     } catch (error) {
-      console.error('Search error:', error);
-      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
-      
-      if (!isMuted) {
-        await speak('Sorry, something went wrong', volume);
-      }
+      console.error('Error loading default recommendations:', error);
+      // Fail silently - not critical to page load
     } finally {
       setIsLoadingDefaults(false);
     }
@@ -818,22 +753,22 @@ export default function DiscoverPage() {
         </motion.button>
 
         <div className="flex items-center gap-2">
-          <motion.button
-            onClick={() => {
-              setIsMuted(!isMuted);
-              if (!isMuted && isSpeaking) stop();
-            }}
-            className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-            {isMuted ? (
-              <VolumeX className="w-5 h-5 text-red-500" />
-            ) : (
-              <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
-            )}
-          </motion.button>
+        <motion.button
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (!isMuted && isSpeaking) stop();
+          }}
+          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          {isMuted ? (
+            <VolumeX className="w-5 h-5 text-red-500" />
+          ) : (
+            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+          )}
+        </motion.button>
 
           {!isMuted && (
             <motion.div
@@ -1116,7 +1051,7 @@ export default function DiscoverPage() {
                   transition={{
                     left: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
                     top: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
-                    opacity: { duration: 0.3, ease: 'easeInOut' },  // Fast fade in/out
+                    opacity: { duration: 0.4, ease: 'easeInOut' },  // Smooth fade in/out
                     scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
                     delay: visibleIndex * 0.03,  // Stagger initial load
                   }}
@@ -1135,16 +1070,8 @@ export default function DiscoverPage() {
                       boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                       transformStyle: 'preserve-3d',
                     }}
-                    animate={isThinking && !isFadingOut ? { 
-                      scale: [1, 0.97, 1.02, 0.98, 1],
-                      rotateY: [0, -4, 4, -2, 0],
-                      rotateX: [0, 2, -2, 1, 0],
-                    } : {}}
-                    transition={isThinking && !isFadingOut ? {
-                      duration: 2.5 + visibleIndex * 0.3,
-                      repeat: Infinity,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    } : {}}
+                    animate={{}}  // No wiggle animation - just smooth spinning
+                    transition={{}}
                     whileHover={{ 
                       scale: 1.1,
                       zIndex: 50,
@@ -1363,7 +1290,8 @@ export default function DiscoverPage() {
               value={prompt}
               onChange={setPrompt}
               onMentionsChange={(newMentions) => setMentions(newMentions)}
-              placeholder="Where should we eat? (Type @ to mention friends)"
+              placeholder={isThinking ? "AI is thinking..." : "Where should we eat? (Type @ to mention friends)"}
+              disabled={isThinking}
               className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
             />
             
