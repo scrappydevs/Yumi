@@ -38,13 +38,19 @@ class SendReservationRequest(BaseModel):
     restaurant_id: str
     starts_at_iso: str
     party_size: int = Field(..., ge=1, le=50)
-    invitees: List[InviteeInput] = Field(..., min_items=1)
+    invitees: List[InviteeInput] = Field(default=[], min_items=0)
 
+
+class InviteLink(BaseModel):
+    inviteId: str
+    phoneE164: str
+    text: str
+    url: str
 
 class SendReservationResponse(BaseModel):
     ok: bool
-    reservation_id: str
-    invites_sent: int
+    reservationId: str
+    invites: list[InviteLink]
 
 
 class ConfirmReservationRequest(BaseModel):
@@ -76,15 +82,20 @@ async def send_reservation(request: SendReservationRequest):
     """
     try:
         supabase = get_supabase()
-        app_base_url = os.getenv("APP_BASE_URL")
+        # Use FRONTEND_URL for invite links (falls back to APP_BASE_URL for backwards compatibility)
+        app_base_url = os.getenv("FRONTEND_URL") or os.getenv("APP_BASE_URL")
         
         if not app_base_url:
-            raise HTTPException(status_code=500, detail="APP_BASE_URL not configured")
+            raise HTTPException(status_code=500, detail="FRONTEND_URL not configured")
         
-        # Validate organizer exists
-        organizer_result = supabase.table("profiles").select("id").eq("id", request.organizer_id).limit(1).execute()
+        # Validate organizer exists and has phone number
+        organizer_result = supabase.table("profiles").select("id, phone").eq("id", request.organizer_id).limit(1).execute()
         if not organizer_result.data:
             raise HTTPException(status_code=404, detail="Organizer not found")
+        
+        organizer = organizer_result.data[0]
+        if not organizer.get("phone"):
+            raise HTTPException(status_code=400, detail="Phone number required. Please update your profile with a phone number to create reservations.")
         
         # Validate restaurant exists
         print(f"🔍 Looking for restaurant with ID: {request.restaurant_id}")
@@ -140,36 +151,44 @@ async def send_reservation(request: SendReservationRequest):
                 "rsvpStatus": "pending"
             })
         
-        supabase.table("reservation_invites").insert(invites_data).execute()
+        invites_result = supabase.table("reservation_invites").insert(invites_data).execute()
+        inserted_invites = invites_result.data if invites_result.data else []
         
-        # Send SMS to each invitee
-        status_callback_url = f"{app_base_url}/api/twilio/status"
-        time_str = format_time_for_sms(starts_at)
-        sent_count = 0
+        # Generate iMessage invites (no SMS sending)
+        invite_links = []
         
-        for invitee in request.invitees:
-            try:
-                # Generate confirm token (15 min expiry)
-                token = sign_action_token(reservation_id, request.organizer_id, "confirm", 900)
-                confirm_url = f"{app_base_url}/r/confirm?token={token}"
-                
-                message_body = reservation_hold(restaurant_name, time_str, confirm_url)
-                
-                result = TwilioService.send_sms(
-                    to=invitee.phone_e164,
-                    body=message_body,
-                    status_callback=status_callback_url
-                )
-                
-                sent_count += 1
-            except Exception as e:
-                print(f"Failed to send SMS to {invitee.phone_e164}: {e}")
+        # Format time for display
+        time_str = starts_at.strftime("%A, %B %d at %I:%M %p")
         
-        return SendReservationResponse(
-            ok=True,
-            reservation_id=reservation_id,
-            invites_sent=sent_count
-        )
+        for inserted_invite in inserted_invites:
+            invite_id = inserted_invite["id"]
+            phone = inserted_invite["inviteePhoneE164"]
+            
+            # Generate invite token (1 hour expiry)
+            token = sign_action_token(
+                resv_id=reservation_id,
+                action="invite_accept",
+                invite_id=invite_id,
+                ttl_seconds=3600
+            )
+            
+            invite_url = f"{app_base_url}/r/invite?token={token}"
+            
+            # Build iMessage text
+            message_text = f"🍽️ Join me at {restaurant_name} on {time_str}! Tap to accept: {invite_url}"
+            
+            invite_links.append({
+                "inviteId": invite_id,
+                "phoneE164": phone,
+                "text": message_text,
+                "url": invite_url
+            })
+        
+        return {
+            "ok": True,
+            "reservationId": reservation_id,
+            "invites": invite_links
+        }
     
     except HTTPException:
         raise
@@ -312,6 +331,101 @@ async def owner_cancel_reservation(request: CancelReservationRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/user/{user_id}")
+async def get_user_reservations(user_id: str, status: str = None):
+    """
+    Get all reservations for a user (as organizer or invitee)
+    """
+    try:
+        supabase = get_supabase()
+        
+        # Get reservations where user is organizer
+        organizer_query = supabase.table("reservations")\
+            .select("*, reservation_invites(*)")\
+            .eq("organizerId", user_id)\
+            .order("startsAt", desc=False)
+        
+        if status:
+            organizer_query = organizer_query.eq("status", status)
+        
+        organizer_reservations = organizer_query.execute()
+        
+        # Get reservations where user is invitee
+        invitee_reservations_result = supabase.table("reservation_invites")\
+            .select("*, reservations(*)")\
+            .eq("inviteeProfileId", user_id)\
+            .execute()
+        
+        # Combine and format
+        all_reservations = []
+        
+        # Add organizer reservations
+        for resv in organizer_reservations.data:
+            restaurant = supabase.table("restaurants").select("name, formatted_address").eq("id", resv["restaurantId"]).limit(1).execute()
+            restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
+            restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
+            
+            # Get invitee details
+            invites = resv.get("reservation_invites", [])
+            invitee_list = []
+            for inv in invites:
+                invitee_info = {"phone": inv["inviteePhoneE164"], "status": inv["rsvpStatus"]}
+                # Try to get profile info if linked
+                if inv.get("inviteeProfileId"):
+                    profile = supabase.table("profiles").select("display_name, username").eq("id", inv["inviteeProfileId"]).limit(1).execute()
+                    if profile.data:
+                        invitee_info["name"] = profile.data[0].get("display_name") or profile.data[0].get("username")
+                invitee_list.append(invitee_info)
+            
+            all_reservations.append({
+                "id": resv["id"],
+                "organizer_id": resv["organizerId"],
+                "restaurant_id": resv["restaurantId"],
+                "restaurant_name": restaurant_name,
+                "restaurant_address": restaurant_address,
+                "starts_at": resv["startsAt"],
+                "party_size": resv["partySize"],
+                "status": resv["status"],
+                "created_at": resv["createdAt"],
+                "is_organizer": True,
+                "invite_count": len(invites),
+                "invitees": invitee_list
+            })
+        
+        # Add invitee reservations
+        for invite in invitee_reservations_result.data:
+            resv = invite["reservations"]
+            if status and resv["status"] != status:
+                continue
+                
+            restaurant = supabase.table("restaurants").select("name, formatted_address").eq("id", resv["restaurantId"]).limit(1).execute()
+            restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
+            restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
+            
+            all_reservations.append({
+                "id": resv["id"],
+                "organizer_id": resv["organizerId"],
+                "restaurant_id": resv["restaurantId"],
+                "restaurant_name": restaurant_name,
+                "restaurant_address": restaurant_address,
+                "starts_at": resv["startsAt"],
+                "party_size": resv["partySize"],
+                "status": resv["status"],
+                "created_at": resv["createdAt"],
+                "is_organizer": False,
+                "rsvp_status": invite["rsvpStatus"]
+            })
+        
+        # Sort by start time
+        all_reservations.sort(key=lambda x: x["starts_at"])
+        
+        return {"reservations": all_reservations}
+    
+    except Exception as e:
+        print(f"Error fetching user reservations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{reservation_id}")
 async def get_reservation(reservation_id: str):
     """
@@ -328,9 +442,35 @@ async def get_reservation(reservation_id: str):
         resv = reservation.data[0]
         
         # Get restaurant details
-        restaurant = supabase.table("restaurants").select("name, formatted_address").eq("id", resv["restaurantId"]).limit(1).execute()
-        restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
-        restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
+        restaurant = supabase.table("restaurants").select("name, formatted_address, phone_number, website, google_maps_url, rating_avg, user_ratings_total, price_level, description").eq("id", resv["restaurantId"]).limit(1).execute()
+        restaurant_data = restaurant.data[0] if restaurant.data else None
+        restaurant_name = restaurant_data.get("name") if restaurant_data else "Unknown Restaurant"
+        restaurant_address = restaurant_data.get("formatted_address") if restaurant_data else None
+        
+        # Get restaurant images
+        restaurant_images = []
+        if restaurant_data:
+            images = supabase.table("images").select("id, image_url, description, dish").eq("restaurant_id", resv["restaurantId"]).limit(10).execute()
+            if images.data:
+                restaurant_images = [{"id": img["id"], "url": img["image_url"], "description": img.get("description"), "dish": img.get("dish")} for img in images.data]
+        
+        # Enrich invites with profile names
+        invites = resv.get("reservation_invites", [])
+        enriched_invites = []
+        for inv in invites:
+            invite_data = {
+                "id": inv["id"],
+                "inviteePhoneE164": inv["inviteePhoneE164"],
+                "rsvpStatus": inv["rsvpStatus"],
+                "respondedAt": inv.get("respondedAt"),
+                "inviteeName": None
+            }
+            # Try to get profile info if linked
+            if inv.get("inviteeProfileId"):
+                profile = supabase.table("profiles").select("display_name, username").eq("id", inv["inviteeProfileId"]).limit(1).execute()
+                if profile.data:
+                    invite_data["inviteeName"] = profile.data[0].get("display_name") or profile.data[0].get("username")
+            enriched_invites.append(invite_data)
         
         return {
             "id": resv["id"],
@@ -338,11 +478,23 @@ async def get_reservation(reservation_id: str):
             "restaurant_id": resv["restaurantId"],
             "restaurant_name": restaurant_name,
             "restaurant_address": restaurant_address,
+            "restaurant": {
+                "name": restaurant_name,
+                "address": restaurant_address,
+                "phone": restaurant_data.get("phone_number") if restaurant_data else None,
+                "website": restaurant_data.get("website") if restaurant_data else None,
+                "google_maps_url": restaurant_data.get("google_maps_url") if restaurant_data else None,
+                "rating": restaurant_data.get("rating_avg") if restaurant_data else None,
+                "user_ratings_total": restaurant_data.get("user_ratings_total") if restaurant_data else None,
+                "price_level": restaurant_data.get("price_level") if restaurant_data else None,
+                "description": restaurant_data.get("description") if restaurant_data else None,
+                "images": restaurant_images
+            },
             "starts_at": resv["startsAt"],
             "party_size": resv["partySize"],
             "status": resv["status"],
             "created_at": resv["createdAt"],
-            "invites": resv.get("reservation_invites", []),
+            "invites": enriched_invites,
             "has_calendar_event": resv["status"] == "confirmed"  # Show calendar if confirmed
         }
     
@@ -405,5 +557,42 @@ async def download_ics(reservation_id: str):
         raise
     except Exception as e:
         print(f"Error generating ICS file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{reservation_id}")
+async def delete_reservation(reservation_id: str):
+    """
+    Delete/cancel a reservation (organizer only)
+    """
+    try:
+        supabase = get_supabase()
+        
+        # First check if reservation exists and get organizer info
+        reservation_result = supabase.table("reservations").select("*").eq("id", reservation_id).single().execute()
+        
+        if not reservation_result.data:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        
+        reservation = reservation_result.data
+        
+        # Delete the reservation (cascade will delete related invites)
+        delete_result = supabase.table("reservations").delete().eq("id", reservation_id).execute()
+        
+        if not delete_result.data:
+            raise HTTPException(status_code=500, detail="Failed to delete reservation")
+        
+        print(f"✅ Deleted reservation {reservation_id}")
+        
+        return {
+            "success": True,
+            "message": "Reservation deleted successfully",
+            "reservation_id": reservation_id
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting reservation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

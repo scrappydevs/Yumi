@@ -52,6 +52,16 @@ interface RestaurantMapProps {
   className?: string;
 }
 
+interface PreloadedRestaurant {
+  place_id: string;
+  name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  match_score?: number;
+}
+
 export function RestaurantMapClean({ className }: RestaurantMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -67,6 +77,42 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showHours, setShowHours] = useState(false);
   const markersRef = useRef<any[]>([]);
+  const [preloadedRestaurants, setPreloadedRestaurants] = useState<PreloadedRestaurant[]>([]);
+  const [averageDistances, setAverageDistances] = useState<{ walking: string; driving: string } | null>(null);
+
+  // Load preloaded restaurants from sessionStorage (if redirected from overview)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('view') === 'results') {
+      const restaurantsData = sessionStorage.getItem('selectedRestaurants');
+      const userLocationData = sessionStorage.getItem('userLocation');
+      
+      if (restaurantsData) {
+        try {
+          const restaurants = JSON.parse(restaurantsData);
+          console.log('📍 Loaded preselected restaurants:', restaurants);
+          setPreloadedRestaurants(restaurants);
+          
+          // Clear sessionStorage after loading
+          sessionStorage.removeItem('selectedRestaurants');
+        } catch (error) {
+          console.error('Error parsing restaurant data:', error);
+        }
+      }
+      
+      if (userLocationData) {
+        try {
+          const location = JSON.parse(userLocationData);
+          setUserLocation(location);
+          sessionStorage.removeItem('userLocation');
+        } catch (error) {
+          console.error('Error parsing user location:', error);
+        }
+      }
+    }
+  }, []);
 
   // Load Google Maps API using singleton loader
   useEffect(() => {
@@ -77,11 +123,11 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
     loadGoogleMaps()
       .then(() => {
-        console.log('Google Maps loaded successfully via singleton');
+        console.log('✅ Google Maps loaded in RestaurantMap');
         setApiLoaded(true);
       })
       .catch((error) => {
-        console.error('Error loading Google Maps:', error);
+        console.error('❌ Error loading Google Maps in RestaurantMap:', error);
       });
   }, []);
 
@@ -174,6 +220,199 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     }
 
   }, [apiLoaded, map]);
+
+  // Calculate distances from user location to all restaurants
+  const calculateAverageDistances = useCallback((restaurants: PreloadedRestaurant[], userLoc: { lat: number; lng: number }) => {
+    if (!window.google || restaurants.length === 0) return;
+
+    const distanceService = new window.google.maps.DistanceMatrixService();
+    const destinations = restaurants
+      .filter(r => r.latitude && r.longitude)
+      .map(r => new window.google.maps.LatLng(r.latitude!, r.longitude!));
+
+    if (destinations.length === 0) return;
+
+    // Calculate walking distances
+    distanceService.getDistanceMatrix(
+      {
+        origins: [new window.google.maps.LatLng(userLoc.lat, userLoc.lng)],
+        destinations,
+        travelMode: window.google.maps.TravelMode.WALKING,
+        unitSystem: window.google.maps.UnitSystem.IMPERIAL,
+      },
+      (response, status) => {
+        if (status === 'OK' && response) {
+          const walkingDistances = response.rows[0].elements
+            .filter(e => e.status === 'OK')
+            .map(e => e.distance.value); // meters
+
+          const avgWalkingMeters = walkingDistances.reduce((a, b) => a + b, 0) / walkingDistances.length;
+          const avgWalkingMiles = (avgWalkingMeters * 0.000621371).toFixed(1);
+
+          // Calculate driving distances
+          distanceService.getDistanceMatrix(
+            {
+              origins: [new window.google.maps.LatLng(userLoc.lat, userLoc.lng)],
+              destinations,
+              travelMode: window.google.maps.TravelMode.DRIVING,
+              unitSystem: window.google.maps.UnitSystem.IMPERIAL,
+            },
+            (response2, status2) => {
+              if (status2 === 'OK' && response2) {
+                const drivingDistances = response2.rows[0].elements
+                  .filter(e => e.status === 'OK')
+                  .map(e => e.distance.value);
+
+                const avgDrivingMeters = drivingDistances.reduce((a, b) => a + b, 0) / drivingDistances.length;
+                const avgDrivingMiles = (avgDrivingMeters * 0.000621371).toFixed(1);
+
+                setAverageDistances({
+                  walking: `${avgWalkingMiles} mi`,
+                  driving: `${avgDrivingMiles} mi`
+                });
+              }
+            }
+          );
+        }
+      }
+    );
+  }, []);
+
+  // Display preloaded restaurants on map
+  useEffect(() => {
+    if (!map || !placesService || preloadedRestaurants.length === 0) return;
+
+    console.log('🗺️ Displaying preloaded restaurants on map');
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    const bounds = new window.google.maps.LatLngBounds();
+    const displayedRestaurants: PlaceResult[] = [];
+
+    // Add user location to bounds if available
+    if (userLocation) {
+      bounds.extend(userLocation);
+      
+      // Calculate average distances
+      calculateAverageDistances(preloadedRestaurants, userLocation);
+    }
+
+    // Fetch details and add markers for each preloaded restaurant
+    preloadedRestaurants.forEach((restaurant, index) => {
+      // If we have coordinates, use them directly
+      if (restaurant.latitude && restaurant.longitude) {
+        const position = { lat: restaurant.latitude, lng: restaurant.longitude };
+        
+        // Create numbered marker
+        const marker = new window.google.maps.Marker({
+          position,
+          map,
+          label: {
+            text: `${index + 1}`,
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: 'bold',
+          },
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 18,
+            fillColor: '#7C3AED', // Purple
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 3,
+          },
+          title: restaurant.name,
+          animation: window.google.maps.Animation.DROP,
+        });
+
+        markersRef.current.push(marker);
+        bounds.extend(position);
+
+        // Create a PlaceResult object for display
+        const placeResult: PlaceResult = {
+          place_id: restaurant.place_id,
+          name: restaurant.name,
+          formatted_address: restaurant.address || '',
+          geometry: {
+            location: new window.google.maps.LatLng(position.lat, position.lng)
+          },
+          rating: restaurant.rating,
+        };
+        displayedRestaurants.push(placeResult);
+
+        // Add click listener
+        marker.addListener('click', () => {
+          handleSelectPlace(placeResult);
+        });
+      } else {
+        // Fetch place details using place_id
+        placesService.getDetails(
+          { placeId: restaurant.place_id, fields: ['name', 'formatted_address', 'geometry', 'rating', 'photos', 'types', 'opening_hours'] },
+          (place, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+              const position = {
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng()
+              };
+
+              // Create numbered marker
+              const marker = new window.google.maps.Marker({
+                position,
+                map,
+                label: {
+                  text: `${index + 1}`,
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                },
+                icon: {
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 18,
+                  fillColor: '#7C3AED', // Purple
+                  fillOpacity: 1,
+                  strokeColor: '#ffffff',
+                  strokeWeight: 3,
+                },
+                title: place.name,
+                animation: window.google.maps.Animation.DROP,
+              });
+
+              markersRef.current.push(marker);
+              bounds.extend(position);
+
+              const placeResult: PlaceResult = {
+                place_id: restaurant.place_id,
+                name: place.name || restaurant.name,
+                formatted_address: place.formatted_address || '',
+                geometry: { location: place.geometry.location },
+                rating: place.rating || restaurant.rating,
+                photos: place.photos,
+                types: place.types,
+                opening_hours: place.opening_hours,
+              };
+              displayedRestaurants.push(placeResult);
+
+              // Add click listener
+              marker.addListener('click', () => {
+                handleSelectPlace(placeResult);
+              });
+            }
+          }
+        );
+      }
+    });
+
+    // Fit map to show all markers
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, 50);
+    }
+
+    // Update visible results
+    setSearchResults(displayedRestaurants);
+    setVisibleResults(displayedRestaurants);
+  }, [map, placesService, preloadedRestaurants, userLocation, calculateAverageDistances]);
 
   // Get place details - Define BEFORE updateVisibleResults uses it
   // Optimized with fewer fields to reduce API quota usage and latency
@@ -450,7 +689,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         <div className="h-[calc(100vh-80px)] flex items-center justify-center bg-white">
           <div className="text-center">
             <motion.div 
-              className="w-12 h-12 rounded-full gradient-purple-blue mx-auto mb-4"
+              className="w-12 h-12 rounded-full bg-purple-600 mx-auto mb-4"
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 1.5, repeat: Infinity }}
             />
@@ -469,9 +708,44 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           <div ref={mapRef} className="absolute inset-0" />
         </div>
 
-        {/* Quick Search - Top Left */}
-        <div className="absolute top-4 left-4 z-20 w-32">
-          <div className="glass-layer-1 rounded-2xl shadow-soft p-3 relative overflow-hidden">
+        {/* Average Distance Info - Top Left */}
+        <AnimatePresence>
+          {averageDistances && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-4 left-4 z-20 w-48"
+            >
+              <div className="bg-white rounded-2xl shadow-lg p-4 relative overflow-hidden border border-gray-200">
+                <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
+                <div className="relative">
+                  <h3 className="text-xs font-bold text-gray-900 mb-3">Avg Distance to All</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🚶</span>
+                        <span className="text-xs text-gray-600">Walk</span>
+                      </div>
+                      <span className="text-sm font-semibold text-purple-600">{averageDistances.walking}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🚗</span>
+                        <span className="text-xs text-gray-600">Drive</span>
+                      </div>
+                      <span className="text-sm font-semibold text-purple-600">{averageDistances.driving}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Quick Search - Top Left (below distance info) */}
+        <div className={`absolute ${averageDistances ? 'top-32' : 'top-4'} left-4 z-20 w-32 transition-all duration-300`}>
+          <div className="bg-white rounded-2xl shadow-lg p-3 relative overflow-hidden border border-gray-200">
             {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
             <div className="relative">
@@ -482,7 +756,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     setTimeout(() => searchRestaurants(), 100); 
                   }}
                   disabled={isLoading}
-                  className="w-full h-8 text-xs glass-layer-1 rounded-xl shadow-soft font-semibold text-[hsl(var(--foreground))] relative overflow-hidden disabled:opacity-50"
+                  className="w-full h-8 text-xs bg-gray-50 rounded-xl shadow-sm font-semibold text-[hsl(var(--foreground))] relative overflow-hidden disabled:opacity-50 border border-gray-200"
                   whileHover={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)' }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -495,7 +769,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     setTimeout(() => searchRestaurants(), 100); 
                   }}
                   disabled={isLoading}
-                  className="w-full h-8 text-xs glass-layer-1 rounded-xl shadow-soft font-semibold text-[hsl(var(--foreground))] relative overflow-hidden disabled:opacity-50"
+                  className="w-full h-8 text-xs bg-gray-50 rounded-xl shadow-sm font-semibold text-[hsl(var(--foreground))] relative overflow-hidden disabled:opacity-50 border border-gray-200"
                   whileHover={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)' }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -508,7 +782,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     setTimeout(() => searchRestaurants(), 100); 
                   }}
                   disabled={isLoading}
-                  className="w-full h-8 text-xs glass-layer-1 rounded-xl shadow-soft font-semibold text-[hsl(var(--foreground))] relative overflow-hidden disabled:opacity-50"
+                  className="w-full h-8 text-xs bg-gray-50 rounded-xl shadow-sm font-semibold text-[hsl(var(--foreground))] relative overflow-hidden disabled:opacity-50 border border-gray-200"
                   whileHover={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)' }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -522,7 +796,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
         {/* Map Type Toggle - Top Right */}
         <div className="absolute top-4 right-4 z-20">
-          <div className="glass-layer-1 rounded-2xl shadow-soft p-3 relative overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-lg p-3 relative overflow-hidden border border-gray-200">
             {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
             <div className="relative">
@@ -530,8 +804,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 <motion.button
                   onClick={() => changeMapType('3d')}
                   className={mapType === '3d' 
-                    ? 'text-xs glass-layer-1 px-3 h-8 rounded-xl shadow-soft font-semibold text-[hsl(var(--foreground))] relative overflow-hidden' 
-                    : 'text-xs px-3 h-8 rounded-xl hover:bg-white/50 font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}
+                    ? 'text-xs bg-gray-100 px-3 h-8 rounded-xl shadow-sm font-semibold text-[hsl(var(--foreground))] relative overflow-hidden border border-gray-300' 
+                    : 'text-xs px-3 h-8 rounded-xl hover:bg-gray-50 font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -543,8 +817,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 <motion.button
                   onClick={() => changeMapType('roadmap')}
                   className={mapType === 'roadmap' 
-                    ? 'text-xs glass-layer-1 px-3 h-8 rounded-xl shadow-soft font-semibold text-[hsl(var(--foreground))] relative overflow-hidden' 
-                    : 'text-xs px-3 h-8 rounded-xl hover:bg-white/50 font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}
+                    ? 'text-xs bg-gray-100 px-3 h-8 rounded-xl shadow-sm font-semibold text-[hsl(var(--foreground))] relative overflow-hidden border border-gray-300' 
+                    : 'text-xs px-3 h-8 rounded-xl hover:bg-gray-50 font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -556,8 +830,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 <motion.button
                   onClick={() => changeMapType('satellite')}
                   className={mapType === 'satellite' 
-                    ? 'text-xs glass-layer-1 px-3 h-8 rounded-xl shadow-soft font-semibold text-[hsl(var(--foreground))] relative overflow-hidden' 
-                    : 'text-xs px-3 h-8 rounded-xl hover:bg-white/50 font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}
+                    ? 'text-xs bg-gray-100 px-3 h-8 rounded-xl shadow-sm font-semibold text-[hsl(var(--foreground))] relative overflow-hidden border border-gray-300' 
+                    : 'text-xs px-3 h-8 rounded-xl hover:bg-gray-50 font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -578,7 +852,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             animate={{ x: 0, opacity: 1 }}
             className="absolute top-20 right-4 w-64 h-[calc(100vh-200px)] z-20"
           >
-            <div className="glass-layer-1 rounded-2xl shadow-medium p-4 h-full flex flex-col relative overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-lg p-4 h-full flex flex-col relative overflow-hidden border border-gray-200">
               {/* Specular highlight */}
               <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
               <div className="relative h-full flex flex-col">
@@ -612,10 +886,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                       }}
                       className="w-full p-3 rounded-xl transition-all text-left relative overflow-hidden"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.35)',
-                        backdropFilter: 'blur(30px) saturate(180%)',
-                        border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                        boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 4px 16px rgba(0, 0, 0, 0.1)',
+                        background: '#ffffff',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
                       }}
                     >
                       <div className="flex gap-3">
@@ -632,7 +905,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                             }}
                           />
                         ) : null}
-                        <div className={`w-14 h-14 rounded-lg bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center flex-shrink-0 text-lg ${place.photos?.[0] ? 'hidden' : ''}`}>
+                        <div className={`w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg ${place.photos?.[0] ? 'hidden' : ''}`}>
                           🍽️
                         </div>
                         <div className="flex-1 min-w-0">
@@ -670,8 +943,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         )}
 
         {/* Bottom Search Bar - Compact */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 pointer-events-none z-15">
-          <div className="max-w-2xl mx-auto pointer-events-auto">
+        <div className="absolute bottom-3 left-0 right-0 pointer-events-none z-15">
+          <div className="max-w-2xl mx-auto px-3 pointer-events-auto">
             <div className="bg-white rounded-full shadow-strong px-4 py-2 relative overflow-hidden">
               <div className="relative">
                 <form onSubmit={(e) => { 
@@ -727,13 +1000,13 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
               exit={{ x: 400, opacity: 0 }}
               className="absolute top-20 right-[280px] w-96 h-[calc(100vh-200px)] z-25"
             >
-              <div className="glass-card rounded-[32px] overflow-hidden h-full flex flex-col relative shadow-strong">
+              <div className="bg-white rounded-[32px] overflow-hidden h-full flex flex-col relative shadow-xl border border-gray-200">
                 {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/20 to-transparent pointer-events-none rounded-t-[32px]" />
                 
                 <button
                   onClick={() => setSelectedPlace(null)}
-                  className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-all"
+                  className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-gray-100 transition-all shadow-md border border-gray-200"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -771,8 +1044,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                       )}
                     </>
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-200 to-blue-200 flex items-center justify-center">
-                      <ImageIcon className="w-16 h-16 text-white/60" />
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                      <ImageIcon className="w-16 h-16 text-gray-400" />
                     </div>
                   )}
                 </div>
@@ -890,7 +1163,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                         ];
 
                         return menuItems.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center p-2.5 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+                          <div key={idx} className="flex justify-between items-center p-2.5 bg-gray-50 rounded-lg border border-gray-200">
                             <span className="text-sm font-medium text-[hsl(var(--foreground))]">
                               {item.name}
                             </span>
@@ -906,7 +1179,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-3">
                     <Button
-                      className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white"
+                      className="flex-1 bg-purple-600 text-white hover:bg-purple-700"
                       onClick={() => {
                         if (selectedPlace.url) {
                           window.open(selectedPlace.url, '_blank');
