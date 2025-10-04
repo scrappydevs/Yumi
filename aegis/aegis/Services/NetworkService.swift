@@ -16,6 +16,30 @@ class NetworkService {
 
     private init() {}
 
+    // MARK: - Flexible Date Decoding Strategy
+    private static let flexibleDateDecoding: JSONDecoder.DateDecodingStrategy = .custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let dateString = try container.decode(String.self)
+
+        // Try multiple date formats
+        let formatters = [
+            ISO8601DateFormatter(),
+            {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                return formatter
+            }()
+        ]
+
+        for formatter in formatters {
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+        }
+
+        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
+    }
+
     // MARK: - Step 1: Upload Image (AI analyzes in background, user doesn't see description)
     func uploadImage(
         image: UIImage, 
@@ -154,7 +178,7 @@ class NetworkService {
         }
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let review = try decoder.decode(Review.self, from: data)
         return review
     }
@@ -177,7 +201,7 @@ class NetworkService {
         }
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let imageData = try decoder.decode(FoodImage.self, from: data)
         return imageData
     }
@@ -200,7 +224,7 @@ class NetworkService {
         }
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let reviews = try decoder.decode([Review].self, from: data)
         return reviews
     }
@@ -224,7 +248,7 @@ class NetworkService {
         }
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let graphData = try decoder.decode(FoodGraphData.self, from: data)
         return graphData
     }
@@ -249,7 +273,7 @@ class NetworkService {
         }
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let profile = try decoder.decode(Profile.self, from: data)
         return profile
     }
@@ -260,21 +284,33 @@ class NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
-        
+
         guard httpResponse.statusCode == 200 else {
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
         }
-        
+
+        // Debug: Print raw response
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("🔍 [FRIENDS] Raw response: \(jsonString)")
+        }
+
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let friends = try decoder.decode([Profile].self, from: data)
-        return friends
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
+
+        do {
+            let friends = try decoder.decode([Profile].self, from: data)
+            print("✅ [FRIENDS] Successfully decoded \(friends.count) friends")
+            return friends
+        } catch {
+            print("❌ [FRIENDS] Decoding error: \(error)")
+            throw error
+        }
     }
     
     // Search for users by username
@@ -298,7 +334,7 @@ class NetworkService {
         }
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let users = try decoder.decode([Profile].self, from: data)
         return users
     }
@@ -345,6 +381,32 @@ class NetworkService {
         guard httpResponse.statusCode == 200 else {
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
         }
+    }
+    
+    // Blend preferences with friends
+    func blendPreferences(friendIds: [UUID], authToken: String) async throws -> BlendedPreferences {
+        let url = URL(string: "\(baseURL)/api/preferences/blend")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["friend_ids": friendIds.map { $0.uuidString }]
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        let blendedPreferences = try decoder.decode(BlendedPreferences.self, from: data)
+        return blendedPreferences
     }
 }
 

@@ -59,13 +59,19 @@ async def get_friends(user_id: str = Depends(get_user_id_from_token)):
         
         # Fetch friend profiles
         friends_response = supabase.table("profiles")\
-            .select("id, username, display_name, avatar_url, bio, created_at, updated_at, friends")\
+            .select("id, username, display_name, avatar_url, bio, created_at, updated_at, friends, preferences, phone, phone_verified, onboarded")\
             .in_("id", friend_ids)\
             .execute()
         
         friends = friends_response.data or []
-        
+
         print(f"[GET FRIENDS] ✅ Returning {len(friends)} friend profiles")
+
+        # Debug: Print first friend to see field structure
+        if friends:
+            import json
+            print(f"[GET FRIENDS DEBUG] Sample friend data: {json.dumps(friends[0], default=str, indent=2)}")
+
         return friends
         
     except HTTPException:

@@ -153,10 +153,11 @@ app.include_router(invites.router, prefix="/api")
 app.include_router(friends_graph.router, prefix="/api")
 
 # Import and include iOS friends management routers
-from routers import profiles, friends, users
+from routers import profiles, friends, users, preferences
 app.include_router(profiles.router, prefix="/api")
 app.include_router(friends.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(preferences.router, prefix="/api")
 
 
 @app.get("/")

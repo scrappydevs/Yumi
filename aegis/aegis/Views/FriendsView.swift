@@ -10,6 +10,7 @@ import SwiftUI
 struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @State private var showingSearch = false
+    @State private var showingBlend = false
     
     var body: some View {
         NavigationView {
@@ -24,6 +25,16 @@ struct FriendsView: View {
             }
             .navigationTitle("Friends")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showingBlend = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                            Text("Blend")
+                        }
+                    }
+                    .disabled(viewModel.friends.isEmpty)
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingSearch = true }) {
                         Image(systemName: "person.badge.plus")
@@ -33,12 +44,14 @@ struct FriendsView: View {
             .sheet(isPresented: $showingSearch) {
                 SearchUsersView(viewModel: viewModel)
             }
+            .sheet(isPresented: $showingBlend) {
+                BlendPreferencesView(viewModel: viewModel)
+            }
             .task {
-                await viewModel.loadMyProfile()
-                await viewModel.loadFriends()
+                await viewModel.loadData()
             }
             .refreshable {
-                await viewModel.loadFriends()
+                await viewModel.loadData()
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
