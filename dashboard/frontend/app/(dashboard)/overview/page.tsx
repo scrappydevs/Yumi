@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -228,8 +228,8 @@ export default function DiscoverPage() {
   const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-  // Rotating loading phrases - more varied and engaging
-  const loadingPhrases = [
+  // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
+  const loadingPhrases = useMemo(() => [
     'Finding the perfect spot for you',
     'Reading the culinary landscape',
     'Consulting the food gods',
@@ -238,7 +238,7 @@ export default function DiscoverPage() {
     'Decoding your taste DNA',
     'Scanning the flavor matrix',
     'Channeling your cravings',
-  ];
+  ], []);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0.8); // 80% default volume
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
@@ -283,7 +283,7 @@ export default function DiscoverPage() {
     }, 3000); // Change phrase every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isThinking, loadingPhrases, isMuted, speak]);
+  }, [isThinking, loadingPhrases, isMuted]); // Removed 'speak' from deps
 
   useEffect(() => {
     if (isThinking) {
