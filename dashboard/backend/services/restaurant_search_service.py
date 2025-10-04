@@ -342,12 +342,17 @@ class RestaurantSearchService:
                 }
 
             # Step 3: Format data for LLM with quality-focused ranking
-            print(f"[RESTAURANT SEARCH] Step 3: Asking LLM to analyze and rank...")
-            print(f"[RESTAURANT SEARCH] Found {len(restaurants)} restaurants:")
-            for i, r in enumerate(restaurants[:10], 1):
+            print(f"\n{'='*80}")
+            print(f"[RESTAURANT SEARCH] 🤖 STEP 3: LLM ANALYSIS & RANKING")
+            print(
+                f"[RESTAURANT SEARCH] Preparing {len(restaurants)} restaurants for LLM...")
+            print(f"[RESTAURANT SEARCH] Restaurant candidates:")
+            for i, r in enumerate(restaurants[:15], 1):
                 reviews = r.get('user_ratings_total', 0)
+                distance = r.get('distance_meters', 0)
+                print(f"[RESTAURANT SEARCH]   {i}. {r['name']}")
                 print(
-                    f"  {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {reviews} reviews)")
+                    f"[RESTAURANT SEARCH]      Cuisine: {r['cuisine']}, Rating: {r['rating']}⭐, Reviews: {reviews}, Distance: {distance}m")
 
             # Build restaurants list for prompt with quality metrics
             restaurants_text = "\n".join([
@@ -365,6 +370,14 @@ class RestaurantSearchService:
                 'preferences_text', 'No preferences specified')
             cuisines_list = preferences.get('cuisines', [])
             atmospheres_list = preferences.get('atmospheres', [])
+
+            print(f"[RESTAURANT SEARCH] User preferences being sent to LLM:")
+            print(
+                f"[RESTAURANT SEARCH]   - Preferred cuisines: {cuisines_list}")
+            print(
+                f"[RESTAURANT SEARCH]   - Preferred vibes: {atmospheres_list}")
+            print(f"[RESTAURANT SEARCH]   - Full preference text: {prefs_text[:150]}..." if len(
+                prefs_text) > 150 else f"[RESTAURANT SEARCH]   - Full preference text: {prefs_text}")
 
             # Create LLM prompt with quality-focused ranking
             prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3-4 that best match the user's query.
@@ -458,16 +471,28 @@ IMPORTANT:
 
 """
 
-            print(f"[RESTAURANT SEARCH] Sending to LLM:")
-            print(f"  Query: {query}")
+            print(f"\n[RESTAURANT SEARCH] 📤 FULL LLM PROMPT:")
+            print(f"{'─'*80}")
+            print(prompt)
+            print(f"{'─'*80}")
+            print(f"[RESTAURANT SEARCH] Prompt stats:")
+            print(f"[RESTAURANT SEARCH]   - Total length: {len(prompt)} chars")
+            print(f"[RESTAURANT SEARCH]   - Query: '{query}'")
             print(
-                f"  User cuisines: {cuisines_list[:2] if cuisines_list else 'None'}")
-            print(f"  Restaurants: {len(restaurants)}")
+                f"[RESTAURANT SEARCH]   - User cuisines: {cuisines_list[:2] if cuisines_list else 'None'}")
+            print(
+                f"[RESTAURANT SEARCH]   - Restaurants in prompt: {len(restaurants)}")
+            print(f"[RESTAURANT SEARCH] 🤖 Calling Gemini LLM...")
 
             # Call Gemini
             model = self.gemini_service.model
             response = model.generate_content(prompt)
             response_text = response.text.strip()
+
+            print(f"\n[RESTAURANT SEARCH] 📥 LLM RESPONSE RECEIVED:")
+            print(f"{'─'*80}")
+            print(response_text)
+            print(f"{'─'*80}")
 
             # Clean up markdown
             if response_text.startswith("```json"):
@@ -480,44 +505,65 @@ IMPORTANT:
 
             # Parse JSON
             import json
+            print(f"[RESTAURANT SEARCH] 🔄 Parsing LLM JSON response...")
             result = json.loads(response_text)
 
             # Log what LLM recommended
-            print(f"[RESTAURANT SEARCH] LLM recommendations:")
+            print(f"\n[RESTAURANT SEARCH] ✅ LLM RECOMMENDATIONS:")
             for i, rec in enumerate(result.get('top_restaurants', []), 1):
+                print(f"[RESTAURANT SEARCH]   {i}. {rec.get('name')}")
                 print(
-                    f"  {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}")
+                    f"[RESTAURANT SEARCH]      - Cuisine: {rec.get('cuisine')}")
+                print(
+                    f"[RESTAURANT SEARCH]      - Rating: {rec.get('rating')}⭐")
+                print(
+                    f"[RESTAURANT SEARCH]      - Match Score: {rec.get('match_score', 'N/A')}")
+                print(
+                    f"[RESTAURANT SEARCH]      - Reasoning: {rec.get('reasoning', 'No reason')}")
 
             # CRITICAL: Enrich LLM results with full restaurant data using fuzzy matching
+            print(
+                f"\n[RESTAURANT SEARCH] 🔗 ENRICHING LLM RESULTS WITH DATABASE DATA")
             enriched_restaurants = []
-            for llm_rec in result.get('top_restaurants', []):
+            for i, llm_rec in enumerate(result.get('top_restaurants', []), 1):
+                llm_name = llm_rec['name']
+                print(f"[RESTAURANT SEARCH] {i}. Looking up '{llm_name}'...")
+
                 # Try exact match first
                 matching = next(
-                    (r for r in restaurants if r['name'] == llm_rec['name']), None)
+                    (r for r in restaurants if r['name'] == llm_name), None)
 
                 # Fall back to fuzzy matching
                 if not matching:
+                    print(
+                        f"[RESTAURANT SEARCH]    No exact match, trying fuzzy matching...")
                     matching = self.fuzzy_match_restaurant(
-                        llm_rec['name'], restaurants)
+                        llm_name, restaurants)
 
                 if matching:
                     # Merge: LLM fields (reasoning, match_score) + original fields (place_id, photo_url, etc.)
                     enriched = {**matching, **llm_rec}
                     enriched_restaurants.append(enriched)
                     print(
-                        f"  ✓ Matched '{llm_rec['name']}' → '{matching['name']}'")
+                        f"[RESTAURANT SEARCH]    ✅ Matched to '{matching['name']}'")
+                    print(
+                        f"[RESTAURANT SEARCH]       - place_id: {matching.get('place_id', 'N/A')}")
+                    print(
+                        f"[RESTAURANT SEARCH]       - Distance: {matching.get('distance_meters', 'N/A')}m")
                 else:
                     # Fallback: keep LLM result as-is (shouldn't happen, but safety)
-                    print(f"  ⚠️ No match found for '{llm_rec['name']}'")
+                    print(f"[RESTAURANT SEARCH]    ⚠️ No match found in database!")
                     enriched_restaurants.append(llm_rec)
 
             # Ensure we have 3-4 restaurants
             if len(enriched_restaurants) < 3 and len(restaurants) >= 3:
                 print(
-                    f"[RESTAURANT SEARCH] ⚠️ LLM returned {len(enriched_restaurants)} restaurants, filling to 3...")
+                    f"\n[RESTAURANT SEARCH] ⚠️ LLM returned only {len(enriched_restaurants)} restaurants, filling to 3...")
                 # Add top-rated restaurants that weren't selected
                 for r in restaurants:
                     if r['name'] not in [e['name'] for e in enriched_restaurants]:
+                        print(
+                            f"[RESTAURANT SEARCH]    Adding fallback: {r['name']} ({r['rating']}⭐)")
                         enriched_restaurants.append({
                             **r,
                             'match_score': 0.5,
@@ -542,8 +588,21 @@ IMPORTANT:
                 "longitude": longitude
             }
 
+            print(f"\n{'='*80}")
+            print(f"[RESTAURANT SEARCH] ✅ FINAL RESULTS")
+            print(f"[RESTAURANT SEARCH] Path taken: {result['path']}")
             print(
-                f"[RESTAURANT SEARCH] ✅ Returning {len(enriched_restaurants)} restaurants")
+                f"[RESTAURANT SEARCH] Returning {len(enriched_restaurants)} top restaurants:")
+            for i, r in enumerate(enriched_restaurants, 1):
+                print(
+                    f"[RESTAURANT SEARCH]   {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐)")
+                print(
+                    f"[RESTAURANT SEARCH]      Match Score: {r.get('match_score', 'N/A')}")
+                print(
+                    f"[RESTAURANT SEARCH]      Reasoning: {r.get('reasoning', 'N/A')}")
+            print(
+                f"[RESTAURANT SEARCH] Plus {len(restaurants[:20])} nearby restaurants for map")
+            print(f"{'='*80}\n")
 
             return result
 

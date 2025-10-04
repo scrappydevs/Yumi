@@ -31,6 +31,12 @@ class TasteProfileService:
             Natural language preferences text, or empty string if none exist
         """
         try:
+            print(f"\n{'='*80}")
+            print(f"[TASTE PROFILE] 📖 FETCHING USER PREFERENCES")
+            print(f"[TASTE PROFILE] User ID: {user_id}")
+            print(
+                f"[TASTE PROFILE] Query: SELECT preferences FROM profiles WHERE id = '{user_id}'")
+
             response = self.supabase.table("profiles")\
                 .select("preferences")\
                 .eq("id", user_id)\
@@ -38,9 +44,15 @@ class TasteProfileService:
                 .execute()
 
             if not response.data or not response.data.get("preferences"):
+                print(f"[TASTE PROFILE] ⚠️ No preferences found in database")
+                print(f"{'='*80}\n")
                 return ""
 
             prefs = response.data["preferences"]
+            print(f"[TASTE PROFILE] ✅ Raw preferences retrieved from database:")
+            print(f"[TASTE PROFILE] Type: {type(prefs)}")
+            print(
+                f"[TASTE PROFILE] Length: {len(str(prefs)) if prefs else 0} chars")
 
             # Handle both text and JSON formats
             if isinstance(prefs, str):
@@ -48,16 +60,26 @@ class TasteProfileService:
                     # Try to parse as JSON (old format)
                     json.loads(prefs)
                     # If successful, it's old format - return empty to trigger generation
+                    print(
+                        f"[TASTE PROFILE] ⚠️ Old JSON format detected, needs migration")
+                    print(f"{'='*80}\n")
                     return ""
                 except (json.JSONDecodeError, TypeError):
                     # It's natural language format - return as is
+                    print(f"[TASTE PROFILE] ✅ Natural language preferences found:")
+                    print(f"[TASTE PROFILE] Preview: {prefs[:200]}..." if len(
+                        prefs) > 200 else f"[TASTE PROFILE] Content: {prefs}")
+                    print(f"{'='*80}\n")
                     return prefs
 
+            print(f"[TASTE PROFILE] ⚠️ Unexpected preference format")
+            print(f"{'='*80}\n")
             return ""
 
         except Exception as e:
             print(
                 f"[TASTE PROFILE ERROR] Failed to fetch preferences text: {str(e)}")
+            print(f"{'='*80}\n")
             return ""
 
     def save_preferences(self, user_id: str, preferences_text: str) -> None:
@@ -166,7 +188,10 @@ class TasteProfileService:
             - price_hints: List[str]
         """
         if not preferences_text or not preferences_text.strip():
-            print("[TASTE PROFILE] No preferences text, returning empty structure")
+            print(f"\n{'='*80}")
+            print("[TASTE PROFILE] 🔍 PARSING PREFERENCES (EMPTY)")
+            print("[TASTE PROFILE] No preferences text provided")
+            print(f"{'='*80}\n")
             return {
                 "cuisines": [],
                 "atmospheres": [],
@@ -174,8 +199,14 @@ class TasteProfileService:
             }
 
         try:
+            print(f"\n{'='*80}")
+            print(f"[TASTE PROFILE] 🔍 PARSING PREFERENCES TO STRUCTURED FORMAT")
             print(
-                f"[TASTE PROFILE] Parsing preferences text ({len(preferences_text)} chars)")
+                f"[TASTE PROFILE] Input text length: {len(preferences_text)} chars")
+            print(f"[TASTE PROFILE] Full text:")
+            print(f"---")
+            print(preferences_text)
+            print(f"---")
 
             prompt = f"""Extract structured data from this user preference text.
 
@@ -191,8 +222,14 @@ Extract and return ONLY JSON (no markdown, no explanations):
 
 If a category has no data, return empty array. Be thorough - extract all cuisines and vibes mentioned."""
 
+            print(f"[TASTE PROFILE] 🤖 Sending to LLM for parsing...")
+            print(f"[TASTE PROFILE] LLM Prompt length: {len(prompt)} chars")
+
             response = self.gemini_service.model.generate_content(prompt)
             response_text = response.text.strip()
+
+            print(f"[TASTE PROFILE] ✅ LLM Response received:")
+            print(f"[TASTE PROFILE] Raw response: {response_text[:500]}...")
 
             # Clean markdown if present
             if response_text.startswith("```json"):
@@ -206,14 +243,23 @@ If a category has no data, return empty array. Be thorough - extract all cuisine
             import json
             structured = json.loads(response_text)
 
-            print(f"[TASTE PROFILE] Parsed: {len(structured.get('cuisines', []))} cuisines, "
-                  f"{len(structured.get('atmospheres', []))} vibes")
+            print(f"[TASTE PROFILE] ✅ Parsed structured data:")
+            print(
+                f"[TASTE PROFILE]   - Cuisines: {structured.get('cuisines', [])}")
+            print(
+                f"[TASTE PROFILE]   - Atmospheres: {structured.get('atmospheres', [])}")
+            print(
+                f"[TASTE PROFILE]   - Price Hints: {structured.get('price_hints', [])}")
+            print(f"{'='*80}\n")
 
             return structured
 
         except Exception as e:
             print(
                 f"[TASTE PROFILE ERROR] Failed to parse preferences: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            print(f"{'='*80}\n")
             return {
                 "cuisines": [],
                 "atmospheres": [],
