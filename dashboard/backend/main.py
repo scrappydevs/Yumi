@@ -98,6 +98,14 @@ app.include_router(config.router)
 app.include_router(reservations.router, prefix="/api")
 app.include_router(twilio_webhooks.router, prefix="/api")
 
+# Import and include voice router
+from routers import voice
+app.include_router(voice.router, prefix="/api")
+
+# Import and include invites router
+from routers import invites
+app.include_router(invites.router, prefix="/api")
+
 
 @app.get("/")
 async def root():

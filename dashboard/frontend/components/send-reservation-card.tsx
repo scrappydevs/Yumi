@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, Users, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ReservationModal } from './reservation-modal';
 
 type SendReservationCardProps = {
   friendId: string;
@@ -20,19 +20,11 @@ export function SendReservationCard({
   friendPhone,
   className = '',
 }: SendReservationCardProps) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const handleSendReservation = () => {
-    // Navigate to new reservation page with pre-filled friend data
-    const params = new URLSearchParams({
-      inviteeId: friendId,
-      inviteeName: friendName,
-    });
-    if (friendPhone) {
-      params.append('inviteePhone', friendPhone);
-    }
-    router.push(`/reservations/new?${params.toString()}`);
+    setModalOpen(true);
   };
 
   return (
@@ -105,6 +97,19 @@ export function SendReservationCard({
           {friendName} will receive an SMS invitation to confirm
         </p>
       </div>
+
+      {/* Reservation Modal */}
+      <ReservationModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        mode="create"
+        showIntro={true}
+        prefillInvitee={{
+          id: friendId,
+          name: friendName,
+          phone: friendPhone
+        }}
+      />
     </Card>
   );
 }

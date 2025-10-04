@@ -41,10 +41,16 @@ class SendReservationRequest(BaseModel):
     invitees: List[InviteeInput] = Field(..., min_items=1)
 
 
+class InviteLink(BaseModel):
+    inviteId: str
+    phoneE164: str
+    text: str
+    url: str
+
 class SendReservationResponse(BaseModel):
     ok: bool
-    reservation_id: str
-    invites_sent: int
+    reservationId: str
+    invites: list[InviteLink]
 
 
 class ConfirmReservationRequest(BaseModel):
@@ -140,40 +146,44 @@ async def send_reservation(request: SendReservationRequest):
                 "rsvpStatus": "pending"
             })
         
-        supabase.table("reservation_invites").insert(invites_data).execute()
+        invites_result = supabase.table("reservation_invites").insert(invites_data).execute()
+        inserted_invites = invites_result.data if invites_result.data else []
         
-        # Send SMS to each invitee
-        # Only use status callback if not localhost (Twilio can't reach localhost)
-        status_callback_url = None
-        if "localhost" not in app_base_url and "127.0.0.1" not in app_base_url:
-            status_callback_url = f"{app_base_url}/api/twilio/status"
+        # Generate iMessage invites (no SMS sending)
+        invite_links = []
         
-        time_str = format_time_for_sms(starts_at)
-        sent_count = 0
+        # Format time for display
+        time_str = starts_at.strftime("%A, %B %d at %I:%M %p")
         
-        for invitee in request.invitees:
-            try:
-                # Generate confirm token (15 min expiry)
-                token = sign_action_token(reservation_id, request.organizer_id, "confirm", 900)
-                confirm_url = f"{app_base_url}/r/confirm?token={token}"
-                
-                message_body = reservation_hold(restaurant_name, time_str, confirm_url)
-                
-                result = TwilioService.send_sms(
-                    to=invitee.phone_e164,
-                    body=message_body,
-                    status_callback=status_callback_url
-                )
-                
-                sent_count += 1
-            except Exception as e:
-                print(f"Failed to send SMS to {invitee.phone_e164}: {e}")
+        for inserted_invite in inserted_invites:
+            invite_id = inserted_invite["id"]
+            phone = inserted_invite["inviteePhoneE164"]
+            
+            # Generate invite token (1 hour expiry)
+            token = sign_action_token(
+                resv_id=reservation_id,
+                action="invite_accept",
+                invite_id=invite_id,
+                ttl_seconds=3600
+            )
+            
+            invite_url = f"{app_base_url}/r/invite?token={token}"
+            
+            # Build iMessage text
+            message_text = f"🍽️ Join me at {restaurant_name} on {time_str}! Tap to accept: {invite_url}"
+            
+            invite_links.append({
+                "inviteId": invite_id,
+                "phoneE164": phone,
+                "text": message_text,
+                "url": invite_url
+            })
         
-        return SendReservationResponse(
-            ok=True,
-            reservation_id=reservation_id,
-            invites_sent=sent_count
-        )
+        return {
+            "ok": True,
+            "reservationId": reservation_id,
+            "invites": invite_links
+        }
     
     except HTTPException:
         raise
@@ -350,6 +360,18 @@ async def get_user_reservations(user_id: str, status: str = None):
             restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
             restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
             
+            # Get invitee details
+            invites = resv.get("reservation_invites", [])
+            invitee_list = []
+            for inv in invites:
+                invitee_info = {"phone": inv["inviteePhoneE164"], "status": inv["rsvpStatus"]}
+                # Try to get profile info if linked
+                if inv.get("inviteeProfileId"):
+                    profile = supabase.table("profiles").select("display_name, username").eq("id", inv["inviteeProfileId"]).limit(1).execute()
+                    if profile.data:
+                        invitee_info["name"] = profile.data[0].get("display_name") or profile.data[0].get("username")
+                invitee_list.append(invitee_info)
+            
             all_reservations.append({
                 "id": resv["id"],
                 "organizer_id": resv["organizerId"],
@@ -361,7 +383,8 @@ async def get_user_reservations(user_id: str, status: str = None):
                 "status": resv["status"],
                 "created_at": resv["createdAt"],
                 "is_organizer": True,
-                "invite_count": len(resv.get("reservation_invites", []))
+                "invite_count": len(invites),
+                "invitees": invitee_list
             })
         
         # Add invitee reservations
@@ -414,9 +437,35 @@ async def get_reservation(reservation_id: str):
         resv = reservation.data[0]
         
         # Get restaurant details
-        restaurant = supabase.table("restaurants").select("name, formatted_address").eq("id", resv["restaurantId"]).limit(1).execute()
-        restaurant_name = restaurant.data[0]["name"] if restaurant.data else "Unknown Restaurant"
-        restaurant_address = restaurant.data[0].get("formatted_address") if restaurant.data else None
+        restaurant = supabase.table("restaurants").select("name, formatted_address, phone_number, website, google_maps_url, rating_avg, user_ratings_total, price_level, description").eq("id", resv["restaurantId"]).limit(1).execute()
+        restaurant_data = restaurant.data[0] if restaurant.data else None
+        restaurant_name = restaurant_data.get("name") if restaurant_data else "Unknown Restaurant"
+        restaurant_address = restaurant_data.get("formatted_address") if restaurant_data else None
+        
+        # Get restaurant images
+        restaurant_images = []
+        if restaurant_data:
+            images = supabase.table("images").select("id, image_url, description, dish").eq("restaurant_id", resv["restaurantId"]).limit(10).execute()
+            if images.data:
+                restaurant_images = [{"id": img["id"], "url": img["image_url"], "description": img.get("description"), "dish": img.get("dish")} for img in images.data]
+        
+        # Enrich invites with profile names
+        invites = resv.get("reservation_invites", [])
+        enriched_invites = []
+        for inv in invites:
+            invite_data = {
+                "id": inv["id"],
+                "inviteePhoneE164": inv["inviteePhoneE164"],
+                "rsvpStatus": inv["rsvpStatus"],
+                "respondedAt": inv.get("respondedAt"),
+                "inviteeName": None
+            }
+            # Try to get profile info if linked
+            if inv.get("inviteeProfileId"):
+                profile = supabase.table("profiles").select("display_name, username").eq("id", inv["inviteeProfileId"]).limit(1).execute()
+                if profile.data:
+                    invite_data["inviteeName"] = profile.data[0].get("display_name") or profile.data[0].get("username")
+            enriched_invites.append(invite_data)
         
         return {
             "id": resv["id"],
@@ -424,11 +473,23 @@ async def get_reservation(reservation_id: str):
             "restaurant_id": resv["restaurantId"],
             "restaurant_name": restaurant_name,
             "restaurant_address": restaurant_address,
+            "restaurant": {
+                "name": restaurant_name,
+                "address": restaurant_address,
+                "phone": restaurant_data.get("phone_number") if restaurant_data else None,
+                "website": restaurant_data.get("website") if restaurant_data else None,
+                "google_maps_url": restaurant_data.get("google_maps_url") if restaurant_data else None,
+                "rating": restaurant_data.get("rating_avg") if restaurant_data else None,
+                "user_ratings_total": restaurant_data.get("user_ratings_total") if restaurant_data else None,
+                "price_level": restaurant_data.get("price_level") if restaurant_data else None,
+                "description": restaurant_data.get("description") if restaurant_data else None,
+                "images": restaurant_images
+            },
             "starts_at": resv["startsAt"],
             "party_size": resv["partySize"],
             "status": resv["status"],
             "created_at": resv["createdAt"],
-            "invites": resv.get("reservation_invites", []),
+            "invites": enriched_invites,
             "has_calendar_event": resv["status"] == "confirmed"  # Show calendar if confirmed
         }
     
