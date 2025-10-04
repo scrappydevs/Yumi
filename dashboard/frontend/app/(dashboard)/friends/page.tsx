@@ -10,7 +10,6 @@ import {
   UserPlus, 
   UserMinus, 
   Users, 
-  X,
   ArrowRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -38,7 +37,6 @@ export default function FriendsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<Profile[]>([]);
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'friends' | 'followers' | 'discover'>('friends');
@@ -308,7 +306,7 @@ export default function FriendsPage() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="group glass-layer-1 rounded-3xl p-6 shadow-soft hover:shadow-medium transition-all cursor-pointer relative overflow-hidden"
-                        onClick={() => setSelectedProfile(friend)}
+                        onClick={() => navigateToProfile(friend.id)}
                         whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)' }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -398,7 +396,7 @@ export default function FriendsPage() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="group glass-layer-1 rounded-3xl p-6 shadow-soft hover:shadow-medium transition-all cursor-pointer relative overflow-hidden"
-                        onClick={() => setSelectedProfile(follower)}
+                        onClick={() => navigateToProfile(follower.id)}
                         whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)' }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -518,7 +516,7 @@ export default function FriendsPage() {
                             {/* Avatar */}
                             <div
                               className="cursor-pointer flex-shrink-0"
-                              onClick={() => setSelectedProfile(user)}
+                              onClick={() => navigateToProfile(user.id)}
                             >
                               {user.avatar_url ? (
                                 <img
@@ -605,123 +603,6 @@ export default function FriendsPage() {
           </AnimatePresence>
         </div>
 
-        {/* Profile Modal */}
-        <AnimatePresence>
-          {selectedProfile && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/10 backdrop-blur-md z-50 flex items-center justify-center p-4"
-              onClick={() => setSelectedProfile(null)}
-            >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="glass-card rounded-[32px] max-w-md w-full shadow-strong overflow-hidden relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Specular highlight */}
-                <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-[32px]" />
-                {/* Close Button */}
-                <div className="absolute top-4 right-4 z-10">
-                  <motion.button
-                    onClick={() => setSelectedProfile(null)}
-                    className="glass-layer-1 w-9 h-9 rounded-xl flex items-center justify-center shadow-soft relative overflow-hidden"
-                    whileHover={{ scale: 1.1, boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)' }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
-                    <X className="w-4 h-4 text-[hsl(var(--foreground))]" />
-                  </motion.button>
-                </div>
-
-                {/* Profile Content */}
-                <div className="p-8">
-                  {/* Avatar */}
-                  <div className="flex flex-col items-center mb-6">
-                    {selectedProfile.avatar_url ? (
-                      <img
-                        src={selectedProfile.avatar_url}
-                        alt={selectedProfile.username}
-                        className="w-28 h-28 rounded-full object-cover mb-4 ring-8 ring-slate-100"
-                      />
-                    ) : (
-                      <div className="w-28 h-28 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center mb-4 ring-8 ring-slate-100">
-                        <span className="text-4xl font-semibold text-slate-600">
-                          {selectedProfile.username[0].toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-
-                    <h2 className="text-2xl font-semibold text-slate-800 mb-1">
-                      {selectedProfile.display_name || selectedProfile.username}
-                    </h2>
-                    <p className="text-sm text-slate-500 mb-4">@{selectedProfile.username}</p>
-                    
-                    {selectedProfile.bio && (
-                      <p className="text-sm text-slate-600 text-center mb-6 px-4">
-                        {selectedProfile.bio}
-                      </p>
-                    )}
-
-                    <div className="glass-layer-1 flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] mb-6 px-4 py-2 rounded-xl shadow-soft relative overflow-hidden">
-                      <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
-                      <Users className="w-3.5 h-3.5 relative z-10" />
-                      <span className="relative z-10">{selectedProfile.friends?.length || 0} friends</span>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      <motion.button
-                        onClick={() => {
-                          navigateToProfile(selectedProfile.id);
-                          setSelectedProfile(null);
-                        }}
-                        className="flex-1 rounded-2xl gradient-purple-blue text-white h-12 text-base font-semibold shadow-lg flex items-center justify-center relative overflow-hidden"
-                        whileHover={{ scale: 1.02, boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)' }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                        <ArrowRight className="w-4 h-4 mr-2" />
-                        View Profile
-                      </motion.button>
-                      {isFriend(selectedProfile.id) ? (
-                        <motion.button
-                          onClick={() => {
-                            removeFriend(selectedProfile.id);
-                            setSelectedProfile(null);
-                          }}
-                          className="glass-layer-1 rounded-2xl text-red-600 hover:text-red-700 px-4 shadow-soft relative overflow-hidden h-12"
-                          whileHover={{ scale: 1.05, boxShadow: '0 8px 24px rgba(239, 68, 68, 0.2)' }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                          <UserMinus className="w-4 h-4" />
-                        </motion.button>
-                      ) : (
-                        <motion.button
-                          onClick={() => {
-                            addFriend(selectedProfile.id);
-                            setSelectedProfile(null);
-                          }}
-                          className="rounded-2xl gradient-purple-blue text-white px-4 shadow-lg relative overflow-hidden h-12"
-                          whileHover={{ scale: 1.05, boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)' }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl" />
-                          <UserPlus className="w-4 h-4" />
-                        </motion.button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );
