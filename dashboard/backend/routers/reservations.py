@@ -120,13 +120,21 @@ async def send_reservation(request: SendReservationRequest):
             raise HTTPException(status_code=400, detail="Reservation time must be in the future")
         
         # Create reservation (use camelCase to match database schema)
+        # If no invitees, auto-confirm the reservation
+        status = "confirmed" if not request.invitees else "pending"
+        
         reservation_data = {
             "organizerId": request.organizer_id,
             "restaurantId": request.restaurant_id,
             "startsAt": starts_at.isoformat(),
             "partySize": request.party_size,
-            "status": "pending",
+            "status": status,
         }
+        
+        if not request.invitees:
+            print(f"✅ Creating solo reservation (auto-confirmed)")
+        else:
+            print(f"📤 Creating reservation with {len(request.invitees)} invites (pending)")
         
         print(f"Creating reservation with data: {reservation_data}")
         
@@ -151,8 +159,13 @@ async def send_reservation(request: SendReservationRequest):
                 "rsvpStatus": "pending"
             })
         
-        invites_result = supabase.table("reservation_invites").insert(invites_data).execute()
-        inserted_invites = invites_result.data if invites_result.data else []
+        # Only insert invites if there are any
+        inserted_invites = []
+        if invites_data:
+            invites_result = supabase.table("reservation_invites").insert(invites_data).execute()
+            inserted_invites = invites_result.data if invites_result.data else []
+        else:
+            print(f"ℹ️ No invites to create - reservation is just for organizer")
         
         # Generate iMessage invites (no SMS sending)
         invite_links = []

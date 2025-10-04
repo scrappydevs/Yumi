@@ -1128,6 +1128,23 @@ export default function DiscoverPage() {
               zIndex: (isThinking || showingResults) ? 10 : -1,
             }}
           >
+            {/* Static purpleish backdrop/shadow for latent mode */}
+            <motion.div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              animate={{
+                opacity: isThinking ? 0 : 0.35,
+              }}
+              transition={{
+                duration: 0.4,
+                ease: "easeOut"
+              }}
+              style={{
+                background: 'radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.4), rgba(109, 40, 217, 0.3), transparent 65%)',
+                filter: 'blur(50px)',
+                transform: 'translateZ(0)',
+              }}
+            />
+            
             {/* Apple-style pink and blue glow effect */}
             <motion.div
               className="absolute inset-0 rounded-full pointer-events-none"
@@ -1167,7 +1184,9 @@ export default function DiscoverPage() {
               }}
             />
             
-            <div className="w-[280px] h-[280px] relative">
+            <div className="w-[280px] h-[280px] relative" style={{
+              filter: isThinking ? 'none' : 'drop-shadow(0 8px 32px rgba(139, 92, 246, 0.3))',
+            }}>
               <LiquidGlassBlob isAnimating={isThinking} />
             </div>
             
@@ -1253,7 +1272,7 @@ export default function DiscoverPage() {
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
               // Different radius for each state: thinking (420), results (200), latent (300)
-              const baseRadius = isThinking ? 420 : showingResults ? 300 : 300;
+              const baseRadius = isThinking ? 380 : showingResults ? 300 : 300;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
