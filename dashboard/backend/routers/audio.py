@@ -77,8 +77,10 @@ class VoicesResponse(BaseModel):
 class VADRequest(BaseModel):
     """Request model for VAD analysis"""
     audio_b64: str = Field(..., description="Base64-encoded audio data")
-    audio_format: str = Field("webm", description="Audio format (webm, mp3, wav)")
-    reset_state: bool = Field(False, description="Reset VAD state before analysis")
+    audio_format: str = Field(
+        "webm", description="Audio format (webm, mp3, wav)")
+    reset_state: bool = Field(
+        False, description="Reset VAD state before analysis")
 
 
 class VADResponse(BaseModel):
@@ -291,16 +293,16 @@ async def list_voices():
 async def vad_analyze(request: VADRequest):
     """
     Analyze audio chunk for voice activity detection
-    
+
     Uses Silero VAD model to detect speech vs silence in real-time.
     Useful for automatic silence detection in voice recording applications.
-    
+
     - **audio_b64**: Base64-encoded audio data (chunk or complete recording)
     - **audio_format**: Audio format (webm, mp3, wav, etc.)
     - **reset_state**: Reset VAD state before analysis (use True for first chunk)
-    
+
     Returns: VAD score and speech detection status
-    
+
     Example:
     ```json
     {
@@ -309,7 +311,7 @@ async def vad_analyze(request: VADRequest):
       "reset_state": false
     }
     ```
-    
+
     Response:
     - vad_score: Current frame score (0.0 = silence, 1.0 = strong speech)
     - average_score: Rolling average over recent chunks
@@ -322,8 +324,23 @@ async def vad_analyze(request: VADRequest):
             audio_format=request.audio_format,
             reset_state=request.reset_state
         )
+
+        # Log detailed error if analysis failed
+        if not result.get("success", False):
+            error_msg = result.get("error", "Unknown error")
+            print(f"❌ VAD Analysis Error: {error_msg}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"VAD analysis failed: {error_msg}"
+            )
+
         return VADResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ VAD Endpoint Exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"VAD analysis failed: {str(e)}")
 
@@ -332,7 +349,7 @@ async def vad_analyze(request: VADRequest):
 async def vad_reset():
     """
     Reset VAD state and buffer
-    
+
     Call this endpoint to reset the VAD model state.
     Useful when starting a new recording session.
     """

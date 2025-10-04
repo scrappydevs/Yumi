@@ -67,13 +67,14 @@ class VAD():
 
     https://github.com/snakers4/silero-vad
     """
+
     def __init__(self,
                  model_path: str = os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    "..",
-                    "resources",
-                    "models",
-                    "silero_vad.onnx"
+                     os.path.dirname(os.path.abspath(__file__)),
+                     "..",
+                     "resources",
+                     "models",
+                     "silero_vad.onnx"
                  ),
                  n_threads: int = 1
                  ):
@@ -92,7 +93,8 @@ class VAD():
                                           providers=["CPUExecutionProvider"])
 
         # Create buffer
-        self.prediction_buffer: deque = deque(maxlen=125)  # buffer length of 10 seconds
+        self.prediction_buffer: deque = deque(
+            maxlen=125)  # buffer length of 10 seconds
 
         # Set model parameters
         self.sample_rate = np.array(16000).astype(np.int64)
@@ -143,71 +145,72 @@ class VAD():
         score = self.predict(x, frame_size)
         self.prediction_buffer.append(score)
         return score
-    
+
     def get_average_score(self, window_size: int = 10) -> float:
         """
         Get average VAD score over recent predictions
-        
+
         Args:
             window_size: Number of recent predictions to average
-            
+
         Returns:
             float: Average VAD score (0.0 = silence, 1.0 = speech)
         """
         if len(self.prediction_buffer) == 0:
             return 0.0
-        
+
         recent_scores = list(self.prediction_buffer)[-window_size:]
         return np.mean(recent_scores)
 
 
 class VADService:
     """Service wrapper for VAD operations with audio format conversion"""
-    
+
     def __init__(self):
         """Initialize VAD service with Silero model"""
         self.vad = VAD()
         print("✅ VAD Service initialized with Silero model")
-    
+
     def analyze_audio_chunk(
-        self, 
-        audio_data: bytes, 
+        self,
+        audio_data: bytes,
         audio_format: str = "webm",
         reset_state: bool = False
     ) -> dict:
         """
         Analyze an audio chunk for voice activity
-        
+
         Args:
             audio_data: Raw audio bytes
             audio_format: Format of the audio (webm, mp3, wav, etc.)
             reset_state: Whether to reset VAD state before analysis
-            
+
         Returns:
             dict with VAD score and metadata
         """
         try:
             if reset_state:
                 self.vad.reset_states()
-            
+
             # Convert audio to 16kHz 16-bit PCM
             audio_segment = AudioSegment.from_file(
-                io.BytesIO(audio_data), 
+                io.BytesIO(audio_data),
                 format=audio_format
             )
-            
+
             # Convert to 16kHz mono
             audio_segment = audio_segment.set_frame_rate(16000).set_channels(1)
-            
+
             # Get raw PCM data
-            samples = np.array(audio_segment.get_array_of_samples(), dtype=np.int16)
-            
+            samples = np.array(
+                audio_segment.get_array_of_samples(), dtype=np.int16)
+
             # Run VAD prediction
             vad_score = self.vad(samples)
-            
+
             # Get rolling average
             avg_score = self.vad.get_average_score()
-            
+
             return {
                 "success": True,
                 "vad_score": float(vad_score),
@@ -216,15 +219,16 @@ class VADService:
                 "buffer_size": len(self.vad.prediction_buffer),
                 "audio_duration_ms": len(audio_segment)
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
                 "vad_score": 0.0,
+                "average_score": 0.0,
                 "is_speech": False
             }
-    
+
     def analyze_audio_base64(
         self,
         audio_b64: str,
@@ -233,12 +237,12 @@ class VADService:
     ) -> dict:
         """
         Analyze base64-encoded audio for voice activity
-        
+
         Args:
             audio_b64: Base64-encoded audio data
             audio_format: Format of the audio
             reset_state: Whether to reset VAD state
-            
+
         Returns:
             dict with VAD score and metadata
         """
@@ -250,9 +254,10 @@ class VADService:
                 "success": False,
                 "error": f"Base64 decode error: {str(e)}",
                 "vad_score": 0.0,
+                "average_score": 0.0,
                 "is_speech": False
             }
-    
+
     def reset(self):
         """Reset VAD state and buffer"""
         self.vad.reset_states()
@@ -269,4 +274,3 @@ def get_vad_service() -> VADService:
     if _vad_service is None:
         _vad_service = VADService()
     return _vad_service
-

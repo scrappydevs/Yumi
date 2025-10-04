@@ -1,14 +1,13 @@
 /**
- * VAD (Voice Activity Detection) Recording Hook
+ * Audio Recording Hook (VAD Disabled)
  * 
- * Uses MediaRecorder to capture audio and analyzes it with backend VAD service
- * to automatically stop recording when speech ends (silence detected).
+ * Uses MediaRecorder to capture audio with Whisper transcription.
+ * Note: VAD (Voice Activity Detection) is disabled - manual stop required.
  * 
  * Features:
  * - Real-time audio recording
- * - Automatic silence detection via VAD
- * - Auto-stop after configurable silence duration
  * - Whisper transcription integration
+ * - Manual stop control
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -61,88 +60,24 @@ export function useVADRecording({
 
   /**
    * Analyze audio chunk with backend VAD service
+   * NOTE: VAD is disabled - this function is a no-op
    */
   const analyzeAudioChunk = async (audioBlob: Blob): Promise<number> => {
-    try {
-      // Convert blob to base64
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const base64Audio = btoa(
-        new Uint8Array(arrayBuffer).reduce(
-          (data, byte) => data + String.fromCharCode(byte),
-          ''
-        )
-      );
-
-      // Call VAD endpoint
-      const response = await fetch('/api/audio/vad/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audio_b64: base64Audio,
-          audio_format: 'webm',
-          reset_state: false,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('VAD analysis failed');
-      }
-
-      const data = await response.json();
-      return data.average_score || 0;
-    } catch (error) {
-      console.error('VAD analysis error:', error);
-      return 0;
-    }
+    // VAD disabled - return 0
+    return 0;
   };
 
   /**
    * Check for silence and auto-stop if needed
+   * NOTE: VAD is disabled - this function is a no-op
    */
   const checkSilence = useCallback(async () => {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
-      return;
-    }
-
-    const now = Date.now();
-    
-    // Only check if enough time has passed
-    if (now - lastCheckTimeRef.current < checkInterval) {
-      return;
-    }
-
-    lastCheckTimeRef.current = now;
-
-    // Get recent audio chunk for VAD analysis
-    if (audioChunksRef.current.length > 0) {
-      const recentChunk = audioChunksRef.current[audioChunksRef.current.length - 1];
-      const vadScore = await analyzeAudioChunk(recentChunk);
-
-      setState((prev) => ({
-        ...prev,
-        vadScore,
-        isSpeechDetected: vadScore > speechThreshold,
-      }));
-
-      // Track speech detection
-      if (vadScore > speechThreshold) {
-        hasDetectedSpeechRef.current = true;
-        silenceStartRef.current = null; // Reset silence timer
-      } else if (hasDetectedSpeechRef.current) {
-        // Only start counting silence after we've detected speech
-        if (silenceStartRef.current === null) {
-          silenceStartRef.current = now;
-        } else if (now - silenceStartRef.current >= silenceThreshold) {
-          // Silence threshold reached - auto stop
-          console.log('🛑 Silence detected, auto-stopping recording');
-          stopRecording();
-        }
-      }
-    }
-  }, [checkInterval, speechThreshold, silenceThreshold]);
+    // VAD disabled - no automatic silence detection
+    return;
+  }, []);
 
   /**
-   * Start recording with VAD
+   * Start recording (VAD disabled - manual stop required)
    */
   const startRecording = useCallback(async () => {
     try {
@@ -196,8 +131,7 @@ export function useVADRecording({
       // Start recording with chunks every second
       mediaRecorder.start(1000);
 
-      // Reset VAD state on backend
-      await fetch('/api/audio/vad/reset', { method: 'POST' });
+      // VAD disabled - no backend reset needed
 
       setState((prev) => ({
         ...prev,
@@ -208,8 +142,7 @@ export function useVADRecording({
         isSpeechDetected: false,
       }));
 
-      // Start silence checking
-      checkIntervalRef.current = setInterval(checkSilence, checkInterval / 2);
+      // VAD disabled - no silence checking interval
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start recording';
       setState((prev) => ({ ...prev, error: errorMessage }));
@@ -217,7 +150,7 @@ export function useVADRecording({
         onError(error instanceof Error ? error : new Error(errorMessage));
       }
     }
-  }, [checkInterval, checkSilence, onError]);
+  }, [onError]);
 
   /**
    * Stop recording manually
@@ -248,7 +181,8 @@ export function useVADRecording({
       );
 
       // Call Whisper transcription endpoint
-      const response = await fetch('/api/audio/stt/transcribe', {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/audio/stt/transcribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
