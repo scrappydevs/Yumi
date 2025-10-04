@@ -45,24 +45,34 @@ export function useSimpleTTS() {
       // Store reference to current audio
       currentAudioRef.current = audio;
 
-      // Wait for it to end
+      // Wait for it to end (with 10-second timeout)
       await new Promise<void>((resolve) => {
         let playPromise: Promise<void> | null = null;
+        let timeoutId: NodeJS.Timeout | null = null;
         
-        audio.onended = () => {
-          console.log('[TTS] Finished:', text);
+        const cleanup = () => {
+          if (timeoutId) clearTimeout(timeoutId);
           setIsSpeaking(false);
           if (currentAudioRef.current === audio) {
             currentAudioRef.current = null;
           }
+        };
+        
+        // 10-second timeout to prevent infinite hangs
+        timeoutId = setTimeout(() => {
+          console.warn('[TTS] Timeout after 10 seconds for:', text);
+          cleanup();
+          resolve();
+        }, 10000);
+        
+        audio.onended = () => {
+          console.log('[TTS] Finished:', text);
+          cleanup();
           resolve();
         };
         audio.onerror = (e) => {
           console.error('[TTS] Audio error - likely rate limit or network issue. Failing silently.');
-          setIsSpeaking(false);
-          if (currentAudioRef.current === audio) {
-            currentAudioRef.current = null;
-          }
+          cleanup();
           resolve();
         };
         

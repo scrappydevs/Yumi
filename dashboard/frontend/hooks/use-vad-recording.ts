@@ -117,6 +117,8 @@ export function useVADRecording({
 
       // Call streaming transcription endpoint
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      console.log('🎤 Calling transcription API with', audioChunks.length, 'chunks');
+      
       const response = await fetch(`${backendUrl}/api/audio/stt/transcribe-chunk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,12 +130,16 @@ export function useVADRecording({
         }),
       });
 
+      console.log('🎤 Transcription API response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        console.warn('Chunk transcription failed (non-critical)');
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.warn('❌ Chunk transcription failed:', response.status, errorText);
         return;
       }
 
       const data = await response.json();
+      console.log('🎤 Transcription API response data:', data);
       
       if (data.success && data.text && data.text.trim()) {
         // Accumulate transcription
@@ -144,11 +150,24 @@ export function useVADRecording({
         
         // Call partial transcription callback using ref (always has latest callback)
         if (onPartialTranscriptionRef.current) {
+          console.log('📝 Calling onPartialTranscription callback');
           onPartialTranscriptionRef.current(accumulatedTranscriptionRef.current);
+        } else {
+          console.warn('⚠️ No onPartialTranscription callback set!');
         }
+      } else {
+        console.warn('⚠️ Transcription response invalid:', {
+          success: data.success,
+          hasText: !!data.text,
+          textTrimmed: data.text?.trim()
+        });
       }
     } catch (error) {
-      console.warn('Chunk transcription error (non-critical):', error);
+      console.error('❌❌ Chunk transcription error:', error);
+      console.error('❌❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown',
+        stack: error instanceof Error ? error.stack : 'No stack'
+      });
     }
   };
 

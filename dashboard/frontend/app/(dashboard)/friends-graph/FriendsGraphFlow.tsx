@@ -28,6 +28,7 @@ import { FriendNode } from './components/types';
 import { useGraphData } from './components/hooks/useGraphData';
 import { useGraphLayout } from './components/hooks/useGraphLayout';
 import { createClient } from '@/lib/supabase/client';
+import { Loader2 } from 'lucide-react';
 
 // Register node types (like auctor-1)
 type GraphNode = FriendNode;
@@ -103,10 +104,8 @@ function FriendsGraphFlow() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center liquid-glass">
-        <div className="glass-panel p-8 rounded-2xl">
-          <p className="text-slate-700">Loading friend network...</p>
-        </div>
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
       </div>
     );
   }
@@ -123,39 +122,41 @@ function FriendsGraphFlow() {
   }
 
   return (
-    <>
-      <div className="h-full w-full relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          connectionLineType={ConnectionLineType.Bezier}
-          proOptions={proOptions}
-          fitView
-          className="liquid-glass"
-        >
-          <Background className="opacity-50" />
-          <Controls className="glass-panel" />
-          <MiniMap 
-            nodeComponent={GraphMinimap}
-            className="glass-panel rounded-lg"
-            maskColor="rgba(248, 250, 252, 0.4)"
-          />
-        </ReactFlow>
-      </div>
-      
-      {/* User detail panel overlay - fixed positioning, outside ReactFlow */}
-      <UserDetailPanel
-        userId={selectedNode}
-        currentUserId={userId}
-        onClose={() => setSelectedNode(null)}
-      />
-    </>
+    <div className="h-full w-full relative">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        connectionLineType={ConnectionLineType.Bezier}
+        proOptions={proOptions}
+        fitView
+        className="liquid-glass"
+      >
+        <Background className="opacity-50" />
+        <Controls className="glass-panel" />
+        <MiniMap 
+          nodeComponent={GraphMinimap}
+          className="glass-panel rounded-lg"
+          maskColor="rgba(248, 250, 252, 0.4)"
+        />
+        
+        {/* User detail panel - positioned within ReactFlow like auctor-1 */}
+        {selectedNode && (
+          <Panel position="top-right">
+            <UserDetailPanel
+              userId={selectedNode}
+              currentUserId={userId}
+              onClose={() => setSelectedNode(null)}
+            />
+          </Panel>
+        )}
+      </ReactFlow>
+    </div>
   );
 }
 

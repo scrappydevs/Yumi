@@ -190,7 +190,7 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
                     'source': user_id,
                     'target': friend['id'],
                     'similarity_score': 0.5,
-                    'explanation': 'Friends on Yummy',
+                    'explanation': 'Friends on Yumi',
                 })
         
         graph_data = {

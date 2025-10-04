@@ -250,14 +250,24 @@ class RestaurantSearchService:
         Returns:
             Search results with top 3-4 restaurants and reasoning
         """
-        print(f"[RESTAURANT SEARCH] Query: '{query}'")
-        print(f"[RESTAURANT SEARCH] User: {user_id}")
-        print(f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
+        import time
+        search_start = time.time()
 
+        print(f"\n{'='*80}")
+        print(f"[RESTAURANT SEARCH] 🍽️  STARTING SEARCH SERVICE")
+        print(f"{'='*80}")
+        print(f"[RESTAURANT SEARCH] Query: '{query}'")
+        print(f"[RESTAURANT SEARCH] User: {user_id[:8]}...")
+        print(f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
         try:
             # Step 1: Get user preferences
-            print(f"[RESTAURANT SEARCH] Step 1: Getting user preferences...")
+            step1_start = time.time()
+            print(f"[RESTAURANT SEARCH] ⏱️  Step 1/4: Getting user preferences...")
             preferences = self.get_user_preferences_tool(user_id)
+            print(
+                f"[RESTAURANT SEARCH] ✅ Step 1 completed in {time.time() - step1_start:.2f}s")
+            print(
+                f"[RESTAURANT SEARCH]    Found cuisines: {preferences.get('cuisines', [])[:3]}")
 
             # Step 2: Detect cuisine from query
             cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
@@ -274,6 +284,7 @@ class RestaurantSearchService:
                     break
 
             restaurants = []
+            step2_start = time.time()
 
             if detected_cuisine:
                 # PATH A: Cuisine detected in query
@@ -331,7 +342,6 @@ class RestaurantSearchService:
                     else:
                         print(
                             f"[RESTAURANT SEARCH] No matches for preferred cuisines, keeping all results")
-
             if not restaurants:
                 return {
                     "status": "success",
@@ -342,6 +352,7 @@ class RestaurantSearchService:
                 }
 
             # Step 3: Format data for LLM with quality-focused ranking
+            step3_start = time.time()
             print(f"\n{'='*80}")
             print(f"[RESTAURANT SEARCH] 🤖 STEP 3: LLM ANALYSIS & RANKING")
             print(
@@ -484,16 +495,25 @@ IMPORTANT:
                 f"[RESTAURANT SEARCH]   - Restaurants in prompt: {len(restaurants)}")
             print(f"[RESTAURANT SEARCH] 🤖 Calling Gemini LLM...")
 
-            # Call Gemini
-            model = self.gemini_service.model
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
+            # Step 4: Call Gemini LLM
+            step4_start = time.time()
+            print(f"\n[RESTAURANT SEARCH] ⏱️  Step 4/4: Calling Gemini AI...")
+            print(f"[RESTAURANT SEARCH]    🤖 Waiting for LLM response...")
 
-            print(f"\n[RESTAURANT SEARCH] 📥 LLM RESPONSE RECEIVED:")
-            print(f"{'─'*80}")
-            print(response_text)
-            print(f"{'─'*80}")
-
+            try:
+                model = self.gemini_service.model
+                response = model.generate_content(prompt)
+                llm_elapsed = time.time() - step4_start
+                print(
+                    f"[RESTAURANT SEARCH] ✅ Gemini responded in {llm_elapsed:.2f}s")
+                response_text = response.text.strip()
+                print(
+                    f"[RESTAURANT SEARCH]    Response length: {len(response_text)} characters")
+            except Exception as e:
+                llm_elapsed = time.time() - step4_start
+                print(
+                    f"[RESTAURANT SEARCH] ❌ Gemini error after {llm_elapsed:.2f}s: {str(e)}")
+                raise
             # Clean up markdown
             if response_text.startswith("```json"):
                 response_text = response_text[7:]
@@ -505,21 +525,21 @@ IMPORTANT:
 
             # Parse JSON
             import json
-            print(f"[RESTAURANT SEARCH] 🔄 Parsing LLM JSON response...")
-            result = json.loads(response_text)
+            print(f"[RESTAURANT SEARCH]    Parsing JSON response...")
+            try:
+                result = json.loads(response_text)
+                print(f"[RESTAURANT SEARCH]    ✅ JSON parsed successfully")
+            except json.JSONDecodeError as e:
+                print(f"[RESTAURANT SEARCH]    ❌ JSON parse error: {str(e)}")
+                print(
+                    f"[RESTAURANT SEARCH]    Response text preview: {response_text[:200]}...")
+                raise
 
             # Log what LLM recommended
-            print(f"\n[RESTAURANT SEARCH] ✅ LLM RECOMMENDATIONS:")
+            print(f"\n[RESTAURANT SEARCH] 📋 LLM recommendations:")
             for i, rec in enumerate(result.get('top_restaurants', []), 1):
-                print(f"[RESTAURANT SEARCH]   {i}. {rec.get('name')}")
                 print(
-                    f"[RESTAURANT SEARCH]      - Cuisine: {rec.get('cuisine')}")
-                print(
-                    f"[RESTAURANT SEARCH]      - Rating: {rec.get('rating')}⭐")
-                print(
-                    f"[RESTAURANT SEARCH]      - Match Score: {rec.get('match_score', 'N/A')}")
-                print(
-                    f"[RESTAURANT SEARCH]      - Reasoning: {rec.get('reasoning', 'No reason')}")
+                    f"       {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}...")
 
             # CRITICAL: Enrich LLM results with full restaurant data using fuzzy matching
             print(
@@ -588,22 +608,25 @@ IMPORTANT:
                 "longitude": longitude
             }
 
+            total_elapsed = time.time() - search_start
             print(f"\n{'='*80}")
-            print(f"[RESTAURANT SEARCH] ✅ FINAL RESULTS")
-            print(f"[RESTAURANT SEARCH] Path taken: {result['path']}")
+            print(f"[RESTAURANT SEARCH] ✅ SEARCH COMPLETED SUCCESSFULLY")
+            print(f"{'='*80}")
+            print(f"[RESTAURANT SEARCH] Total time: {total_elapsed:.2f}s")
             print(
-                f"[RESTAURANT SEARCH] Returning {len(enriched_restaurants)} top restaurants:")
-            for i, r in enumerate(enriched_restaurants, 1):
-                print(
-                    f"[RESTAURANT SEARCH]   {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐)")
-                print(
-                    f"[RESTAURANT SEARCH]      Match Score: {r.get('match_score', 'N/A')}")
-                print(
-                    f"[RESTAURANT SEARCH]      Reasoning: {r.get('reasoning', 'N/A')}")
+                f"[RESTAURANT SEARCH]    - Step 1 (Preferences): ~{time.time() - step1_start:.2f}s")
             print(
-                f"[RESTAURANT SEARCH] Plus {len(restaurants[:20])} nearby restaurants for map")
+                f"[RESTAURANT SEARCH]    - Step 2 (Find Restaurants): ~{time.time() - step2_start:.2f}s")
+            print(
+                f"[RESTAURANT SEARCH]    - Step 3 (Build Prompt): ~{time.time() - step3_start:.2f}s")
+            print(
+                f"[RESTAURANT SEARCH]    - Step 4 (LLM Call): ~{llm_elapsed:.2f}s")
+            print(
+                f"[RESTAURANT SEARCH] Returning {len(result.get('top_restaurants', []))} top restaurants")
             print(f"{'='*80}\n")
 
+            # Clean up
+            self._current_search_cuisine = None
             return result
 
         except Exception as e:

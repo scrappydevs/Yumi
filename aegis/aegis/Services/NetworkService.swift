@@ -11,9 +11,8 @@ import UIKit
 class NetworkService {
     static let shared = NetworkService()
 
-    // Backend URL - Physical iPhone connects to Mac's current WiFi IP
-    // IMPORTANT: Update this if your Mac's IP changes
-    private let baseURL = "http://10.253.26.187:8000"
+    // Backend URL - Using ngrok tunnel to local backend
+    private let baseURL = "https://unsliding-deena-unsportful.ngrok-free.dev"
 
     private init() {}
 
@@ -228,6 +227,124 @@ class NetworkService {
         decoder.dateDecodingStrategy = .iso8601
         let graphData = try decoder.decode(FoodGraphData.self, from: data)
         return graphData
+    }
+    
+    // MARK: - Friends Management
+    
+    // Fetch current user's profile
+    func fetchMyProfile(authToken: String) async throws -> Profile {
+        let url = URL(string: "\(baseURL)/api/profiles/me")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let profile = try decoder.decode(Profile.self, from: data)
+        return profile
+    }
+    
+    // Fetch user's friends
+    func fetchFriends(authToken: String) async throws -> [Profile] {
+        let url = URL(string: "\(baseURL)/api/friends")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let friends = try decoder.decode([Profile].self, from: data)
+        return friends
+    }
+    
+    // Search for users by username
+    func searchUsers(query: String, authToken: String) async throws -> [Profile] {
+        guard !query.isEmpty else { return [] }
+        
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        let url = URL(string: "\(baseURL)/api/users/search?q=\(encodedQuery)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let users = try decoder.decode([Profile].self, from: data)
+        return users
+    }
+    
+    // Add a friend
+    func addFriend(friendId: UUID, authToken: String) async throws {
+        let url = URL(string: "\(baseURL)/api/friends/add")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["friend_id": friendId.uuidString]
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+    }
+    
+    // Remove a friend
+    func removeFriend(friendId: UUID, authToken: String) async throws {
+        let url = URL(string: "\(baseURL)/api/friends/remove")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["friend_id": friendId.uuidString]
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
     }
 }
 
