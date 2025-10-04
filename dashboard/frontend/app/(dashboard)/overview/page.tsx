@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
 import { MetallicSphereComponent } from '@/components/metallic-sphere';
+import { YummyLogo } from '@/components/yummy-logo';
 
 // Mock restaurant data with food images
 const SAMPLE_RESTAURANTS = [
@@ -191,6 +192,7 @@ export default function DiscoverPage() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [expandedOnce, setExpandedOnce] = useState(false);
+  const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -211,6 +213,36 @@ export default function DiscoverPage() {
     }
   }, [isThinking]);
 
+  // Cycle images into the glob and bring new ones out
+  useEffect(() => {
+    if (!isThinking) {
+      setAbsorbedIndices([]);
+      return;
+    }
+
+    // Sequentially absorb 2-3 images at a time, then release them
+    const cycleInterval = setInterval(() => {
+      setAbsorbedIndices((prev) => {
+        // If we have absorbed images, release them and absorb new ones
+        if (prev.length > 0) {
+          return [];
+        }
+        // Absorb 2-3 random images from the visible set
+        const numToAbsorb = Math.floor(Math.random() * 2) + 2; // 2 or 3 images
+        const availableIndices = Array.from({ length: 10 }, (_, i) => i);
+        const selected: number[] = [];
+        for (let i = 0; i < numToAbsorb && availableIndices.length > 0; i++) {
+          const randomIdx = Math.floor(Math.random() * availableIndices.length);
+          selected.push(availableIndices[randomIdx]);
+          availableIndices.splice(randomIdx, 1);
+        }
+        return selected;
+      });
+    }, 1800); // Cycle every 1.8 seconds
+
+    return () => clearInterval(cycleInterval);
+  }, [isThinking]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Prompt:', prompt);
@@ -227,6 +259,35 @@ export default function DiscoverPage() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
+      
+      {/* Yummy Logo - Top Center */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+        <motion.div
+          className="glass-layer-1 rounded-3xl shadow-strong relative overflow-hidden"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ 
+            y: 0, 
+            opacity: 1,
+          }}
+          transition={{ 
+            delay: 0.05,
+            duration: 0.8,
+            ease: "easeOut"
+          }}
+          style={{
+            width: '140px',
+            height: '80px',
+          }}
+        >
+          {/* Specular highlight */}
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
+          
+          {/* Three.js Logo */}
+          <div className="w-full h-full relative">
+            <YummyLogo isAnimating={isThinking} />
+          </div>
+        </motion.div>
+      </div>
       
       {/* Test Button - Top Left */}
       <div className="absolute top-6 left-6 z-10">
@@ -493,10 +554,13 @@ export default function DiscoverPage() {
           <AnimatePresence mode="sync">
           {(() => {
             // Always render all 20 restaurants, but control visibility
-            // First 10 are the "core" images, next 10 are "new" images
+            // First 10 are the "core" images, next 10 fill in between
             return SAMPLE_RESTAURANTS.map((restaurant, index) => {
               const isCore = index < 10; // First 10 are core images
               const shouldShow = isCore || isThinking; // Show new images only when thinking
+              
+              // Check if this image is being absorbed into the glob
+              const isAbsorbed = isThinking && isCore && absorbedIndices.includes(index);
               
               // For core images: use their index (0-9)
               // For new images: interleave between core images (0.5, 1.5, 2.5, etc.)
@@ -504,13 +568,9 @@ export default function DiscoverPage() {
               const totalSlots = isThinking ? 20 : 10;
               
               const angle = ((effectiveIndex / 10) * 360 + rotation) * (Math.PI / 180);
-              
-              // When thinking: core images move INTO the blob (small radius), new images go to outer circle
-              // When not thinking: core images at normal radius
-              const radius = isThinking 
-                ? (isCore ? 80 : 350)  // Core images move into blob, new images at outer circle
-                : 200;  // Normal state
-              
+              // If absorbed, move towards center (smaller radius), otherwise normal radius
+              const targetRadius = isAbsorbed ? 60 : (isThinking ? 350 : 200);
+              const radius = targetRadius;
               const x = 350 + Math.cos(angle) * radius;
               const y = 350 + Math.sin(angle) * radius;
             
@@ -524,19 +584,22 @@ export default function DiscoverPage() {
                 animate={{
                   left: x,
                   top: y,
+                  opacity: isAbsorbed ? 0.3 : 1,
+                  scale: isAbsorbed ? 0.6 : 1,
                 }}
                 exit={{
                   opacity: 0,
                   scale: 0.8,
-                  transition: { duration: 0.4 }
+                  transition: { duration: 0.00 }
                 }}
                 transition={{
-                  duration: 0.8,  // Smooth transition for movement
-                  ease: [0.22, 1, 0.36, 1],
+                  duration: isAbsorbed ? 0.6 : 0.00,
+                  ease: isAbsorbed ? [0.4, 0.0, 0.2, 1] : [0.22, 1, 0.36, 1],
                 }}
                 style={{
                   x: '-50%',
                   y: '-50%',
+                  zIndex: isAbsorbed ? 1 : 'auto',
                 }}
               >
                 <motion.div
@@ -545,55 +608,49 @@ export default function DiscoverPage() {
                     background: 'rgba(255, 255, 255, 0.35)',
                     backdropFilter: 'blur(30px) saturate(180%)',
                     border: '0.25px solid rgba(0, 0, 0, 0.08)',
-                    boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                    boxShadow: isAbsorbed 
+                      ? 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 0 40px rgba(139, 92, 246, 0.6), 0 0 60px rgba(59, 130, 246, 0.4)'
+                      : 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                     transformStyle: 'preserve-3d',
                   }}
                   initial={{ opacity: isCore ? 1 : 0, scale: isCore ? 1 : 0.8 }}
                   animate={{ 
-                    opacity: isThinking ? (isCore ? 0.4 : 1) : 1,  // Core images fade when absorbed
-                    scale: isThinking 
-                      ? (isCore 
-                          ? [0.5, 0.45, 0.52, 0.48, 0.51, 0.5]  // Smaller when absorbed into blob
-                          : [1, 0.95, 1.02, 0.98, 1.01, 1])     // Normal animation for outer images
-                      : 1,
+                    opacity: 1,
+                    scale: isThinking ? [1, 0.95, 1.02, 0.98, 1.01, 1] : 1,
                     rotateX: isThinking ? [0, 8, -5, 3, -2, 0] : 0,
                     rotateY: isThinking ? [0, -6, 8, -4, 2, 0] : 0,
                     rotateZ: isThinking ? [0, -3, 4, -2, 1, 0] : 0,
                     y: isThinking ? [0, -4, 2, -1, 1, 0] : 0,
                   }}
                   transition={isThinking ? {
-                    delay: isCore ? 0 : 0.15,  // New images appear after core ones are absorbed
-                    opacity: {
-                      duration: 0.6,
-                      ease: [0.4, 0, 0.2, 1]
-                    },
+                    delay: isCore ? 0 : 0.1,
                     scale: {
-                      duration: 2 + index * 0.2,
+                      duration: 0.1 + index * 0.2,
                       repeat: Infinity,
                       ease: [0.4, 0, 0.6, 1]
                     },
                     rotateX: {
-                      duration: 2 + index * 0.25,
+                      duration: 0.1 + index * 0.25,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     },
                     rotateY: {
-                      duration: 2 + index * 0.3,
+                      duration: 0.1 + index * 0.3,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     },
                     rotateZ: {
-                      duration: 2 + index * 0.22,
+                      duration: 0.1 + index * 0.22,
                       repeat: Infinity,
                       ease: [0.4, 0, 0.6, 1]
                     },
                     y: {
-                      duration: 2 + index * 0.35,
+                      duration: 0.1 + index * 0.35,
                       repeat: Infinity,
                       ease: [0.25, 0.46, 0.45, 0.94]
                     }
                   } : {
-                    duration: 0.8,
+                    duration: 0.05,
                     ease: [0.22, 1, 0.36, 1]
                   }}
                   whileHover={{ 
