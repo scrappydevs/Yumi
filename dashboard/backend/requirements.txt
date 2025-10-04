@@ -16,3 +16,4 @@ twilio==9.3.7
 ics==0.7.2
 python-dateutil==2.9.0
 numpy==1.26.4
+sentence-transformers==3.3.1
