@@ -18,8 +18,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aegis - Civic Infrastructure Intelligence",
-  description: "AI-powered civic engagement platform for municipal infrastructure management",
+  title: "Yummy - Personalized AI Food Recommendations",
+  description: "AI-powered restaurant discovery with personalized recommendations based on your taste profile and preferences",
 };
 
 export default function RootLayout({
@@ -28,7 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark">
+      <head>
+        {/* Preconnect to Google Maps for faster loading */}
+        <link rel="preconnect" href="https://maps.googleapis.com" />
+        <link rel="preconnect" href="https://maps.gstatic.com" />
+        <link rel="dns-prefetch" href="https://maps.googleapis.com" />
+        <link rel="dns-prefetch" href="https://maps.gstatic.com" />
+      </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         style={{ fontFamily: 'var(--font-inter)' }}

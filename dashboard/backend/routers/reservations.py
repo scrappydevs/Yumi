@@ -38,7 +38,7 @@ class SendReservationRequest(BaseModel):
     restaurant_id: str
     starts_at_iso: str
     party_size: int = Field(..., ge=1, le=50)
-    invitees: List[InviteeInput] = Field(..., min_items=1)
+    invitees: List[InviteeInput] = Field(default=[], min_items=0)
 
 
 class InviteLink(BaseModel):
@@ -82,10 +82,11 @@ async def send_reservation(request: SendReservationRequest):
     """
     try:
         supabase = get_supabase()
-        app_base_url = os.getenv("APP_BASE_URL")
+        # Use FRONTEND_URL for invite links (falls back to APP_BASE_URL for backwards compatibility)
+        app_base_url = os.getenv("FRONTEND_URL") or os.getenv("APP_BASE_URL")
         
         if not app_base_url:
-            raise HTTPException(status_code=500, detail="APP_BASE_URL not configured")
+            raise HTTPException(status_code=500, detail="FRONTEND_URL not configured")
         
         # Validate organizer exists and has phone number
         organizer_result = supabase.table("profiles").select("id, phone").eq("id", request.organizer_id).limit(1).execute()
@@ -556,5 +557,42 @@ async def download_ics(reservation_id: str):
         raise
     except Exception as e:
         print(f"Error generating ICS file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{reservation_id}")
+async def delete_reservation(reservation_id: str):
+    """
+    Delete/cancel a reservation (organizer only)
+    """
+    try:
+        supabase = get_supabase()
+        
+        # First check if reservation exists and get organizer info
+        reservation_result = supabase.table("reservations").select("*").eq("id", reservation_id).single().execute()
+        
+        if not reservation_result.data:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        
+        reservation = reservation_result.data
+        
+        # Delete the reservation (cascade will delete related invites)
+        delete_result = supabase.table("reservations").delete().eq("id", reservation_id).execute()
+        
+        if not delete_result.data:
+            raise HTTPException(status_code=500, detail="Failed to delete reservation")
+        
+        print(f"✅ Deleted reservation {reservation_id}")
+        
+        return {
+            "success": True,
+            "message": "Reservation deleted successfully",
+            "reservation_id": reservation_id
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting reservation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

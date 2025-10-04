@@ -191,17 +191,17 @@ async def list_models():
             },
             {
                 "id": "pro",
-                "name": "Gemini Pro",
-                "model": "gemini-1.5-pro",
+                "name": "Gemini Flash",
+                "model": "gemini-2.5-flash",
                 "type": "text",
-                "description": "Balanced model for complex reasoning",
-                "best_for": ["Complex analysis", "Detailed responses", "Balanced performance"],
+                "description": "Most capable model for complex reasoning",
+                "best_for": ["Complex analysis", "Detailed responses", "Best performance"],
                 "endpoint": "/api/ai/generate/pro"
             },
             {
                 "id": "lite",
                 "name": "Gemini Lite",
-                "model": "gemini-1.5-flash-8b",
+                "model": "gemini-2.5-flash-lite",
                 "type": "text",
                 "description": "Lightweight model for efficiency",
                 "best_for": ["Simple tasks", "Low latency", "Cost efficiency"],

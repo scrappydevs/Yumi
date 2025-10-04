@@ -79,127 +79,132 @@ export function OpenIMessageCard({
   }
   
   return (
-    <div className={`bg-white rounded-2xl p-8 shadow-sm border border-gray-100 space-y-6 ${className}`}>
-      {/* Header */}
-      <div className="text-center">
-        <div className="text-5xl mb-3">📱</div>
-        <h2 className="text-2xl font-bold text-black mb-2">Send Invitation</h2>
-        <p className="text-sm text-gray-600">
-          Your reservation has been created
-        </p>
-      </div>
+    <div className={`glass-card rounded-3xl p-8 shadow-strong relative overflow-hidden ${className}`}>
+      {/* Specular highlight */}
+      <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
       
-      {/* Phone Number Section */}
-      <div className="space-y-2">
-        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block">
-          Send to
-        </label>
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleCopyNumber}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              handleCopyNumber()
-            }
-          }}
-          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-between group"
-          data-test="copy-number"
-          aria-label={`Copy phone number ${toNumber}`}
-        >
-          <span className="font-mono text-sm text-gray-800">{toNumber}</span>
-          <div className="flex items-center gap-2">
-            <AnimatePresence>
-              {copiedNumber && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="text-xs text-green-600 font-medium"
-                >
-                  Copied!
-                </motion.span>
-              )}
-            </AnimatePresence>
-            {copiedNumber ? (
-              <Check className="w-4 h-4 text-green-600" />
-            ) : (
-              <Copy className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-            )}
+      <div className="relative space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full glass-layer-1 shadow-soft mb-3 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent rounded-t-full pointer-events-none" />
+            <Check className="w-6 h-6 text-green-600 relative z-10" />
           </div>
-        </div>
-      </div>
-      
-      {/* Message Body Section */}
-      <div className="space-y-2">
-        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block">
-          Message
-        </label>
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleCopyBody}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              handleCopyBody()
-            }
-          }}
-          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors relative group"
-          data-test="copy-body"
-          aria-label="Copy message"
-        >
-          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere pr-8">
-            {presetBody}
+          <h2 className="text-2xl font-bold text-[hsl(var(--foreground))]">Reservation Created</h2>
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            Send invitation to confirm
           </p>
-          <div className="absolute top-3 right-3">
-            <AnimatePresence>
-              {copiedBody && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute -top-1 right-0 text-xs text-green-600 font-medium bg-white px-2 py-1 rounded-md shadow-sm"
-                >
-                  Copied!
-                </motion.span>
+        </div>
+        
+        {/* Phone Number Section */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider block">
+            Send to
+          </label>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={handleCopyNumber}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                handleCopyNumber()
+              }
+            }}
+            className="glass-layer-1 rounded-2xl px-4 py-3.5 cursor-pointer hover:shadow-soft transition-all flex items-center justify-between group relative overflow-hidden"
+            data-test="copy-number"
+            aria-label={`Copy phone number ${toNumber}`}
+          >
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
+            <span className="font-mono text-sm text-[hsl(var(--foreground))] relative z-10">{toNumber}</span>
+            <div className="flex items-center gap-2 relative z-10">
+              <AnimatePresence>
+                {copiedNumber && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="text-xs text-green-600 font-medium"
+                  >
+                    Copied
+                  </motion.span>
+                )}
+              </AnimatePresence>
+              {copiedNumber ? (
+                <Check className="w-4 h-4 text-green-600" />
+              ) : (
+                <Copy className="w-4 h-4 text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--foreground))]" />
               )}
-            </AnimatePresence>
-            {copiedBody ? (
-              <Check className="w-4 h-4 text-green-600" />
-            ) : (
-              <Copy className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-            )}
+            </div>
           </div>
         </div>
+        
+        {/* Message Body Section */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider block">
+            Message
+          </label>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={handleCopyBody}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                handleCopyBody()
+              }
+            }}
+            className="glass-layer-1 rounded-2xl px-4 py-3.5 cursor-pointer hover:shadow-soft transition-all relative group overflow-hidden"
+            data-test="copy-body"
+            aria-label="Copy message"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
+            <p className="text-sm text-[hsl(var(--foreground))] whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere pr-8 relative z-10">
+              {presetBody}
+            </p>
+            <div className="absolute top-3 right-3 z-10">
+              <AnimatePresence>
+                {copiedBody && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute -top-1 right-0 text-xs text-green-600 font-medium bg-white px-2 py-1 rounded-lg shadow-soft"
+                  >
+                    Copied
+                  </motion.span>
+                )}
+              </AnimatePresence>
+              {copiedBody ? (
+                <Check className="w-4 h-4 text-green-600" />
+              ) : (
+                <Copy className="w-4 h-4 text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--foreground))]" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* CTA Button */}
+        <motion.a
+          href={href}
+          rel="noopener"
+          target="_self"
+          className="glass-btn-inline block w-full h-14 text-base font-semibold relative"
+          data-test="open-imessage"
+          aria-label={ctaText}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          {ctaText}
+        </motion.a>
+        
+        {/* Platform Note */}
+        <p className="text-xs text-[hsl(var(--muted-foreground))] text-center px-4">
+          {!isApple
+            ? "If this doesn't open Messages, copy the text and number above and send manually."
+            : "If the message isn't pre-filled, copy it from above and paste into Messages."}
+        </p>
       </div>
-      
-      {/* CTA Button */}
-      <a
-        href={href}
-        rel="noopener"
-        target="_self"
-        className="block w-full gradient-purple-blue text-white rounded-2xl h-16 flex items-center justify-center gap-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-shadow"
-        data-test="open-imessage"
-        aria-label={ctaText}
-      >
-        <span className="text-2xl">💬</span>
-        <span>{ctaText}</span>
-      </a>
-      
-      {/* Platform Note */}
-      {!isApple && (
-        <p className="text-xs text-gray-500 text-center px-4">
-          💡 If this doesn't open Messages, copy the text and number above and send manually.
-        </p>
-      )}
-      
-      {isApple && (
-        <p className="text-xs text-gray-500 text-center px-4">
-          💡 If the message isn't pre-filled, copy it from above and paste into Messages.
-        </p>
-      )}
     </div>
   )
 }

@@ -23,7 +23,7 @@ services:
       # - TWILIO_AUTH_TOKEN (Twilio auth token)
       # - TWILIO_PHONE_NUMBER (Twilio phone number)
       # - JWT_SECRET (for JWT token signing - generate a secure random string)
-      # - FRONTEND_URL (URL of your Netlify deployment)
+      # - FRONTEND_URL (URL of your frontend deployment - used for invitation links, e.g., https://yummy.app)
     healthCheckPath: /health
     autoDeploy: true
     disk:

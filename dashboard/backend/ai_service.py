@@ -138,7 +138,7 @@ class GeminiAIService:
             Dict containing response and metadata
         """
         return self._generate_content(
-            model="gemini-1.5-pro",
+            model="gemini-2.5-flash",
             prompt=prompt,
             system_instruction=system_instruction,
             temperature=temperature,
@@ -165,7 +165,7 @@ class GeminiAIService:
             Dict containing response and metadata
         """
         return self._generate_content(
-            model="gemini-1.5-flash-8b",
+            model="gemini-2.5-flash-lite",
             prompt=prompt,
             system_instruction=system_instruction,
             temperature=temperature

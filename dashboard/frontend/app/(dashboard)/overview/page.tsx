@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import NextImage from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -15,8 +16,6 @@ import {
   Mic,
   Volume2,
   VolumeX,
-  Locate,
-  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
@@ -24,7 +23,7 @@ import { MetallicSphereComponent } from '@/components/metallic-sphere';
 import { MentionInput } from '@/components/ui/mention-input';
 import { Mention } from '@/hooks/use-friend-mentions';
 import { useSimpleTTS } from '@/hooks/use-simple-tts';
-import { useGeolocation } from '@/hooks/use-geolocation';
+import { useVADRecording } from '@/hooks/use-vad-recording';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 
@@ -175,6 +174,7 @@ export default function DiscoverPage() {
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const rotationCyclesRef = useRef(0);  // Use ref for real-time access in interval
   const [location, setLocation] = useState('Boston');  // Default to Boston
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
@@ -184,12 +184,10 @@ export default function DiscoverPage() {
   const [userCoords, setUserCoords] = useState<{lat: number, lng: number} | null>(null);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
+  const [glowingIndices, setGlowingIndices] = useState<Set<number>>(new Set());
 
   // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
   const loadingPhrases = useMemo(() => [
@@ -208,9 +206,38 @@ export default function DiscoverPage() {
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(false);
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const [volume, setVolume] = useState(0.8); // 80% default volume
+  const [friendsData, setFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string, recent_activity?: string}>>([]);
+  const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, recentReviews?: any[], favoriteRestaurants?: any[]} | null>(null);
+  const [mentionedFriendsData, setMentionedFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string}>>([]);
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
-  const { coords: detectedCoords, isLoading: isDetectingLocation, error: locationError, getCurrentLocation } = useGeolocation(false); // Don't auto-fetch - only on user action
   const { user } = useAuth();
+  
+  // VAD Recording hook for auto-stop on silence with streaming transcription
+  const {
+    isRecording,
+    isTranscribing,
+    vadScore,
+    isSpeechDetected,
+    toggleRecording,
+  } = useVADRecording({
+    silenceThreshold: 2500, // 2.5 seconds of silence
+    speechThreshold: 0.5,
+    enableStreaming: true, // Enable real-time streaming transcription
+    streamingInterval: 2000, // Send chunks every 2 seconds
+    onPartialTranscription: (text) => {
+      // Update prompt with streaming text in real-time
+      console.log('[Overview] Received partial transcription:', text);
+      setPrompt(text);
+    },
+    onTranscriptionComplete: (text) => {
+      // Final transcription (more accurate)
+      console.log('[Overview] Received final transcription:', text);
+      setPrompt(text);
+    },
+    onError: (error) => {
+      console.error('VAD Recording error:', error);
+    },
+  });
   
   // Derived state: is this a group search?
   const isGroupSearch = mentions.length > 0;
@@ -222,37 +249,65 @@ export default function DiscoverPage() {
     }
   }, [volume, setAudioVolume]);
 
-  // Update userCoords when geolocation hook detects location
-  useEffect(() => {
-    if (detectedCoords) {
-      setUserCoords(detectedCoords);
-      setIsUsingCurrentLocation(true);
-      
-      // Auto-detect closest city
-      const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
-        const distance = Math.sqrt(
-          Math.pow(detectedCoords.lat - cityCoords.lat, 2) + 
-          Math.pow(detectedCoords.lng - cityCoords.lng, 2)
-        );
-        return { city, distance };
-      });
-      
-      const closest = distances.sort((a, b) => a.distance - b.distance)[0];
-      if (closest) {
-        console.log(`🎯 Closest city to current location: ${closest.city}`);
-        setLocation(closest.city);
-      }
-    }
-  }, [detectedCoords]);
-
   useEffect(() => {
     setMounted(true);
+    console.log('🎬 Orbit animation started! Initial cycles:', rotationCyclesRef.current);
     
     // Orbit animation - smooth rotation at all times
     const interval = setInterval(() => {
-      const speed = isThinking ? 1.2 : (showingResults ? 0.6 : 0.8);  // Slightly faster during thinking, but smooth
-      setRotation((prev) => (prev + speed) % 360);
+      // Dynamic speed based on state and cycle count
+      let speed;
+      if (isThinking) {
+        speed = 1.2;  // Faster during thinking
+      } else if (showingResults) {
+        speed = 0.6;  // Slower when showing results
+      } else {
+        // Latent state: SUPER fast for first 2 cycles, then slow down
+        speed = rotationCyclesRef.current < 1 ? 5.0 : 0.8;
+      }
+      
+      setRotation((prev) => {
+        const newRotation = (prev + speed) % 360;
+        // Track complete cycles (when we pass 360/0 degrees)
+        if (prev > newRotation && !isThinking && !showingResults) {
+          rotationCyclesRef.current += 1;
+          console.log(`🔄 Rotation cycle complete! Count: ${rotationCyclesRef.current}, Speed will be: ${rotationCyclesRef.current < 1 ? 5.0 : 0.8}`);
+        }
+        return newRotation;
+      });
     }, 50);
+    
+    // Get user's actual geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserCoords(coords);
+          console.log(`📍 Detected location: ${coords.lat}, ${coords.lng}`);
+          
+          // Auto-detect closest city
+          const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
+            const distance = Math.sqrt(
+              Math.pow(coords.lat - cityCoords.lat, 2) + 
+              Math.pow(coords.lng - cityCoords.lng, 2)
+            );
+            return { city, distance };
+          });
+          
+          const closest = distances.sort((a, b) => a.distance - b.distance)[0];
+          if (closest) {
+            console.log(`🎯 Closest city: ${closest.city}`);
+            setLocation(closest.city);
+          }
+        },
+        (error) => {
+          console.warn('Geolocation error:', error.message);
+        }
+      );
+    }
     
     return () => {
       clearInterval(interval);
@@ -270,24 +325,99 @@ export default function DiscoverPage() {
     }
   }, [user, mounted, location, isLoadingDefaults, isThinking, lastLoadedLocation]); // location change triggers reload
 
-  // Rotate phrases while thinking/loading
+  // Load friends data for profile pictures
+  useEffect(() => {
+    if (!user || !mounted) return;
+
+    async function loadFriends() {
+      try {
+        const supabase = createClient();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('friends')
+          .eq('id', user!.id)
+          .single();
+
+        if (profile?.friends && profile.friends.length > 0) {
+          // Fetch friend profiles (limit to 6 for cleaner orbit)
+          const { data: friends } = await supabase
+            .from('profiles')
+            .select('id, username, display_name, avatar_url')
+            .in('id', profile.friends.slice(0, 6));
+
+          if (friends) {
+            setFriendsData(friends);
+            console.log(`👥 Loaded ${friends.length} friends for orbit`);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading friends:', error);
+      }
+    }
+
+    loadFriends();
+  }, [user, mounted]);
+
+  // Load mentioned friends' full profiles
+  useEffect(() => {
+    if (!user || mentions.length === 0) {
+      setMentionedFriendsData([]);
+      return;
+    }
+
+    async function loadMentionedFriends() {
+      try {
+        const supabase = createClient();
+        const mentionIds = mentions.map(m => m.id);
+        
+        const { data: mentionedProfiles } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .in('id', mentionIds);
+
+        if (mentionedProfiles) {
+          setMentionedFriendsData(mentionedProfiles);
+          console.log(`👤 Loaded ${mentionedProfiles.length} mentioned friends`);
+        }
+      } catch (error) {
+        console.error('Error loading mentioned friends:', error);
+      }
+    }
+
+    loadMentionedFriends();
+  }, [user, mentions]);
+
+  // Rotate phrases while thinking/loading - Pick 1-3 random phrases
   useEffect(() => {
     if (!isThinking) {
       setCurrentPhrase(loadingPhrases[0]); // Reset to first phrase
       return;
     }
 
+    // Randomly select 1-3 phrases from the list
+    const numPhrases = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3 phrases
+    const shuffled = [...loadingPhrases].sort(() => Math.random() - 0.5);
+    const selectedPhrases = shuffled.slice(0, numPhrases);
+    
+    console.log(`[Overview] Selected ${numPhrases} phrases to speak:`, selectedPhrases);
+
     let phraseIndex = 0;
     
-    // Speak the first phrase when thinking starts (always say the exact text)
-    console.log('[Overview] Starting thinking, first phrase:', loadingPhrases[0]);
+    // Speak the first selected phrase when thinking starts
+    console.log('[Overview] Starting thinking, first phrase:', selectedPhrases[0]);
+    setCurrentPhrase(selectedPhrases[0]);
     if (!isMuted && speak) {
-      speak(loadingPhrases[0]).catch(err => console.error('Speak error:', err));
+      speak(selectedPhrases[0]).catch(err => console.error('Speak error:', err));
+    }
+
+    if (selectedPhrases.length === 1) {
+      // Only one phrase, no need for interval
+      return;
     }
 
     const interval = setInterval(() => {
-      phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-      const newPhrase = loadingPhrases[phraseIndex];
+      phraseIndex = (phraseIndex + 1) % selectedPhrases.length;
+      const newPhrase = selectedPhrases[phraseIndex];
       console.log('[Overview] Rotating to phrase:', newPhrase);
       setCurrentPhrase(newPhrase);
       
@@ -295,10 +425,10 @@ export default function DiscoverPage() {
       if (!isMuted && speak) {
         speak(newPhrase).catch(err => console.error('Speak error:', err));
       }
-    }, 3000); // Change phrase every 3 seconds
+    }, 6000); // Change phrase every 6 seconds (more spaced out)
 
     return () => clearInterval(interval);
-  }, [isThinking, loadingPhrases, isMuted, speak]); // Added speak back with proper handling
+  }, [isThinking, loadingPhrases, isMuted, speak]);
 
   useEffect(() => {
     if (isThinking) {
@@ -315,38 +445,56 @@ export default function DiscoverPage() {
     // No swapping animation during thinking - just let them spin!
   }, [isThinking, isNarrowing]);
 
-  // Initialize Web Speech API
+  // Random glow effect while thinking (but not during narrowing phase)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SpeechRecognition) return;
-    
-    const recognitionInstance = new SpeechRecognition();
-    recognitionInstance.continuous = true;
-    recognitionInstance.interimResults = true;
-    recognitionInstance.lang = 'en-US';
-    
-    recognitionInstance.onresult = (event: any) => {
-      let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+    if (!isThinking || isNarrowing) {
+      setGlowingIndices(new Set());
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const numImages = allNearbyImages.length;
+      if (numImages === 0) return;
+
+      // Randomly select 2-4 images to glow
+      const numToGlow = Math.floor(Math.random() * 3) + 2; // 2 to 4 images
+      const newGlowing = new Set<number>();
+      
+      while (newGlowing.size < Math.min(numToGlow, numImages)) {
+        const randomIndex = Math.floor(Math.random() * numImages);
+        newGlowing.add(randomIndex);
       }
-      setPrompt(transcript);
-    };
-    
-    recognitionInstance.onerror = () => setIsRecording(false);
-    recognitionInstance.onend = () => setIsRecording(false);
-    
-    setRecognition(recognitionInstance);
-  }, []);
+      
+      setGlowingIndices(newGlowing);
+    }, 1500); // Change glowing images every 1.5 seconds
+
+    return () => clearInterval(interval);
+  }, [isThinking, isNarrowing, allNearbyImages.length]);
+
+  // VAD recording now handled by useVADRecording hook above
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    
+    console.log('🚀🚀🚀 HANDLE SUBMIT CALLED 🚀🚀🚀');
+    console.log('🚀 Query:', prompt);
+    console.log('🚀 Mentions:', mentions);
+    
+    // Check if prompt is empty
+    if (!prompt.trim()) {
+      // If we have mentions but no text, show specific message
+      if (mentions.length > 0) {
+        console.log('⚠️ Submission blocked: No query text. Please add what you want (e.g., "I want sushi")');
+      } else {
+        console.log('⚠️ Submission blocked: Empty query');
+      }
+      return;
+    }
     
     const searchQuery = prompt;  // Save the query before clearing
+    const searchMentions = [...mentions];  // Save mentions before clearing
     setPrompt('');  // Clear the input immediately
+    setMentions([]);  // Clear mentions (but keep mentionedFriendsData to show in orbit)
     setIsThinking(true);
     setShowingResults(false);  // Reset results state
     setIsNarrowing(false);  // Reset narrowing state
@@ -354,12 +502,28 @@ export default function DiscoverPage() {
     setSearchResults([]);
     setAllNearbyImages([]); // Reset images for new search
     setVisibleImageIds([]);
+    rotationCyclesRef.current = 0;  // Reset rotation cycles for next latent state
     
     // Check if this is a group search (has mentions)
-    const isGroupSearch = mentions.length > 0;
+    const isGroupSearch = searchMentions.length > 0;
     
     // Note: The rotating phrases with voice are handled by the useEffect hook
     // No need to speak here to avoid voice overlap
+    
+    // Set up 60-second timeout (LLM can be slow)
+    const timeoutId = setTimeout(() => {
+      console.error('⏰⏰⏰ 60-SECOND TIMEOUT FIRED! ⏰⏰⏰');
+      console.error('⏰ Backend took longer than 60 seconds to respond');
+      const timeoutText = 'Search is taking longer than expected. Try again.';
+      setCurrentPhrase(timeoutText);
+      setSearchError(timeoutText);
+      setIsThinking(false);
+      setShowingResults(false);
+      setMentionedFriendsData([]);  // Clear mentioned friends on timeout
+      if (!isMuted) {
+        speak(timeoutText);
+      }
+    }, 60000); // 60 seconds
     
     try {
       // Get coordinates - use actual user location if available, otherwise use selected city
@@ -411,7 +575,11 @@ export default function DiscoverPage() {
           index
         }));
       
+      console.log(`📊 Mapped ${allImages.length} images from nearby restaurants`);
+      console.log(`📊 First few images:`, allImages.slice(0, 3));
+      
       if (allImages.length > 0) {
+        console.log('✅ allImages.length > 0, proceeding with LLM call...');
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
@@ -423,24 +591,22 @@ export default function DiscoverPage() {
         // Wait for "Finding restaurants nearby" speech to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Step 2: Analyzing food preferences
+        // Step 2: Analyzing food preferences (don't await - let it happen in parallel)
         const step2Text = isGroupSearch 
           ? "Analyzing everyone's food preferences"
           : 'Analyzing your food preferences';
         setCurrentPhrase(step2Text);
         if (!isMuted) {
-          await speak(step2Text);
+          speak(step2Text);  // No await - don't block LLM call!
         }
         
-        // Wait for step 2 speech to complete before continuing
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
+        // Don't wait for TTS - proceed immediately to LLM call
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
         console.log(`   Query: "${searchQuery}"`);
         console.log(`   Location: (${coords.lat}, ${coords.lng})`);
         if (isGroupSearch) {
-          console.log(`👥 Group search with ${mentions.length} friends: ${mentions.map(m => m.username).join(', ')}`);
+          console.log(`👥 Group search with ${searchMentions.length} friends: ${searchMentions.map(m => m.username).join(', ')}`);
         }
 
         const searchFormData = new FormData();
@@ -450,7 +616,7 @@ export default function DiscoverPage() {
         
         // Add friend IDs if this is a group search
         if (isGroupSearch) {
-          const friendIds = mentions.map(m => m.id).join(',');
+          const friendIds = searchMentions.map(m => m.id).join(',');
           searchFormData.append('friend_ids', friendIds);
           console.log(`📋 Including friend IDs: ${friendIds}`);
         }
@@ -461,6 +627,9 @@ export default function DiscoverPage() {
           : '/api/restaurants/search';
 
         console.log(`📡 Calling ${searchEndpoint}...`);
+        console.log(`📡 Fetch URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`);
+        console.log(`📡 Starting fetch at: ${new Date().toISOString()}`);
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
@@ -469,22 +638,58 @@ export default function DiscoverPage() {
           body: searchFormData,
         });
 
+        console.log(`📡 Fetch completed at: ${new Date().toISOString()}`);
         console.log(`📡 Response status: ${response.status}`);
+        console.log(`📡 Response ok: ${response.ok}`);
+        
         if (!response.ok) {
+          console.error('❌ Response not OK, trying to parse error...');
           const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
           console.error('❌ Search failed:', errorData);
           throw new Error(errorData.detail || 'Failed to search restaurants');
         }
 
+        console.log('📡 Parsing JSON response...');
         const data = await response.json();
-        console.log('✅ LLM analysis complete');
-        console.log(`📊 Received ${data.top_restaurants?.length || 0} top restaurants`);
-        console.log(`📊 Received ${data.all_nearby_restaurants?.length || 0} nearby restaurants`);
+        console.log('✅ JSON parsed successfully');
+        console.log('📊 Full response data:', JSON.stringify(data, null, 2));
+        console.log(`📊 data.status: ${data.status}`);
+        console.log(`📊 data.top_restaurants exists: ${!!data.top_restaurants}`);
+        console.log(`📊 data.top_restaurants length: ${data.top_restaurants?.length || 0}`);
+        console.log(`📊 data.all_nearby_restaurants length: ${data.all_nearby_restaurants?.length || 0}`);
         
         // PHASE 3: Show final results
+        console.log('🔍 Checking if we have top_restaurants...');
+        console.log(`🔍 data.top_restaurants truthy: ${!!data.top_restaurants}`);
+        console.log(`🔍 data.top_restaurants.length > 0: ${data.top_restaurants && data.top_restaurants.length > 0}`);
+        
         if (data.top_restaurants && data.top_restaurants.length > 0) {
+          console.log(`✅✅✅ ENTERING SUCCESS BLOCK ✅✅✅`);
+          console.log(`✅ Received ${data.top_restaurants.length} restaurants from LLM`);
+          
+          // Clear timeout IMMEDIATELY - we have results!
+          console.log('⏰ Clearing timeout - results received');
+          clearTimeout(timeoutId);
+          
           // Filter to only restaurants with place_ids (photos have fallbacks now)
           const restaurantsWithIds = data.top_restaurants.filter((r: SearchResult) => r.place_id);
+          console.log(`✅ After filtering for place_ids: ${restaurantsWithIds.length} restaurants`);
+          
+          if (restaurantsWithIds.length === 0) {
+            console.error('❌ No restaurants have place_ids!');
+            const noResultsText = 'No valid restaurants found. Try a different query.';
+            setSearchError(noResultsText);
+            setCurrentPhrase(noResultsText);
+            setIsThinking(false);
+            setShowingResults(false);
+            setMentionedFriendsData([]);  // Clear mentioned friends
+            if (!isMuted) {
+              await speak(noResultsText);
+            }
+            clearTimeout(timeoutId);
+            return;
+          }
+          
           const finalCount = Math.min(5, restaurantsWithIds.length);
           
           // Ensure all restaurants have a photo_url (use fallback if needed)
@@ -603,22 +808,66 @@ export default function DiscoverPage() {
           // Use the processed restaurants (with fallback images)
           setSearchResults(restaurantsWithIds.slice(0, finalCount));
           
-          // Speak result if not muted
+          // Clear mentioned friends data after results are shown
+          setMentionedFriendsData([]);
+          
+          // Speak result if not muted - ensure TTS matches displayed text
           if (!isMuted) {
             await speak(step3Text);
           }
         } else {
           // No recommendations from LLM
-          setSearchError('No restaurants found. Try a different query or location.');
+          console.error('❌ ENTERED NO RESULTS BLOCK');
+          console.error('❌ data.top_restaurants:', data.top_restaurants);
+          console.error('❌ data.top_restaurants type:', typeof data.top_restaurants);
+          console.error('❌ data.top_restaurants length:', data.top_restaurants?.length);
+          
+          const noResultsText = 'No restaurants found. Try a different query or location.';
+          setSearchError(noResultsText);
+          setCurrentPhrase(noResultsText);
           setIsThinking(false);
           setShowingResults(false);
+          setMentionedFriendsData([]);  // Clear mentioned friends
+          if (!isMuted) {
+            await speak(noResultsText);
+          }
+        }
+      } else {
+        // No images from nearby restaurants - this shouldn't happen
+        console.error('❌❌ allImages.length is 0! No images to show.');
+        console.error('❌❌ nearbyData.restaurants:', nearbyData.restaurants);
+        console.error('❌❌ This means ensureImageUrl() returned empty for all restaurants');
+        
+        const noImagesText = 'No restaurant images found. Try a different location.';
+        setSearchError(noImagesText);
+        setCurrentPhrase(noImagesText);
+        setIsThinking(false);
+        setShowingResults(false);
+        setMentionedFriendsData([]);
+        if (!isMuted) {
+          await speak(noImagesText);
         }
       }
       
+      // Clear timeout on successful completion (safety net)
+      console.log('⏰ Clearing timeout at end of try block (safety net)');
+      clearTimeout(timeoutId);
+      
     } catch (error) {
+      console.error('❌❌❌ ENTERED CATCH BLOCK ❌❌❌');
       console.error('Search error:', error);
-      setSearchError(error instanceof Error ? error.message : 'Failed to search restaurants');
+      console.error('Error type:', typeof error);
+      console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      
+      const errorText = error instanceof Error ? error.message : 'Failed to search restaurants';
+      setSearchError(errorText);
+      setCurrentPhrase('Sorry, something went wrong');
       setIsThinking(false);
+      setMentionedFriendsData([]);  // Clear mentioned friends on error
+      
+      // Clear timeout on error
+      clearTimeout(timeoutId);
       
       if (!isMuted) {
         await speak('Sorry, something went wrong');
@@ -656,7 +905,7 @@ export default function DiscoverPage() {
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
-      formData.append('limit', '10');  // Only fetch 10 for latent state
+      formData.append('limit', '25');  // Fetch 25 since we filter for cuisine/description
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -706,21 +955,7 @@ export default function DiscoverPage() {
     }
   };
 
-  const toggleVoiceRecording = () => {
-    if (!recognition) return;
-    if (isRecording) {
-      recognition.stop();
-      setIsRecording(false);
-    } else {
-      setPrompt('');
-      try {
-        recognition.start();
-        setIsRecording(true);
-      } catch (error) {
-        console.error('Failed to start recognition:', error);
-      }
-    }
-  };
+  // toggleRecording now comes from useVADRecording hook
 
   if (!mounted) {
   return (
@@ -731,24 +966,10 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 relative overflow-hidden bg-white">
+    <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-white">
       
-      {/* Test Button & Mute - Top Left */}
-      <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
-        <motion.button
-          onClick={() => setIsThinking(!isThinking)}
-          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-xs font-medium">
-            {isThinking ? 'Thinking...' : 'Test AI'}
-          </span>
-        </motion.button>
-
-        <div className="flex items-center gap-2">
+      {/* Sound Controls - Top Left */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
         <motion.button
           onClick={() => {
             setIsMuted(!isMuted);
@@ -766,27 +987,42 @@ export default function DiscoverPage() {
           )}
         </motion.button>
 
-          {!isMuted && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 100, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="glass-layer-1 px-3 py-2 rounded-full shadow-soft"
-            >
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume * 100}
-                onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
-                className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
-                }}
-              />
-            </motion.div>
-          )}
-        </div>
+        {!isMuted && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 100, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="glass-layer-1 px-3 py-2.5 rounded-full shadow-soft flex items-center"
+          >
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume * 100}
+              onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
+              className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+              }}
+            />
+          </motion.div>
+        )}
+      </div>
+
+      {/* Test AI Button - Bottom Left */}
+      <div className="absolute bottom-6 left-6 z-10">
+        <motion.button
+          onClick={() => setIsThinking(!isThinking)}
+          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
+          <span className="text-xs font-medium">
+            {isThinking ? 'Thinking...' : 'Test AI'}
+          </span>
+        </motion.button>
       </div>
 
       {/* Location Tagger - Top Right */}
@@ -833,28 +1069,8 @@ export default function DiscoverPage() {
                   repeat: Infinity,
                   ease: "linear"
                 }}
-                className="relative"
               >
-                {isUsingCurrentLocation ? (
-                  <Locate className="w-3.5 h-3.5 text-green-600" />
-                ) : (
-                  <Navigation className="w-3.5 h-3.5 text-[hsl(var(--primary))]" />
-                )}
-                {/* Green pulse indicator for current location */}
-                {isUsingCurrentLocation && (
-                  <motion.div
-                    className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full"
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [1, 0.7, 1],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  />
-                )}
+                <Navigation className="w-3.5 h-3.5 text-[hsl(var(--primary))]" />
               </motion.div>
               <span className="text-sm font-semibold">{location}</span>
               <ChevronDown className="w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
@@ -870,88 +1086,23 @@ export default function DiscoverPage() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: dropdownPositionAbove ? 10 : -10, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                style={{ width: '200px' }}
+                style={{ width: '110px' }}
               >
                 {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                 
                 <div className="relative py-2">
-                  {/* Use Current Location Button */}
-                  <div className="border-b border-gray-200/30 mb-1">
-                    <motion.button
-                      className="w-full px-3 py-2.5 text-left text-xs font-semibold hover:bg-white/40 transition-colors flex items-center gap-2"
-                      onClick={async () => {
-                        try {
-                          const coords = await getCurrentLocation();
-                          setUserCoords(coords);
-                          setIsUsingCurrentLocation(true);
-                          
-                          // Auto-detect closest city
-                          const distances = Object.entries(CITY_COORDINATES).map(([city, cityCoords]) => {
-                            const distance = Math.sqrt(
-                              Math.pow(coords.lat - cityCoords.lat, 2) + 
-                              Math.pow(coords.lng - cityCoords.lng, 2)
-                            );
-                            return { city, distance };
-                          });
-                          
-                          const closest = distances.sort((a, b) => a.distance - b.distance)[0];
-                          if (closest) {
-                            setLocation(closest.city);
-                          }
-                          
-                          setShowLocationPicker(false);
-                        } catch (error) {
-                          console.error('Failed to get location:', error);
-                        }
-                      }}
-                      whileHover={{ x: 2 }}
-                      disabled={isDetectingLocation}
-                      style={{
-                        background: isUsingCurrentLocation 
-                          ? 'linear-gradient(90deg, rgba(34, 197, 94, 0.15), transparent)' 
-                          : 'transparent',
-                      }}
-                    >
-                      {isDetectingLocation ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
-                      ) : (
-                        <Locate className="w-3.5 h-3.5 text-purple-600" />
-                      )}
-                      <span className={isUsingCurrentLocation ? 'text-green-700' : ''}>
-                        {isDetectingLocation ? 'Locating...' : 'Use Current Location'}
-                      </span>
-                    </motion.button>
-                    {!isUsingCurrentLocation && !isDetectingLocation && (
-                      <div className="px-3 pb-2 text-[9px] text-gray-500 leading-tight">
-                        We'll ask for location permission
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Error message if location detection failed */}
-                  {locationError && (
-                    <div className="px-3 py-2 text-[10px] text-red-600 bg-red-50/50 mb-1">
-                      {locationError}
-                    </div>
-                  )}
-                  
-                  {/* City list */}
                   {['Boston', 'New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
                     <motion.button
                       key={loc}
-                      className="w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
+                      className="w-full px-2 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
                       onClick={() => {
                         setLocation(loc);
-                        setUserCoords(CITY_COORDINATES[loc]);
-                        setIsUsingCurrentLocation(false);
                         setShowLocationPicker(false);
                       }}
                       whileHover={{ x: 2 }}
                       style={{
-                        background: location === loc && !isUsingCurrentLocation
-                          ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' 
-                          : 'transparent',
+                        background: location === loc ? 'linear-gradient(90deg, rgba(155, 135, 245, 0.15), transparent)' : 'transparent',
                       }}
                     >
                       {loc}
@@ -1063,12 +1214,12 @@ export default function DiscoverPage() {
               }}
             />
             
-            <div className="w-24 h-24 relative">
+            <div className="w-24 h-24 relative ml-3">
               <MetallicSphereComponent isActive={false} />
             </div>
             
             <motion.p
-              className="mt-6 text-sm font-semibold whitespace-nowrap text-center text-gray-400"
+              className="mt-6 text-md font-bold whitespace-nowrap text-center bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 bg-clip-text text-transparent"
               animate={{
                 opacity: [0.5, 1, 0.5],
               }}
@@ -1080,6 +1231,7 @@ export default function DiscoverPage() {
             >
               Feeling Hungry?
             </motion.p>
+
           </div>
 
           {/* Orbiting Restaurant Photos - Dynamic from actual search results */}
@@ -1100,7 +1252,8 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              const baseRadius = (isThinking || showingResults) ? 420 : 280;  // Larger radius when thinking/showing results
+              // Different radius for each state: thinking (420), results (200), latent (300)
+              const baseRadius = isThinking ? 420 : showingResults ? 300 : 300;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1113,15 +1266,15 @@ export default function DiscoverPage() {
                   className="absolute"
                   initial={{ 
                     opacity: 0, 
-                    scale: 0.3,  // Less dramatic for smoother initial load
-                    left: '50%',  // Start at center (inside blob)
-                    top: '50%'    // Start at center (inside blob)
+                    scale: 0.3,  // Start small
+                    left: '50%',  // Start at center
+                    top: '50%'    // Start at center
                   }}
                   animate={{
                     left: x,
                     top: y,
                     opacity: isFadingOut ? 0 : 1,  // Fade to completely invisible
-                    scale: 1,  // Keep scale constant - NO POSITION CHANGE
+                    scale: 1,  // Expand to full size
                   }}
                   exit={{
                     // Fade out in place
@@ -1130,11 +1283,12 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    left: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
-                    top: { duration: 0.6, ease: [0.34, 1.56, 0.64, 1] },  // Smooth movement
-                    opacity: { duration: 0.4, ease: 'easeInOut' },  // Smooth fade in/out
+                    // Instant movement during fast rotation (< 2 cycles), smooth during slow rotation
+                    left: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    top: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    opacity: { duration: 0.4, ease: 'easeInOut' },
                     scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
-                    delay: visibleIndex * 0.03,  // Stagger initial load
+                    // No delay - all images appear at once to prevent repositioning
                   }}
                   style={{
                     x: '-50%',
@@ -1151,8 +1305,18 @@ export default function DiscoverPage() {
                       boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
                       transformStyle: 'preserve-3d',
                     }}
-                    animate={{}}  // No wiggle animation - just smooth spinning
-                    transition={{}}
+                    animate={isThinking && glowingIndices.has(visibleIndex) ? {
+                      boxShadow: [
+                        'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                        `inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 0 40px 8px rgba(139, 92, 246, 0.6), 0 0 60px 12px rgba(59, 130, 246, 0.4)`,
+                        'inset 0 0 30px -8px rgba(255, 255, 255, 0.9), 0 8px 28px rgba(0, 0, 0, 0.12)',
+                      ],
+                    } : {}}
+                    transition={isThinking && glowingIndices.has(visibleIndex) ? {
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    } : {}}
                     whileHover={{ 
                       scale: 1.1,
                       zIndex: 50,
@@ -1218,9 +1382,253 @@ export default function DiscoverPage() {
             });
           })()}
           </AnimatePresence>
+
+          {/* Orbiting Friend Avatars - Between center and restaurants */}
+          <AnimatePresence>
+          {friendsData.length > 0 && friendsData.map((friend, index) => {
+            // Check if this friend is mentioned
+            const isMentioned = mentionedFriendsData.some(m => m.id === friend.id);
+            // Hide non-mentioned friends during thinking/results
+            if (!isMentioned && (isThinking || showingResults)) return null;
+            
+            // Calculate position on inner circle (radius 150)
+            const angle = ((index / friendsData.length) * 360 + rotation * 0.7) * (Math.PI / 180); // Slower rotation
+            const friendRadius = 150;
+            const x = 350 + Math.cos(angle) * friendRadius;
+            const y = 350 + Math.sin(angle) * friendRadius;
+            
+            // Enhanced styling for mentioned friends
+            const avatarSize = isMentioned ? 72 : 64;
+            const marginOffset = isMentioned ? -36 : -32;
+            
+            return (
+              <motion.div
+                key={friend.id}
+                className="absolute"
+                initial={{ scale: 0.3, left: '50%', top: '50%', opacity: 0 }}
+                animate={{
+                  left: `${x}px`,
+                  top: `${y}px`,
+                  scale: isMentioned ? 1.1 : 1,
+                  opacity: 1,
+                }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{
+                  left: { duration: 0, ease: 'linear' },
+                  top: { duration: 0, ease: 'linear' },
+                  opacity: { duration: 0.4, ease: 'easeInOut' },
+                  scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
+                }}
+                style={{
+                  width: `${avatarSize}px`,
+                  height: `${avatarSize}px`,
+                  marginLeft: `${marginOffset}px`,
+                  marginTop: `${marginOffset}px`,
+                  zIndex: isMentioned ? 10 : 5,
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={async () => {
+                  // Fetch friend's recent activity
+                  try {
+                    const supabase = createClient();
+                    
+                    // Get recent reviews
+                    const { data: reviews } = await supabase
+                      .from('reviews')
+                      .select('restaurant_name, rating, comment, created_at')
+                      .eq('user_id', friend.id)
+                      .order('created_at', { ascending: false })
+                      .limit(3);
+                    
+                    console.log(`👤 Loaded activity for ${friend.display_name || friend.username}: ${reviews?.length || 0} reviews`);
+                    
+                    setHoveredFriend({
+                      ...friend,
+                      recentReviews: reviews || [],
+                    });
+                  } catch (error) {
+                    console.error('Error loading friend activity:', error);
+                    setHoveredFriend({...friend});
+                  }
+                }}
+                onMouseLeave={() => setHoveredFriend(null)}
+              >
+                <div className="relative w-full h-full">
+                  {/* Liquid glass container with gradient border - enhanced for mentioned friends */}
+                  <div 
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: isMentioned 
+                        ? 'linear-gradient(135deg, rgba(155, 135, 245, 0.9), rgba(99, 102, 241, 0.9))'
+                        : 'linear-gradient(135deg, rgba(155, 135, 245, 0.6), rgba(99, 102, 241, 0.6))',
+                      padding: isMentioned ? '3px' : '2px',
+                      boxShadow: isMentioned ? '0 0 20px rgba(155, 135, 245, 0.6), 0 0 40px rgba(99, 102, 241, 0.4)' : 'none',
+                    }}
+                  >
+                    <div 
+                      className="w-full h-full rounded-full overflow-hidden relative"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(10px)',
+                      }}
+                    >
+                      <NextImage
+                        src={friend.avatar_url || '/default-avatar.png'}
+                        alt={friend.display_name || friend.username}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* "Searching for" indicator for mentioned friends */}
+                  {isMentioned && (
+                    <motion.div
+                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap"
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        background: 'rgba(155, 135, 245, 0.95)',
+                        color: 'white',
+                        boxShadow: '0 2px 8px rgba(155, 135, 245, 0.4)',
+                      }}
+                    >
+                      Included
+                    </motion.div>
+                  )}
+
+                  {/* Small name label on hover */}
+                  {hoveredFriend?.id === friend.id && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-xl whitespace-nowrap pointer-events-none"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        border: '0.5px solid rgba(255, 255, 255, 0.8)',
+                        boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 8px 24px rgba(0, 0, 0, 0.12)',
+                      }}
+                    >
+                      <div className="text-xs font-semibold text-gray-900">
+                        {friend.display_name || friend.username}
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+          </AnimatePresence>
                   </div>
                 </div>
                 
+      {/* Friend Activity Panel - Appears on right when hovering over a friend */}
+      <AnimatePresence>
+        {hoveredFriend && !isThinking && !showingResults && (
+          <motion.div
+            key="friend-panel"
+            className="fixed right-8 top-1/4 w-96 pointer-events-none z-50"
+            initial={{ opacity: 0, x: 50, y: '-50%' }}
+            animate={{ opacity: 1, x: 0, y: '-50%' }}
+            exit={{ opacity: 0, x: 50, y: '-50%' }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div 
+              className="glass-layer-1 rounded-3xl p-6 shadow-strong relative overflow-hidden"
+              style={{
+                backdropFilter: 'blur(40px) saturate(180%)',
+                background: 'rgba(255, 255, 255, 0.5)',
+                border: '0.5px solid rgba(255, 255, 255, 0.6)',
+                boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 20px 60px rgba(0, 0, 0, 0.15), 0 30px 80px rgba(155, 135, 245, 0.2)',
+                filter: 'drop-shadow(0 20px 40px rgba(99, 102, 241, 0.25)) drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1))',
+              }}
+            >
+              {/* Specular highlight */}
+              <div 
+                className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-3xl"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 100%)',
+                }}
+              />
+              
+              <div className="relative space-y-4">
+                {/* Friend Header */}
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-16 h-16 rounded-full overflow-hidden relative"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(155, 135, 245, 0.6), rgba(99, 102, 241, 0.6))',
+                      padding: '2px',
+                    }}
+                  >
+                    <div className="w-full h-full rounded-full overflow-hidden relative bg-white">
+                      <NextImage
+                        src={hoveredFriend.avatar_url || '/default-avatar.png'}
+                        alt={hoveredFriend.display_name || hoveredFriend.username}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {hoveredFriend.display_name || hoveredFriend.username}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      @{hoveredFriend.username}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Recent Reviews */}
+                {hoveredFriend.recentReviews && hoveredFriend.recentReviews.length > 0 ? (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <p className="text-sm font-medium text-gray-700 mb-3">
+                      Recent Activity
+                    </p>
+                    <div className="space-y-3">
+                      {hoveredFriend.recentReviews.map((review: any, idx: number) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {review.restaurant_name}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span className="text-sm font-medium text-gray-700">
+                                {review.rating}
+                              </span>
+                            </div>
+                          </div>
+                          {review.comment && (
+                            <p className="text-xs text-gray-600 line-clamp-2">
+                              "{review.comment}"
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-400">
+                            {new Date(review.created_at).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-gray-200/50">
+                    <p className="text-sm text-gray-500 italic">
+                      No recent activity yet
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hover Panel - Appears on right when hovering over a restaurant */}
       <AnimatePresence>
         {hoveredRestaurant && showingResults && (
@@ -1336,7 +1744,7 @@ export default function DiscoverPage() {
       </AnimatePresence>
                 
       {/* Compact Search Bar - Minimal */}
-      <div className="w-full max-w-3xl mb-8 z-10">
+      <div className="w-full max-w-3xl mb-6 z-10">
         <motion.div
           className="glass-layer-1 rounded-full h-14 px-4 shadow-strong relative flex items-center gap-3"
           initial={{ y: 20, opacity: 0 }}
@@ -1367,14 +1775,41 @@ export default function DiscoverPage() {
           />
           
           <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3 relative z-10">
-            <MentionInput
-              value={prompt}
-              onChange={setPrompt}
-              onMentionsChange={(newMentions) => setMentions(newMentions)}
-              placeholder={isThinking ? "AI is thinking..." : "Where should we eat? (Type @ to mention friends)"}
-              disabled={isThinking}
-              className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
-            />
+            <div className="flex-1 relative">
+              <MentionInput
+                value={prompt}
+                onChange={setPrompt}
+                onMentionsChange={(newMentions) => setMentions(newMentions)}
+                placeholder={isThinking ? "AI is thinking..." : isRecording ? "Listening..." : "Where should we eat? (Type @ to mention friends)"}
+                disabled={isThinking}
+                className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
+              />
+              {/* Streaming transcription indicator */}
+              {isRecording && prompt && (
+                <motion.div
+                  className="absolute -right-2 top-1/2 -translate-y-1/2 flex gap-1"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <motion.div
+                    className="w-1 h-1 rounded-full bg-purple-500"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+                  />
+                  <motion.div
+                    className="w-1 h-1 rounded-full bg-purple-500"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                  />
+                  <motion.div
+                    className="w-1 h-1 rounded-full bg-purple-500"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                  />
+                </motion.div>
+              )}
+            </div>
             
             <div className="flex items-center gap-2">
               <motion.button
@@ -1399,8 +1834,8 @@ export default function DiscoverPage() {
               
               <motion.button
                 type="button"
-                onClick={toggleVoiceRecording}
-                disabled={isThinking}
+                onClick={toggleRecording}
+                disabled={isThinking || isTranscribing}
                 className="w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: isRecording 
@@ -1464,14 +1899,15 @@ export default function DiscoverPage() {
                         match_score: r.match_score
                       }));
                       
-                      // Store data in sessionStorage
+                      // Store data in sessionStorage with route flag
                       sessionStorage.setItem('selectedRestaurants', JSON.stringify(restaurantData));
+                      sessionStorage.setItem('showAsRoute', 'true'); // Flag to show as route
                       if (userCoords) {
                         sessionStorage.setItem('userLocation', JSON.stringify(userCoords));
                       }
                       
                       // Navigate to spatial page
-                      window.location.href = '/spatial?view=results';
+                      window.location.href = '/spatial?view=route';
                     }}
                     initial={{ opacity: 0, scale: 0.8, width: 36 }}
                     animate={{ opacity: 1, scale: 1, width: 'auto' }}
@@ -1489,7 +1925,7 @@ export default function DiscoverPage() {
                   >
                     <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl" />
                     <MapPin className="w-4 h-4 text-white" />
-                    <span className="text-sm font-semibold text-white">View on Map</span>
+                    <span className="text-sm font-semibold text-white">Plan Route</span>
                   </motion.button>
                 )}
               </AnimatePresence>

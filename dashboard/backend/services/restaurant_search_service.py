@@ -214,15 +214,25 @@ class RestaurantSearchService:
         Returns:
             Search results with top 3 restaurants and reasoning
         """
+        import time
+        search_start = time.time()
+        
+        print(f"\n{'='*80}")
+        print(f"[RESTAURANT SEARCH] 🍽️  STARTING SEARCH SERVICE")
+        print(f"{'='*80}")
         print(f"[RESTAURANT SEARCH] Query: '{query}'")
-        print(f"[RESTAURANT SEARCH] User: {user_id}")
+        print(f"[RESTAURANT SEARCH] User: {user_id[:8]}...")
         print(f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
+        print(f"{'='*80}\n")
         
         # Stage 4: Simplified approach - call tools directly, LLM analyzes results
         try:
             # Step 1: Get user preferences
-            print(f"[RESTAURANT SEARCH] Step 1: Getting user preferences...")
+            step1_start = time.time()
+            print(f"[RESTAURANT SEARCH] ⏱️  Step 1/4: Getting user preferences...")
             preferences = self.get_user_preferences_tool(user_id)
+            print(f"[RESTAURANT SEARCH] ✅ Step 1 completed in {time.time() - step1_start:.2f}s")
+            print(f"[RESTAURANT SEARCH]    Found cuisines: {preferences.get('cuisines', [])[:3]}")
             
             # Step 1.5: Detect cuisine from query for smart radius expansion
             cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian', 
@@ -240,13 +250,16 @@ class RestaurantSearchService:
             self._current_search_cuisine = detected_cuisine
             
             # Step 2: Get nearby restaurants
-            print(f"[RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
+            step2_start = time.time()
+            print(f"\n[RESTAURANT SEARCH] ⏱️  Step 2/4: Finding nearby restaurants...")
             restaurants = self.get_nearby_restaurants_tool(
                 latitude=latitude,
                 longitude=longitude,
                 radius=1000,
                 limit=10
             )
+            print(f"[RESTAURANT SEARCH] ✅ Step 2 completed in {time.time() - step2_start:.2f}s")
+            print(f"[RESTAURANT SEARCH]    Found {len(restaurants)} restaurants")
             
             if not restaurants:
                 return {
@@ -259,10 +272,11 @@ class RestaurantSearchService:
                 }
             
             # Step 3: Format data for LLM
-            print(f"[RESTAURANT SEARCH] Step 3: Asking LLM to analyze and rank...")
-            print(f"[RESTAURANT SEARCH] Restaurants found:")
+            step3_start = time.time()
+            print(f"\n[RESTAURANT SEARCH] ⏱️  Step 3/4: Preparing LLM prompt...")
+            print(f"[RESTAURANT SEARCH]    Restaurants to analyze:")
             for i, r in enumerate(restaurants, 1):
-                print(f"  {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐)")
+                print(f"       {i}. {r['name']} - {r['cuisine']} ({r['rating']}⭐)")
             
             # Build restaurants list for prompt
             restaurants_text = "\n".join([
@@ -350,15 +364,28 @@ USER HAS {'MINIMAL' if not has_preferences else 'FULL'} PREFERENCES - adjust wei
 
 IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
-            print(f"[RESTAURANT SEARCH] Prompt being sent to LLM:")
-            print(f"  Query: {query}")
-            print(f"  Preferences: {preferences.get('cuisines', [])[:3]}...")
-            print(f"  Restaurants in prompt: {len(restaurants)}")
+            print(f"[RESTAURANT SEARCH] ✅ Step 3 completed in {time.time() - step3_start:.2f}s")
+            print(f"[RESTAURANT SEARCH]    Prompt length: {len(prompt)} characters")
+            print(f"[RESTAURANT SEARCH]    Query: {query}")
+            print(f"[RESTAURANT SEARCH]    Preferences: {preferences.get('cuisines', [])[:3]}...")
+            print(f"[RESTAURANT SEARCH]    Restaurants in prompt: {len(restaurants)}")
             
-            # Call Gemini
-            model = self.gemini_service.model
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
+            # Step 4: Call Gemini LLM
+            step4_start = time.time()
+            print(f"\n[RESTAURANT SEARCH] ⏱️  Step 4/4: Calling Gemini AI...")
+            print(f"[RESTAURANT SEARCH]    🤖 Waiting for LLM response...")
+            
+            try:
+                model = self.gemini_service.model
+                response = model.generate_content(prompt)
+                llm_elapsed = time.time() - step4_start
+                print(f"[RESTAURANT SEARCH] ✅ Gemini responded in {llm_elapsed:.2f}s")
+                response_text = response.text.strip()
+                print(f"[RESTAURANT SEARCH]    Response length: {len(response_text)} characters")
+            except Exception as e:
+                llm_elapsed = time.time() - step4_start
+                print(f"[RESTAURANT SEARCH] ❌ Gemini error after {llm_elapsed:.2f}s: {str(e)}")
+                raise
             
             # Clean up markdown
             if response_text.startswith("```json"):
@@ -371,12 +398,19 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             
             # Parse JSON
             import json
-            result = json.loads(response_text)
+            print(f"[RESTAURANT SEARCH]    Parsing JSON response...")
+            try:
+                result = json.loads(response_text)
+                print(f"[RESTAURANT SEARCH]    ✅ JSON parsed successfully")
+            except json.JSONDecodeError as e:
+                print(f"[RESTAURANT SEARCH]    ❌ JSON parse error: {str(e)}")
+                print(f"[RESTAURANT SEARCH]    Response text preview: {response_text[:200]}...")
+                raise
 
             # Log what LLM recommended
-            print(f"[RESTAURANT SEARCH] LLM recommendations:")
+            print(f"\n[RESTAURANT SEARCH] 📋 LLM recommendations:")
             for i, rec in enumerate(result.get('top_restaurants', []), 1):
-                print(f"  {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}")
+                print(f"       {i}. {rec.get('name')} - {rec.get('cuisine')} - {rec.get('reasoning', 'No reason')[:50]}...")
 
             # CRITICAL: Enrich LLM results with full restaurant data (place_id, photo_url, etc.)
             # Match by name and merge fields from original restaurants list
@@ -406,7 +440,17 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 "longitude": longitude
             }
             
-            print(f"[RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants")
+            total_elapsed = time.time() - search_start
+            print(f"\n{'='*80}")
+            print(f"[RESTAURANT SEARCH] ✅ SEARCH COMPLETED SUCCESSFULLY")
+            print(f"{'='*80}")
+            print(f"[RESTAURANT SEARCH] Total time: {total_elapsed:.2f}s")
+            print(f"[RESTAURANT SEARCH]    - Step 1 (Preferences): ~{time.time() - step1_start:.2f}s")
+            print(f"[RESTAURANT SEARCH]    - Step 2 (Find Restaurants): ~{time.time() - step2_start:.2f}s")
+            print(f"[RESTAURANT SEARCH]    - Step 3 (Build Prompt): ~{time.time() - step3_start:.2f}s")
+            print(f"[RESTAURANT SEARCH]    - Step 4 (LLM Call): ~{llm_elapsed:.2f}s")
+            print(f"[RESTAURANT SEARCH] Returning {len(result.get('top_restaurants', []))} top restaurants")
+            print(f"{'='*80}\n")
             
             # Clean up
             self._current_search_cuisine = None

@@ -17,7 +17,7 @@ from services.taste_profile_service import get_taste_profile_service
 from services.restaurant_search_service import get_restaurant_search_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
-from routers import issues, ai, audio, config, reservations, twilio_webhooks
+from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph
 import asyncio
 
 # Lazy import for embedding service (heavy memory usage)
@@ -148,6 +148,9 @@ app.include_router(voice.router, prefix="/api")
 # Import and include invites router
 from routers import invites
 app.include_router(invites.router, prefix="/api")
+
+# Import and include friends graph router
+app.include_router(friends_graph.router, prefix="/api")
 
 
 @app.get("/")
@@ -773,7 +776,7 @@ async def get_nearby_restaurants(
             limit=limit
         )
 
-        # Filter to only those with photos
+        # Filter to only those with photos, valid cuisine, and description
         restaurants_with_photos = [
             {
                 'name': r['name'],
@@ -784,7 +787,11 @@ async def get_nearby_restaurants(
                 'address': r.get('address', ''),
                 'price_level': r.get('price_level', 2)
             }
-            for r in restaurants if r.get('photo_url')
+            for r in restaurants 
+            if r.get('photo_url') 
+            and r.get('cuisine') 
+            and r.get('cuisine') != 'Unknown' 
+            and r.get('cuisine') != ''
         ]
 
         print(f"[NEARBY RESTAURANTS] ✅ Found {len(restaurants_with_photos)} restaurants with photos")
@@ -900,14 +907,25 @@ async def search_restaurants(
         }
     """
     try:
-        print(f"[SEARCH RESTAURANTS] Request from user: {user_id}")
+        import time
+        start_time = time.time()
+        
+        print(f"\n{'='*80}")
+        print(f"[SEARCH RESTAURANTS] 🔍 NEW SEARCH REQUEST")
+        print(f"{'='*80}")
+        print(f"[SEARCH RESTAURANTS] User: {user_id[:8]}...")
         print(f"[SEARCH RESTAURANTS] Query: '{query}'")
         print(f"[SEARCH RESTAURANTS] Location: ({latitude}, {longitude})")
+        print(f"[SEARCH RESTAURANTS] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
 
         # Get restaurant search service
+        print(f"[SEARCH RESTAURANTS] Step 1/3: Getting search service...")
         search_service = get_restaurant_search_service()
+        print(f"[SEARCH RESTAURANTS] ✅ Search service ready")
 
         # Execute search (currently Stage 1 - tool testing only)
+        print(f"[SEARCH RESTAURANTS] Step 2/3: Calling search_restaurants method...")
         results = await search_service.search_restaurants(
             query=query,
             user_id=user_id,
@@ -915,7 +933,11 @@ async def search_restaurants(
             longitude=longitude
         )
 
-        print(f"[SEARCH RESTAURANTS] ✅ Search completed")
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(f"[SEARCH RESTAURANTS] Step 3/3: ✅ SEARCH COMPLETED in {elapsed:.2f}s")
+        print(f"[SEARCH RESTAURANTS] Results: {len(results.get('top_restaurants', []))} top restaurants")
+        print(f"{'='*80}\n")
         return results
 
     except HTTPException:
@@ -994,6 +1016,114 @@ async def search_restaurants_group(
         raise HTTPException(status_code=500, detail=f"Group restaurant search failed: {str(e)}")
 
 
+# ============================================================================
+# IMPLICIT SIGNALS & PREFERENCE TRACKING
+# ============================================================================
+
+
+@app.post("/api/interactions/track")
+async def track_interaction(
+    user_id: str = Depends(get_user_id_from_token),
+    interaction_type: str = Form(...),
+    place_id: str = Form(None),
+    restaurant_name: str = Form(None),
+    cuisine: str = Form(None),
+    atmosphere: str = Form(None),
+    address: str = Form(None),
+    latitude: float = Form(None),
+    longitude: float = Form(None)
+):
+    """
+    Track implicit user interactions with restaurants (click, view, maps_view, reservation).
+
+    **Auto-updates preferences every ~10 interactions.**
+
+    Args:
+        interaction_type: Type of interaction (view, click, maps_view, reservation)
+        place_id: Google Place ID (can be None)
+        restaurant_name: Name of restaurant (can be None)
+        cuisine: Optional cuisine type
+        atmosphere: Optional atmosphere (e.g., "Casual", "Fine Dining")
+        address: Optional restaurant address
+        latitude: Optional restaurant latitude
+        longitude: Optional restaurant longitude
+
+    Returns:
+        Success confirmation
+    """
+    try:
+        print(
+            f"[TRACK INTERACTION] {interaction_type} from user: {user_id[:8]}...")
+
+        from services.implicit_signals_service import get_implicit_signals_service
+        signals_service = get_implicit_signals_service()
+
+        # Track the interaction (auto-updates every ~10 interactions)
+        signals_service.track_restaurant_interaction(
+            user_id=user_id,
+            interaction_type=interaction_type,
+            place_id=place_id,
+            restaurant_name=restaurant_name,
+            cuisine=cuisine,
+            atmosphere=atmosphere,
+            address=address,
+            latitude=latitude,
+            longitude=longitude
+        )
+
+        print(f"[TRACK INTERACTION] ✅ Tracked successfully")
+        return {"status": "success", "message": "Interaction tracked"}
+
+    except Exception as e:
+        print(f"[TRACK INTERACTION ERROR] {str(e)}")
+        # Don't fail - tracking is non-critical
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/preferences/update-from-signals")
+async def update_preferences_from_signals(
+    user_id: str = Depends(get_user_id_from_token),
+    days: int = Form(30)
+):
+    """
+    Manually trigger preference update from implicit signals.
+    This analyzes recent user behavior and generates natural language preferences.
+
+    **This also happens automatically every ~10 interactions.**
+
+    Args:
+        days: Number of days of history to analyze (default: 30)
+
+    Returns:
+        Updated preference text
+    """
+    try:
+        print(
+            f"[UPDATE PREFERENCES] Manual trigger for user: {user_id[:8]}...")
+
+        from services.taste_profile_service import get_taste_profile_service
+        taste_profile_service = get_taste_profile_service()
+
+        # Update preferences from implicit signals
+        new_prefs = await taste_profile_service.update_profile_from_implicit_signals(
+            user_id=user_id,
+            days=days
+        )
+
+        print(f"[UPDATE PREFERENCES] ✅ Preferences updated")
+        return {
+            "status": "success",
+            "preferences": new_prefs
+        }
+
+    except Exception as e:
+        print(f"[UPDATE PREFERENCES ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update preferences: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
 
@@ -1013,5 +1143,6 @@ if __name__ == "__main__":
         host=host,
         port=port,
         reload=True,
-        log_level="info"
+        log_level="info",
+        timeout_keep_alive=120  # 2 minutes for long LLM calls
     )

@@ -153,8 +153,7 @@ export default function GlassExamplesPage() {
           z-index: 0;
           overflow: hidden;
           border-radius: 30px;
-          box-shadow: inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), 
-                      inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
+          background-color: transparent;
         }
 
         .glass-container::after {
@@ -163,7 +162,8 @@ export default function GlassExamplesPage() {
           z-index: -1;
           inset: 0;
           border-radius: 30px;
-          backdrop-filter: blur(0px);
+          backdrop-filter: blur(40px) saturate(200%);
+          -webkit-backdrop-filter: blur(40px) saturate(200%);
           filter: url(#container-glass);
           overflow: hidden;
           isolation: isolate;
@@ -204,9 +204,7 @@ export default function GlassExamplesPage() {
           z-index: 0;
           overflow: hidden;
           border-radius: 9999px;
-          box-shadow: inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), 
-                      inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
-          background-color: rgb(255 255 255 / 10%);
+          background-color: transparent;
         }
 
         .glass-btn::after {
@@ -215,7 +213,8 @@ export default function GlassExamplesPage() {
           z-index: -1;
           inset: 0;
           border-radius: 9999px;
-          backdrop-filter: blur(0px);
+          backdrop-filter: blur(28px) saturate(190%);
+          -webkit-backdrop-filter: blur(28px) saturate(190%);
           filter: url(#btn-glass);
           overflow: hidden;
           isolation: isolate;
@@ -263,9 +262,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 9999px;
-          box-shadow: inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), 
-                      inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
-          background-color: rgb(255 255 255 / 10%);
+          background-color: transparent;
         }
 
         .glass-btn-sm::after {
@@ -274,7 +271,8 @@ export default function GlassExamplesPage() {
           z-index: -1;
           inset: 0;
           border-radius: 9999px;
-          backdrop-filter: blur(0px);
+          backdrop-filter: blur(24px) saturate(185%);
+          -webkit-backdrop-filter: blur(24px) saturate(185%);
           filter: url(#btn-glass);
           overflow: hidden;
           isolation: isolate;
@@ -305,8 +303,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 30px;
-          box-shadow: inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), 
-                      inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
+          background-color: transparent;
         }
 
         .glass-panel::after {
@@ -315,7 +312,8 @@ export default function GlassExamplesPage() {
           z-index: -1;
           inset: 0;
           border-radius: 30px;
-          backdrop-filter: blur(0px);
+          backdrop-filter: blur(35px) saturate(195%);
+          -webkit-backdrop-filter: blur(35px) saturate(195%);
           filter: url(#panel-glass);
           overflow: hidden;
           isolation: isolate;
@@ -345,8 +343,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 30px;
-          box-shadow: inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), 
-                      inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
+          background-color: transparent;
         }
 
         .glass-card::after {
@@ -355,7 +352,8 @@ export default function GlassExamplesPage() {
           z-index: -1;
           inset: 0;
           border-radius: 30px;
-          backdrop-filter: blur(0px);
+          backdrop-filter: blur(42px) saturate(200%);
+          -webkit-backdrop-filter: blur(42px) saturate(200%);
           filter: url(#panel-glass);
           overflow: hidden;
           isolation: isolate;
@@ -397,9 +395,7 @@ export default function GlassExamplesPage() {
           inset: 0;
           overflow: hidden;
           border-radius: 9999px;
-          box-shadow: inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), 
-                      inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
-          background-color: rgb(255 255 255 / 10%);
+          background-color: transparent;
         }
 
         .glass-btn-inline::after {
@@ -408,7 +404,8 @@ export default function GlassExamplesPage() {
           z-index: -1;
           inset: 0;
           border-radius: 9999px;
-          backdrop-filter: blur(0px);
+          backdrop-filter: blur(26px) saturate(188%);
+          -webkit-backdrop-filter: blur(26px) saturate(188%);
           filter: url(#btn-glass);
           overflow: hidden;
           isolation: isolate;

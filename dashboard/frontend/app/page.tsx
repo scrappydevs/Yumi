@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { motion } from 'framer-motion';
 import { Loader2, ArrowRight, Utensils } from 'lucide-react';
-import { LiquidGlassBlob } from '@/components/liquid-glass-blob';
+import { DemoSocialGraph } from '@/components/DemoSocialGraph';
+import Image from 'next/image';
 
 export default function Home() {
   const router = useRouter();
@@ -106,67 +107,11 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-        {/* Bouncing purple highlights */}
-        <motion.div
-          className="absolute w-6 h-6 rounded-full bg-purple-400 shadow-lg shadow-purple-400/50"
-          animate={{
-            x: [0, 60, -40, 80, -60, 0],
-            y: [0, -80, 60, -40, 80, 0],
-            scale: [1, 1.5, 0.8, 1.3, 0.9, 1],
-            opacity: [0.7, 1, 0.6, 0.9, 0.7, 0.7],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute w-5 h-5 rounded-full bg-purple-500 shadow-lg shadow-purple-500/50"
-          animate={{
-            x: [0, -70, 50, -30, 70, 0],
-            y: [0, 70, -50, 90, -70, 0],
-            scale: [1, 1.2, 0.9, 1.4, 0.8, 1],
-            opacity: [0.6, 0.9, 0.7, 1, 0.6, 0.6],
-          }}
-          transition={{
-            duration: 2.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.3,
-          }}
-        />
-        <motion.div
-          className="absolute w-7 h-7 rounded-full bg-purple-300 shadow-lg shadow-purple-300/50"
-          animate={{
-            x: [0, 50, -60, 40, -50, 0],
-            y: [0, -60, -40, 70, -50, 0],
-            scale: [1, 0.9, 1.4, 0.8, 1.2, 1],
-            opacity: [0.5, 0.8, 0.6, 0.9, 0.5, 0.5],
-          }}
-          transition={{
-            duration: 2.8,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.6,
-          }}
-        />
-        <motion.div
-          className="absolute w-4 h-4 rounded-full bg-purple-600 shadow-lg shadow-purple-600/50"
-          animate={{
-            x: [0, -50, 70, -80, 60, 0],
-            y: [0, 80, -70, 50, -60, 0],
-            scale: [1, 1.3, 0.7, 1.5, 0.9, 1],
-            opacity: [0.8, 1, 0.7, 0.9, 0.8, 0.8],
-          }}
-          transition={{
-            duration: 3.2,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.9,
-          }}
-        />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
+        {/* Demo Social Network Graph Background - takes up most of the page */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-20">
+          <DemoSocialGraph className="w-full h-full" />
+        </div>
         
         {/* Central spinner */}
         <motion.div
@@ -180,17 +125,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0 pointer-events-none">
-        <LiquidGlassBlob 
-          isAnimating={true}
-          className="absolute top-20 left-20 w-[300px] h-[300px]"
-        />
-        <LiquidGlassBlob 
-          isAnimating={true}
-          className="absolute bottom-20 right-20 w-[400px] h-[400px]"
-        />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
+      {/* Demo Social Network Graph Background - takes up most of the page */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-25">
+        <DemoSocialGraph className="w-full h-full" />
       </div>
 
       <motion.div
@@ -204,18 +142,22 @@ export default function Home() {
           {/* Specular highlight */}
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
           
-          <div className="relative space-y-8">
+          <div className="relative space-y-6">
 
             {/* Header */}
-            <div className="text-center space-y-3">
-              <motion.h1
+            <div className="text-center space-y-1">
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="text-3xl font-bold text-[hsl(var(--foreground))]"
+                className="flex justify-center -mb-2"
               >
-                Yummy
-              </motion.h1>
+                <img 
+                  src="/assets/yummylogo.png"
+                  alt="Yummy Logo" 
+                  className="h-40 w-auto object-contain"
+                />
+              </motion.div>
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

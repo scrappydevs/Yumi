@@ -234,45 +234,36 @@ export default function FriendsPage() {
               onClick={() => setActiveTab('friends')}
               className={`relative px-6 py-2 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'friends'
-                  ? 'glass-layer-1 text-[hsl(var(--foreground))] shadow-soft'
+                  ? 'bg-white text-[hsl(var(--foreground))] shadow-md'
                   : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {activeTab === 'friends' && (
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl pointer-events-none" />
-              )}
               Following {friends.length > 0 && `(${friends.length})`}
             </motion.button>
             <motion.button
               onClick={() => setActiveTab('followers')}
               className={`relative px-6 py-2 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'followers'
-                  ? 'glass-layer-1 text-[hsl(var(--foreground))] shadow-soft'
+                  ? 'bg-white text-[hsl(var(--foreground))] shadow-md'
                   : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {activeTab === 'followers' && (
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl pointer-events-none" />
-              )}
               Followers {followers.length > 0 && `(${followers.length})`}
             </motion.button>
             <motion.button
               onClick={() => setActiveTab('discover')}
               className={`relative px-6 py-2 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === 'discover'
-                  ? 'glass-layer-1 text-[hsl(var(--foreground))] shadow-soft'
+                  ? 'bg-white text-[hsl(var(--foreground))] shadow-md'
                   : 'text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {activeTab === 'discover' && (
-                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-xl pointer-events-none" />
-              )}
               Discover
             </motion.button>
           </div>
@@ -462,7 +453,7 @@ export default function FriendsPage() {
                   </div>
                 )}
               </motion.div>
-            ) : (
+            ) : activeTab === 'discover' ? (
               <motion.div
                 key="discover"
                 initial={{ opacity: 0, y: 10 }}
@@ -504,8 +495,8 @@ export default function FriendsPage() {
                       {filteredUsers.map((user) => (
                         <motion.div
                           key={user.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
                           className="glass-layer-1 rounded-2xl p-4 shadow-soft hover:shadow-medium transition-all relative overflow-hidden"
                           whileHover={{ scale: 1.01, boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)' }}
                           whileTap={{ scale: 0.99 }}
@@ -599,7 +590,7 @@ export default function FriendsPage() {
                   )}
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
 

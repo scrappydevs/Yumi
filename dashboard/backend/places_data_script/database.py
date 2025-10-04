@@ -5,8 +5,8 @@ from supabase import create_client, Client
 from typing import List, Set, Optional
 import hashlib
 import logging
-from models import Restaurant, RestaurantPhoto, RestaurantReview
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_STORAGE_BUCKET
+from .models import Restaurant, RestaurantPhoto, RestaurantReview
+from .config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_STORAGE_BUCKET
 
 logger = logging.getLogger(__name__)
 

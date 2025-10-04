@@ -1,78 +1,34 @@
 """
-Taste Profile Service - Auto-updates user preferences based on reviews.
+Taste Profile Service - Generates natural language preferences from user behavior.
 
-This service uses LLM analysis to extract taste insights from user reviews
-and intelligently updates their preference profile.
+This service merges existing preferences with new interaction patterns to create
+rich, wholesome preference narratives like:
+"Aarush loves Indian food that is spicy and sweet, often goes out with friends..."
 """
 import json
-import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from services.gemini_service import GeminiService
 from supabase_client import get_supabase
 
 
 class TasteProfileService:
-    """Service for managing and updating user taste profiles."""
-    
-    # Valid atmosphere tags
-    ATMOSPHERE_TAGS = {
-        "Casual", "Fine Dining", "Cozy", "Trendy", 
-        "Fast Casual", "Family-Friendly", "Romantic", "Lively"
-    }
-    
-    # Valid price ranges
-    PRICE_RANGES = {"$", "$$", "$$$", "$$$$"}
-    
+    """Service for generating and updating natural language taste profiles."""
+
     def __init__(self):
         """Initialize with Gemini service and Supabase client."""
         self.gemini_service = GeminiService()
         self.supabase = get_supabase()
         print("[TASTE PROFILE] Service initialized")
-    
-    async def update_profile_from_review(
-        self, 
-        user_id: str, 
-        review_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+
+    def get_current_preferences_text(self, user_id: str) -> str:
         """
-        Main orchestrator: analyze review and update user's taste profile.
-        
+        Get user's current preferences as natural language text.
+
         Args:
             user_id: User UUID
-            review_data: Full review data with joined image info
-            
+
         Returns:
-            Updated preferences dict
-        """
-        print(f"[TASTE PROFILE] Updating profile for user: {user_id}")
-        
-        # 1. Get current preferences
-        current_prefs = self.get_current_preferences(user_id)
-        print(f"[TASTE PROFILE] Current preferences: {current_prefs}")
-        
-        # 2. Analyze review with LLM
-        new_insights = await self.analyze_review_with_llm(review_data, current_prefs)
-        print(f"[TASTE PROFILE] New insights: {new_insights}")
-        
-        # 3. Merge preferences
-        updated_prefs = self.merge_preferences(current_prefs, new_insights)
-        print(f"[TASTE PROFILE] Merged preferences: {updated_prefs}")
-        
-        # 4. Save to database
-        self.save_preferences(user_id, updated_prefs)
-        print(f"[TASTE PROFILE] Preferences saved!")
-        
-        return updated_prefs
-    
-    def get_current_preferences(self, user_id: str) -> Dict[str, Any]:
-        """
-        Fetch and parse user's current preferences from profiles table.
-        
-        Args:
-            user_id: User UUID
-            
-        Returns:
-            Preferences dict with default structure if empty
+            Natural language preferences text, or empty string if none exist
         """
         try:
             response = self.supabase.table("profiles")\
@@ -80,9 +36,46 @@ class TasteProfileService:
                 .eq("id", user_id)\
                 .single()\
                 .execute()
-            
+
             if not response.data or not response.data.get("preferences"):
-                # Return default structure
+                return ""
+
+            prefs = response.data["preferences"]
+
+            # Handle both text and JSON formats
+            if isinstance(prefs, str):
+                try:
+                    # Try to parse as JSON (old format)
+                    json.loads(prefs)
+                    # If successful, it's old format - return empty to trigger generation
+                    return ""
+                except (json.JSONDecodeError, TypeError):
+                    # It's natural language format - return as is
+                    return prefs
+
+            return ""
+
+        except Exception as e:
+            print(
+                f"[TASTE PROFILE ERROR] Failed to fetch preferences text: {str(e)}")
+            return ""
+
+    def get_current_preferences(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get user's current preferences as a structured dict.
+
+        Args:
+            user_id: User UUID
+
+        Returns:
+            Preferences dict with cuisines, atmosphere, price range, flavor notes
+        """
+        try:
+            # Get the natural language preferences text
+            pref_text = self.get_current_preferences_text(user_id)
+            
+            if not pref_text:
+                # Return empty structure
                 return {
                     "cuisines": [],
                     "priceRange": "",
@@ -90,300 +83,259 @@ class TasteProfileService:
                     "flavorNotes": []
                 }
             
-            prefs_str = response.data["preferences"]
-            prefs = json.loads(prefs_str) if isinstance(prefs_str, str) else prefs_str
-            
-            # Ensure all keys exist
+            # For now, return the text as-is in a structured format
+            # The LLM can interpret the natural language directly
             return {
-                "cuisines": prefs.get("cuisines", []),
-                "priceRange": prefs.get("priceRange", ""),
-                "atmosphere": prefs.get("atmosphere", []),
-                "flavorNotes": prefs.get("flavorNotes", [])
+                "preferences_text": pref_text,
+                "cuisines": [],
+                "priceRange": "",
+                "atmosphere": [],
+                "flavorNotes": []
             }
-            
+
         except Exception as e:
             print(f"[TASTE PROFILE ERROR] Failed to fetch preferences: {str(e)}")
-            # Return default on error
             return {
                 "cuisines": [],
                 "priceRange": "",
                 "atmosphere": [],
                 "flavorNotes": []
             }
-    
-    def merge_multiple_user_preferences(
-        self,
-        user_ids: List[str]
-    ) -> Dict[str, Any]:
+
+    def merge_multiple_user_preferences(self, user_ids: list[str]) -> str:
         """
-        Merge preferences from multiple users for group restaurant search.
-        
-        Strategy:
-        - Cuisines: Union of all users' favorite cuisines (up to 8 total)
-        - Price range: Take the most expensive preference (to accommodate everyone's budget)
-        - Atmosphere: Union of atmosphere preferences
-        - Flavor notes: Union of flavor preferences
-        
+        Merge preferences from multiple users for group dining recommendations.
+
         Args:
-            user_ids: List of user UUIDs to merge preferences for
-            
+            user_ids: List of user UUIDs
+
         Returns:
-            Merged preferences dict with combined preferences
+            Merged natural language preferences text suitable for group search
         """
-        if not user_ids:
-            return {
-                "cuisines": [],
-                "priceRange": "",
-                "atmosphere": [],
-                "flavorNotes": []
-            }
-        
-        print(f"[TASTE PROFILE] Merging preferences for {len(user_ids)} users")
-        
-        # Collect all preferences
-        all_preferences = []
-        for user_id in user_ids:
-            prefs = self.get_current_preferences(user_id)
-            all_preferences.append(prefs)
-            print(f"[TASTE PROFILE] User {user_id[:8]}... preferences: {prefs}")
-        
-        # Initialize merged dict
-        merged = {
-            "cuisines": [],
-            "priceRange": "",
-            "atmosphere": [],
-            "flavorNotes": []
-        }
-        
-        # 1. Merge cuisines - Union of all users' cuisines
-        all_cuisines = set()
-        for prefs in all_preferences:
-            all_cuisines.update(prefs.get("cuisines", []))
-        merged["cuisines"] = list(all_cuisines)[:8]  # Limit to 8
-        
-        # 2. Merge price ranges - Take most expensive to accommodate everyone
-        price_order = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4, "": 0}
-        max_price = ""
-        max_price_value = 0
-        
-        for prefs in all_preferences:
-            price = prefs.get("priceRange", "")
-            price_value = price_order.get(price, 0)
-            if price_value > max_price_value:
-                max_price_value = price_value
-                max_price = price
-        
-        merged["priceRange"] = max_price
-        
-        # 3. Merge atmosphere - Union of all atmosphere tags
-        all_atmosphere = set()
-        for prefs in all_preferences:
-            all_atmosphere.update(prefs.get("atmosphere", []))
-        merged["atmosphere"] = list(all_atmosphere)
-        
-        # 4. Merge flavor notes - Union of all flavor preferences
-        all_flavors = set()
-        for prefs in all_preferences:
-            all_flavors.update(prefs.get("flavorNotes", []))
-        merged["flavorNotes"] = list(all_flavors)[:10]  # Limit to 10
-        
-        print(f"[TASTE PROFILE] ✅ Merged preferences: {merged}")
-        return merged
-    
-    async def analyze_review_with_llm(
-        self,
-        review_data: Dict[str, Any],
-        current_preferences: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Use Gemini LLM to extract taste insights from review.
-        
-        Args:
-            review_data: Review with image data
-            current_preferences: User's current prefs
-            
-        Returns:
-            Insights dict with cuisines_to_add, atmosphere_tags, etc.
-        """
-        # Extract review fields
-        image_data = review_data.get("images", {}) or {}
-        dish = image_data.get("dish", "Unknown")
-        cuisine = image_data.get("cuisine", "Unknown")
-        rating = review_data.get("overall_rating", 0)
-        user_review = review_data.get("description", "")
-        restaurant_name = review_data.get("restaurant_name", "")
-        food_description = image_data.get("description", "")
-        
-        # Build prompt
-        prompt = self._build_analysis_prompt(
-            dish=dish,
-            cuisine=cuisine,
-            rating=rating,
-            user_review=user_review,
-            restaurant_name=restaurant_name,
-            food_description=food_description,
-            current_prefs=current_preferences
-        )
-        
-        print(f"[TASTE PROFILE] Analyzing review with LLM...")
-        
-        # Call Gemini (using Flash for speed)
         try:
-            # Use generate_content from Gemini model
-            response = self.gemini_service.model.generate_content(prompt)
+            print(f"[TASTE PROFILE] Merging preferences for {len(user_ids)} users")
             
-            # Parse JSON response
-            response_text = response.text.strip()
+            # Fetch preferences for all users
+            individual_prefs = []
+            for user_id in user_ids:
+                pref_text = self.get_current_preferences_text(user_id)
+                if pref_text:
+                    individual_prefs.append(pref_text)
             
-            # Remove markdown code blocks if present
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
-            response_text = response_text.strip()
+            if not individual_prefs:
+                print("[TASTE PROFILE] No preferences found for any user in group")
+                return "Group of diners with varied tastes looking for a restaurant that can accommodate different preferences."
             
-            insights = json.loads(response_text)
-            print(f"[TASTE PROFILE] LLM insights: {insights}")
+            # If only one person has preferences, use theirs
+            if len(individual_prefs) == 1:
+                return individual_prefs[0]
             
-            return insights
+            # Merge multiple preferences using LLM
+            print(f"[TASTE PROFILE] Merging {len(individual_prefs)} preference profiles...")
+            merge_prompt = f"""You are merging dining preferences for a group of {len(user_ids)} people.
+
+Here are the individual preferences:
+
+{chr(10).join([f"Person {i+1}: {pref}" for i, pref in enumerate(individual_prefs)])}
+
+Task: Create a single, concise group preference profile (2-3 sentences) that:
+1. Identifies common preferences across the group
+2. Notes any diverse tastes that need accommodation
+3. Suggests suitable restaurant types that would work for everyone
+
+Example output:
+"This group has a shared love for Asian cuisines, particularly sushi and Korean BBQ. While most prefer vibrant, casual atmospheres, one member appreciates quieter settings. They're comfortable with mid to high price ranges and enjoy trying new restaurants together. A versatile Asian fusion restaurant or a popular ramen spot with varied options would satisfy the entire group."
+
+Return ONLY the merged preference text (no markdown, no explanations).
+"""
+            
+            response = self.gemini_service.model.generate_content(merge_prompt)
+            merged_text = response.text.strip()
+            
+            # Clean up markdown if present
+            if merged_text.startswith("```"):
+                lines = merged_text.split('\n')
+                merged_text = '\n'.join(lines[1:-1] if len(lines) > 2 else lines)
+                merged_text = merged_text.strip()
+            
+            print(f"[TASTE PROFILE] Merged preferences: {merged_text}")
+            return merged_text
             
         except Exception as e:
-            print(f"[TASTE PROFILE ERROR] LLM analysis failed: {str(e)}")
-            # Return empty insights on error
-            return {
-                "cuisines_to_add": [],
-                "cuisines_to_keep": current_preferences.get("cuisines", []),
-                "atmosphere_tags": [],
-                "price_preference": "",
-                "flavor_notes": [],
-                "reasoning": f"Error: {str(e)}"
-            }
-    
-    def _build_analysis_prompt(
-        self,
-        dish: str,
-        cuisine: str,
-        rating: int,
-        user_review: str,
-        restaurant_name: str,
-        food_description: str,
-        current_prefs: Dict[str, Any]
-    ) -> str:
-        """Build the LLM prompt for taste analysis."""
-        
-        allowed_cuisines = list(GeminiService.ALLOWED_CUISINES)
-        
-        return f"""You are a food preference analyzer. Based on a user's new food review, extract taste insights.
+            print(f"[TASTE PROFILE ERROR] Failed to merge preferences: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Return generic group text on error
+            return f"Group of {len(user_ids)} diners with varied tastes looking for a versatile restaurant."
 
-Current Preferences:
-{json.dumps(current_prefs, indent=2)}
-
-New Review:
-- Dish: {dish}
-- Cuisine: {cuisine}
-- Rating: {rating}/5 stars
-- Restaurant: {restaurant_name}
-- User's Opinion: "{user_review}"
-- AI Description: {food_description}
-
-Task: Extract taste insights from this review.
-
-Return ONLY valid JSON (no markdown, no explanation):
-{{
-  "cuisines_to_add": ["cuisine1"],
-  "cuisines_to_keep": ["existing1", "existing2"],
-  "atmosphere_tags": ["Casual", "Cozy"],
-  "price_preference": "$$",
-  "flavor_notes": ["spicy", "savory"],
-  "reasoning": "Brief explanation"
-}}
-
-Rules:
-1. Only add cuisine to cuisines_to_add if rating >= 4
-2. Cuisine must be from this allowed list: {allowed_cuisines[:20]}... (truncated for space)
-3. Keep cuisines_to_keep to top 5 most important from current preferences
-5. Atmosphere tags must be from: Casual, Fine Dining, Cozy, Trendy, Fast Casual, Family-Friendly, Romantic, Lively
-6. If price is not explicitly mentioned by user, estimate the price (to the nearest $5). Price is in USD.
-7. Extract flavor_notes from user's review (e.g., spicy, sweet, savory, rich, light)
-8. Be conservative - only add preferences if there's strong evidence
-
-Return valid JSON only."""
-    
-    def merge_preferences(
-        self,
-        current: Dict[str, Any],
-        new_insights: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def save_preferences(self, user_id: str, preferences_text: str) -> None:
         """
-        Intelligently merge current preferences with new insights.
-        
-        Args:
-            current: Current preferences
-            new_insights: Insights from LLM analysis
-            
-        Returns:
-            Merged preferences dict
-        """
-        merged = current.copy()
-        
-        # 1. Merge cuisines
-        cuisines_to_add = new_insights.get("cuisines_to_add", [])
-        cuisines_to_keep = new_insights.get("cuisines_to_keep", [])
-        
-        # Start with kept cuisines, add new ones
-        new_cuisines = list(set(cuisines_to_keep + cuisines_to_add))
-        
-        # Limit to top 5
-        merged["cuisines"] = new_cuisines[:5]
-        
-        # 2. Merge atmosphere tags
-        current_atmosphere = set(current.get("atmosphere", []))
-        new_atmosphere = set(new_insights.get("atmosphere_tags", []))
-        merged["atmosphere"] = list(current_atmosphere | new_atmosphere)
-        
-        # 3. Update price range (only if new one provided)
-        new_price = new_insights.get("price_preference", "")
-        if new_price and new_price in self.PRICE_RANGES:
-            merged["priceRange"] = new_price
-        
-        # 4. Merge flavor notes
-        current_flavors = set(current.get("flavorNotes", []))
-        new_flavors = set(new_insights.get("flavor_notes", []))
-        all_flavors = list(current_flavors | new_flavors)
-        # Limit to 10 flavor notes
-        merged["flavorNotes"] = all_flavors[:10]
-        
-        print(f"[TASTE PROFILE] Merge reasoning: {new_insights.get('reasoning', 'N/A')}")
-        
-        return merged
-    
-    def save_preferences(
-        self,
-        user_id: str,
-        preferences: Dict[str, Any]
-    ) -> None:
-        """
-        Save preferences to profiles.preferences column.
-        
+        Save natural language preferences to profiles.preferences column.
+
         Args:
             user_id: User UUID
-            preferences: Preferences dict to save
+            preferences_text: Natural language preference text
         """
         try:
-            prefs_json = json.dumps(preferences)
-            
             self.supabase.table("profiles")\
-                .update({"preferences": prefs_json})\
+                .update({"preferences": preferences_text})\
                 .eq("id", user_id)\
                 .execute()
-            
-            print(f"[TASTE PROFILE] Saved preferences for user {user_id}")
-            
+
+            print(
+                f"[TASTE PROFILE] Saved preferences for user {user_id[:8]}... ({len(preferences_text)} chars)")
+
         except Exception as e:
-            print(f"[TASTE PROFILE ERROR] Failed to save preferences: {str(e)}")
+            print(
+                f"[TASTE PROFILE ERROR] Failed to save preferences: {str(e)}")
             raise
+
+    async def update_profile_from_implicit_signals(
+        self,
+        user_id: str,
+        days: int = 30
+    ) -> str:
+        """
+        Update user's taste profile based on recent implicit signals.
+        Merges current preferences with new interaction patterns.
+
+        Args:
+            user_id: User UUID
+            days: Number of days of interaction history to analyze (default: 30)
+
+        Returns:
+            Updated natural language preference text (2 paragraphs)
+        """
+        try:
+            print(
+                f"[TASTE PROFILE] Updating from implicit signals for user: {user_id[:8]}...")
+
+            # Import here to avoid circular dependency
+            from services.implicit_signals_service import get_implicit_signals_service
+
+            signals_service = get_implicit_signals_service()
+
+            # Get interaction summary
+            summary = signals_service.get_interaction_summary(
+                user_id, days=days)
+
+            if summary.get('total_interactions', 0) == 0:
+                print(
+                    f"[TASTE PROFILE] No interactions found, keeping existing preferences")
+                return self.get_current_preferences_text(user_id)
+
+            # Get current preferences (natural language)
+            current_prefs_text = self.get_current_preferences_text(user_id)
+
+            # Build LLM prompt to generate natural language preferences
+            prompt = self._build_implicit_signals_prompt(
+                summary, current_prefs_text)
+
+            print(f"[TASTE PROFILE] Asking LLM to generate narrative preferences...")
+
+            # Call Gemini to generate narrative
+            response = self.gemini_service.model.generate_content(prompt)
+            new_prefs_text = response.text.strip()
+
+            # Remove markdown formatting if present
+            if new_prefs_text.startswith("```"):
+                lines = new_prefs_text.split('\n')
+                new_prefs_text = '\n'.join(
+                    lines[1:-1] if len(lines) > 2 else lines)
+                new_prefs_text = new_prefs_text.strip()
+
+            print(
+                f"[TASTE PROFILE] Generated preference narrative ({len(new_prefs_text)} chars)")
+
+            # Save natural language preferences
+            self.save_preferences(user_id, new_prefs_text)
+
+            return new_prefs_text
+
+        except Exception as e:
+            print(
+                f"[TASTE PROFILE ERROR] Failed to update from implicit signals: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Return existing preferences on error
+            return self.get_current_preferences_text(user_id)
+
+    def _build_implicit_signals_prompt(
+        self,
+        summary: Dict[str, Any],
+        current_prefs: str
+    ) -> str:
+        """
+        Build LLM prompt to generate natural language preferences from implicit signals.
+
+        Args:
+            summary: Interaction summary with search queries, cuisines, restaurants
+            current_prefs: Current preference text (if any)
+
+        Returns:
+            Prompt string for LLM
+        """
+        # Extract key data from summary
+        top_cuisines = [c['cuisine']
+                        for c in summary.get('top_cuisines', [])[:5]]
+        top_atmospheres = [a['atmosphere']
+                           for a in summary.get('top_atmospheres', [])[:5]]
+        top_restaurants = [r['name']
+                           for r in summary.get('top_restaurants', [])[:5]]
+        recent_searches = summary.get('search_queries', [])[:10]
+
+        reservation_count = summary.get('reservation_count', 0)
+        maps_view_count = summary.get('maps_view_count', 0)
+
+        return f"""You are a food preference analyst. Generate a natural language preference profile based on user's recent dining behavior.
+
+CURRENT PREFERENCES (if any):
+{current_prefs if current_prefs else "(No preferences yet - create from scratch)"}
+
+RECENT BEHAVIOR ANALYSIS:
+- Total interactions: {summary.get('total_interactions', 0)} actions in last 30 days
+- Reservations made: {reservation_count} (HIGHEST SIGNAL - shows commitment)
+- Maps views: {maps_view_count} (HIGH SIGNAL - strong intent to visit)
+- Restaurant clicks: {summary.get('click_count', 0)}
+- Restaurant views: {summary.get('view_count', 0)}
+
+TOP CUISINES (weighted by interaction strength):
+{', '.join(top_cuisines) if top_cuisines else "None yet"}
+
+PREFERRED ATMOSPHERES (weighted by interaction strength):
+{', '.join(top_atmospheres) if top_atmospheres else "None yet"}
+
+FAVORITE RESTAURANTS (by interaction frequency):
+{', '.join(top_restaurants) if top_restaurants else "None yet"}
+
+RECENT SEARCH QUERIES:
+{chr(10).join(f"- {q}" for q in recent_searches) if recent_searches else "None yet"}
+
+TASK:
+Generate a natural, engaging, ~2 paragraph preference profile. Write in third person (e.g., "The user loves...").
+
+GUIDELINES:
+1. **Be specific and descriptive** - mention actual restaurants, favorite cuisines, typical dining patterns
+2. **Weight signals appropriately**:
+   - Reservations = strongest evidence of preference (weight: 10.0)
+   - Maps views = strong intent (weight: 5.0)
+   - Clicks = explicit interest (weight: 3.0)
+   - Views = mild interest (weight: 2.0)
+   - Searches = initial curiosity (weight: 1.0)
+3. **Keep the warmth** - write like you're describing a friend's taste
+4. **Update, don't replace** - if current preferences exist, MERGE them with new insights rather than replacing
+5. **Include context** - time of day, who they dine with, special occasions, atmosphere preferences
+6. **Be concise** - aim for ~150-250 words total
+
+EXAMPLE STYLE:
+"The user has a deep love for Indian cuisine, particularly dishes that balance spicy heat with sweet undertones. They frequently explore new restaurants with friends, especially trendy bars and late-night spots in the city. Their all-time favorite dining experience was the fresh seafood at The Pier in New York, where they discovered a passion for sushi. They return frequently to authentic Japanese restaurants, always seeking that perfect balance of traditional preparation and creative presentation.
+
+When choosing where to eat, they gravitate toward vibrant, lively atmospheres over quiet, formal settings. They're comfortable spending $$ to $$$ for a good meal, especially when trying new cuisines. Recent patterns show a growing interest in Korean BBQ and Thai food, with multiple visits to popular local spots. They appreciate restaurants that accommodate groups and offer shareable plates for communal dining experiences."
+
+IMPORTANT: If current preferences exist, MERGE the new insights with the existing text. Keep what's still relevant and add new patterns. Don't completely replace unless the new data contradicts old preferences.
+
+Return ONLY the natural language preference text (no JSON, no markdown, no explanations).
+"""
 
 
 # Singleton instance
@@ -391,9 +343,10 @@ _taste_profile_service: Optional[TasteProfileService] = None
 
 
 def get_taste_profile_service() -> TasteProfileService:
-    """Get or create taste profile service instance."""
+    """Get or create singleton instance of TasteProfileService."""
     global _taste_profile_service
+
     if _taste_profile_service is None:
         _taste_profile_service = TasteProfileService()
-    return _taste_profile_service
 
+    return _taste_profile_service
