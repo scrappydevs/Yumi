@@ -48,9 +48,9 @@ function MetallicSphere({ isActive }: SphereProps) {
         clearcoat={1}
         clearcoatRoughness={0}
         attenuationDistance={1}
-        attenuationColor="#DDD6FE"
-        color="#EDE9FE"
-        envMapIntensity={2.5}
+        attenuationColor="#F5F3FF"
+        color="#FFFFFF"
+        envMapIntensity={4.5}
         metalness={0}
         reflectivity={1}
       />
@@ -76,29 +76,30 @@ export function MetallicSphereComponent({ isActive = false, className = '' }: Me
           antialias: true,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.8,
+          toneMappingExposure: 2.5,
         }}
         dpr={[1, 2]}
         frameloop="always"
       >
         <Suspense fallback={null}>
-          {/* Bright ambient light */}
-          <ambientLight intensity={1.5} color="#F8FAFC" />
+          {/* Very bright ambient light */}
+          <ambientLight intensity={2.5} color="#FFFFFF" />
           
-          {/* Key light - intense purple */}
-          <directionalLight position={[5, 5, 5]} intensity={3.5} color="#8B5CF6" />
+          {/* Key light - ultra intense purple */}
+          <directionalLight position={[5, 5, 5]} intensity={6} color="#8B5CF6" />
           
-          {/* Fill light - intense blue */}
-          <directionalLight position={[-5, -3, -5]} intensity={3} color="#3B82F6" />
+          {/* Fill light - ultra intense blue */}
+          <directionalLight position={[-5, -3, -5]} intensity={5.5} color="#3B82F6" />
           
-          {/* Rim light - bright cyan accent */}
-          <directionalLight position={[0, 10, -5]} intensity={2.5} color="#06B6D4" />
+          {/* Rim light - super bright cyan accent */}
+          <directionalLight position={[0, 10, -5]} intensity={5} color="#06B6D4" />
           
-          {/* Accent point lights - vibrant purple and blue gradient */}
-          <pointLight position={[4, 2, 4]} intensity={3} color="#A78BFA" />
-          <pointLight position={[-4, -2, -4]} intensity={2.5} color="#60A5FA" />
-          <pointLight position={[0, -4, 2]} intensity={2.5} color="#C084FC" />
-          <pointLight position={[2, 4, -2]} intensity={2.5} color="#38BDF8" />
+          {/* Accent point lights - ultra vibrant purple and blue gradient */}
+          <pointLight position={[4, 2, 4]} intensity={6} color="#A78BFA" />
+          <pointLight position={[-4, -2, -4]} intensity={5.5} color="#60A5FA" />
+          <pointLight position={[0, -4, 2]} intensity={5.5} color="#C084FC" />
+          <pointLight position={[2, 4, -2]} intensity={5.5} color="#38BDF8" />
+          <pointLight position={[0, 0, 5]} intensity={4} color="#DDD6FE" />
           
           {/* Apple-style white environment with purple-blue gradient hints */}
           <Environment resolution={512} background={false}>
