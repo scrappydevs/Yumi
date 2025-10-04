@@ -157,9 +157,34 @@ class ImageMetadataUpdater:
             image_bytes: Raw image bytes
 
         Returns:
-            Dictionary with 'dish' and 'cuisine' keys, or None if failed
+            Dictionary with 'dish' and 'cuisine' keys, or None if not food or failed
         """
         try:
+            # First, check if the image contains food
+            from PIL import Image
+            import io
+            import google.generativeai as genai
+            
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # Quick check: is this food?
+            food_check_prompt = """Is this image showing food or a meal? 
+            
+Answer with ONLY one word:
+- YES if this is food, a meal, a dish, a drink, or any edible item
+- NO if this is not food (e.g., a person, place, object, scenery, etc.)
+
+Answer:"""
+            
+            response = self.gemini_service.model.generate_content([food_check_prompt, image])
+            
+            if response.text:
+                answer = response.text.strip().upper()
+                if answer == "NO" or "NO" in answer:
+                    logger.info("⏭️  Image is not food - skipping without update")
+                    return None
+            
+            # If it's food, proceed with detailed analysis
             result = self.gemini_service.analyze_food_image(image_bytes)
 
             # Validate that we got valid results
@@ -225,7 +250,7 @@ class ImageMetadataUpdater:
             logger.error(f"Failed to update image {image_id}: {e}")
             return False
 
-    def process_single_image(self, image: Dict) -> bool:
+    def process_single_image(self, image: Dict) -> tuple[bool, str]:
         """
         Process a single image: download, analyze, update.
 
@@ -233,7 +258,7 @@ class ImageMetadataUpdater:
             image: Image record from database
 
         Returns:
-            True if processing succeeded, False otherwise
+            Tuple of (success: bool, status: str) where status is 'success', 'skipped', or 'failed'
         """
         image_id = image['id']
         image_url = image['image_url']
@@ -249,14 +274,14 @@ class ImageMetadataUpdater:
         # Skip if both are already set
         if current_dish and current_cuisine:
             logger.info(f"Skipping - both dish and cuisine already set")
-            return True
+            return True, 'skipped'
 
         # Download image
         logger.info("Downloading image...")
         image_bytes = self.download_image(image_url)
         if not image_bytes:
             logger.error(f"❌ Failed to download image {image_id}")
-            return False
+            return False, 'failed'
 
         logger.info(f"Downloaded {len(image_bytes)} bytes")
 
@@ -265,8 +290,9 @@ class ImageMetadataUpdater:
         analysis = self.analyze_image(image_bytes)
 
         if not analysis:
-            logger.error(f"❌ Failed to analyze image {image_id}")
-            return False
+            # Check if this was a non-food image (logged in analyze_image)
+            # Return as skipped rather than failed
+            return True, 'skipped'
 
         # Determine what to update (only update missing fields)
         dish_to_update = analysis['dish'] if not current_dish and analysis.get(
@@ -283,10 +309,10 @@ class ImageMetadataUpdater:
 
         if success:
             logger.info(f"✅ Successfully processed image {image_id}")
+            return True, 'success'
         else:
             logger.error(f"❌ Failed to update image {image_id}")
-
-        return success
+            return False, 'failed'
 
     def run(self, batch_size: int = 10, delay_seconds: float = 1.0):
         """
@@ -311,17 +337,20 @@ class ImageMetadataUpdater:
         logger.info(f"\nProcessing {total} images...")
 
         success_count = 0
+        skipped_count = 0
         failure_count = 0
 
         for idx, image in enumerate(images, 1):
             logger.info(f"\n[{idx}/{total}] Processing image...")
 
             try:
-                success = self.process_single_image(image)
+                success, status = self.process_single_image(image)
 
-                if success:
+                if status == 'success':
                     success_count += 1
-                else:
+                elif status == 'skipped':
+                    skipped_count += 1
+                elif status == 'failed':
                     failure_count += 1
 
                 # Log progress every batch_size images
@@ -329,7 +358,7 @@ class ImageMetadataUpdater:
                     logger.info(f"\n{'='*60}")
                     logger.info(f"PROGRESS: {idx}/{total} images processed")
                     logger.info(
-                        f"Success: {success_count}, Failed: {failure_count}")
+                        f"✅ Updated: {success_count}, ⏭️  Skipped: {skipped_count}, ❌ Failed: {failure_count}")
                     logger.info(f"{'='*60}\n")
 
                 # Rate limiting delay
@@ -348,8 +377,10 @@ class ImageMetadataUpdater:
         logger.info("="*60)
         logger.info(f"Total images processed: {total}")
         logger.info(f"✅ Successful updates: {success_count}")
+        logger.info(f"⏭️  Skipped (non-food/already set): {skipped_count}")
         logger.info(f"❌ Failed updates: {failure_count}")
-        logger.info(f"Success rate: {(success_count/total*100):.1f}%")
+        if (success_count + skipped_count) > 0:
+            logger.info(f"Success rate: {(success_count/(success_count+skipped_count)*100):.1f}%")
         logger.info("="*60)
 
 

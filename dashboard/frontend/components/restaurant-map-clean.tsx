@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { loadGoogleMaps } from '@/lib/google-maps-loader';
 
 declare global {
   interface Window {
@@ -67,34 +68,24 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   const [showHours, setShowHours] = useState(false);
   const markersRef = useRef<any[]>([]);
 
-  // Load Google Maps API
+  // Load Google Maps API using singleton loader
   useEffect(() => {
     if (window.google?.maps) {
       setApiLoaded(true);
       return;
     }
 
-    const loadGoogleMaps = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/config/maps-key');
-        const data = await response.json();
-        
-        if (!data.apiKey) return;
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&libraries=places&v=weekly`;
-        script.async = true;
-        script.onload = () => setApiLoaded(true);
-        document.head.appendChild(script);
-      } catch (error) {
+    loadGoogleMaps()
+      .then(() => {
+        console.log('Google Maps loaded successfully via singleton');
+        setApiLoaded(true);
+      })
+      .catch((error) => {
         console.error('Error loading Google Maps:', error);
-      }
-    };
-
-    loadGoogleMaps();
+      });
   }, []);
 
-  // Initialize map
+  // Initialize map with performance optimizations
   useEffect(() => {
     if (!apiLoaded || !mapRef.current || map) return;
 
@@ -106,6 +97,20 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       zoomControl: true,
       rotateControl: true,
       gestureHandling: 'greedy',
+      // Performance optimizations
+      maxZoom: 20,
+      minZoom: 10,
+      restriction: {
+        latLngBounds: {
+          north: 85,
+          south: -85,
+          west: -180,
+          east: 180,
+        },
+        strictBounds: false,
+      },
+      clickableIcons: false, // Disable POI clicks for better performance
+      backgroundColor: '#ffffff',
     });
 
     setMap(newMap);
@@ -171,6 +176,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   }, [apiLoaded, map]);
 
   // Get place details - Define BEFORE updateVisibleResults uses it
+  // Optimized with fewer fields to reduce API quota usage and latency
   const handleSelectPlace = useCallback((place: PlaceResult) => {
     if (!placesService) return;
 
@@ -186,17 +192,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         'url',
         'opening_hours',
         'price_level',
-        'reviews',
         'types',
         'user_ratings_total',
-        'vicinity',
         'geometry',
-        'editorial_summary',
-        'serves_breakfast',
-        'serves_lunch',
-        'serves_dinner',
-        'serves_brunch',
-        'serves_vegetarian_food',
       ],
     };
 
@@ -228,7 +226,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
     markersRef.current = [];
     
-    // Add markers ONLY for visible results
+    // Add markers ONLY for visible results with optimized rendering
     resultsInView.forEach((place) => {
       if (place.geometry?.location) {
         const marker = new window.google.maps.Marker({
@@ -242,6 +240,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             strokeColor: '#ffffff',
             strokeWeight: 2,
           },
+          optimized: true, // Enable marker optimization for better performance
         });
 
         const textContent = `
@@ -270,15 +269,22 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
   }, [map, searchResults, handleSelectPlace]);
 
-  // Listen for map bounds changes
+  // Listen for map bounds changes with debouncing for better performance
   useEffect(() => {
     if (!map) return;
     
+    let timeoutId: NodeJS.Timeout;
+    
     const listener = map.addListener('idle', () => {
-      updateVisibleResults();
+      // Debounce updates to avoid excessive re-renders during map movement
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        updateVisibleResults();
+      }, 150); // 150ms debounce
     });
     
     return () => {
+      clearTimeout(timeoutId);
       window.google.maps.event.removeListener(listener);
     };
   }, [map, updateVisibleResults]);
@@ -340,7 +346,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         });
         markersRef.current = [];
 
-        // Create markers
+        // Create markers with optimization
         results.forEach((place) => {
           if (place.geometry?.location && map) {
             const marker = new window.google.maps.Marker({
@@ -354,6 +360,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 strokeColor: '#ffffff',
                 strokeWeight: 2,
               },
+              optimized: true, // Enable marker optimization for better performance
             });
 
             if (place.photos?.[0]) {
@@ -617,7 +624,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                             src={place.photos[0].getUrl({ maxWidth: 120, maxHeight: 120 })}
                             alt={place.name}
                             className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                            loading="eager"
+                            loading="lazy"
+                            decoding="async"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                               (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
@@ -738,6 +746,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                         src={selectedPlace.photos[currentPhotoIndex].getUrl({ maxWidth: 600, maxHeight: 400 })}
                         alt={selectedPlace.name}
                         className="w-full h-full object-cover"
+                        loading="eager"
+                        decoding="async"
                       />
                       {selectedPlace.photos.length > 1 && (
                         <>
