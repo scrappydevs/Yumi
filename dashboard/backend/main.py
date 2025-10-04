@@ -997,6 +997,114 @@ async def search_restaurants_group(
         raise HTTPException(status_code=500, detail=f"Group restaurant search failed: {str(e)}")
 
 
+# ============================================================================
+# IMPLICIT SIGNALS & PREFERENCE TRACKING
+# ============================================================================
+
+
+@app.post("/api/interactions/track")
+async def track_interaction(
+    user_id: str = Depends(get_user_id_from_token),
+    interaction_type: str = Form(...),
+    place_id: str = Form(None),
+    restaurant_name: str = Form(None),
+    cuisine: str = Form(None),
+    atmosphere: str = Form(None),
+    address: str = Form(None),
+    latitude: float = Form(None),
+    longitude: float = Form(None)
+):
+    """
+    Track implicit user interactions with restaurants (click, view, maps_view, reservation).
+
+    **Auto-updates preferences every ~10 interactions.**
+
+    Args:
+        interaction_type: Type of interaction (view, click, maps_view, reservation)
+        place_id: Google Place ID (can be None)
+        restaurant_name: Name of restaurant (can be None)
+        cuisine: Optional cuisine type
+        atmosphere: Optional atmosphere (e.g., "Casual", "Fine Dining")
+        address: Optional restaurant address
+        latitude: Optional restaurant latitude
+        longitude: Optional restaurant longitude
+
+    Returns:
+        Success confirmation
+    """
+    try:
+        print(
+            f"[TRACK INTERACTION] {interaction_type} from user: {user_id[:8]}...")
+
+        from services.implicit_signals_service import get_implicit_signals_service
+        signals_service = get_implicit_signals_service()
+
+        # Track the interaction (auto-updates every ~10 interactions)
+        signals_service.track_restaurant_interaction(
+            user_id=user_id,
+            interaction_type=interaction_type,
+            place_id=place_id,
+            restaurant_name=restaurant_name,
+            cuisine=cuisine,
+            atmosphere=atmosphere,
+            address=address,
+            latitude=latitude,
+            longitude=longitude
+        )
+
+        print(f"[TRACK INTERACTION] ✅ Tracked successfully")
+        return {"status": "success", "message": "Interaction tracked"}
+
+    except Exception as e:
+        print(f"[TRACK INTERACTION ERROR] {str(e)}")
+        # Don't fail - tracking is non-critical
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/preferences/update-from-signals")
+async def update_preferences_from_signals(
+    user_id: str = Depends(get_user_id_from_token),
+    days: int = Form(30)
+):
+    """
+    Manually trigger preference update from implicit signals.
+    This analyzes recent user behavior and generates natural language preferences.
+
+    **This also happens automatically every ~10 interactions.**
+
+    Args:
+        days: Number of days of history to analyze (default: 30)
+
+    Returns:
+        Updated preference text
+    """
+    try:
+        print(
+            f"[UPDATE PREFERENCES] Manual trigger for user: {user_id[:8]}...")
+
+        from services.taste_profile_service import get_taste_profile_service
+        taste_profile_service = get_taste_profile_service()
+
+        # Update preferences from implicit signals
+        new_prefs = await taste_profile_service.update_profile_from_implicit_signals(
+            user_id=user_id,
+            days=days
+        )
+
+        print(f"[UPDATE PREFERENCES] ✅ Preferences updated")
+        return {
+            "status": "success",
+            "preferences": new_prefs
+        }
+
+    except Exception as e:
+        print(f"[UPDATE PREFERENCES ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update preferences: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
 

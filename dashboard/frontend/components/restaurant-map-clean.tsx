@@ -146,7 +146,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       });
   }, []);
 
-  // Initialize map
+  // Initialize map with performance optimizations
   useEffect(() => {
     if (!apiLoaded || !mapRef.current || map) return;
 
@@ -437,6 +437,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   }, [map, placesService, preloadedRestaurants, userLocation, calculateAverageDistances]);
 
   // Get place details - Define BEFORE updateVisibleResults uses it
+  // Optimized with fewer fields to reduce API quota usage and latency
   const handleSelectPlace = useCallback((place: PlaceResult) => {
     if (!placesService) return;
 
@@ -452,17 +453,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         'url',
         'opening_hours',
         'price_level',
-        'reviews',
         'types',
         'user_ratings_total',
-        'vicinity',
         'geometry',
-        'editorial_summary',
-        'serves_breakfast',
-        'serves_lunch',
-        'serves_dinner',
-        'serves_brunch',
-        'serves_vegetarian_food',
       ],
     };
 
@@ -494,7 +487,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
     markersRef.current = [];
     
-    // Add markers ONLY for visible results
+    // Add markers ONLY for visible results with optimized rendering
     resultsInView.forEach((place) => {
       if (place.geometry?.location) {
         const marker = new window.google.maps.Marker({
@@ -508,6 +501,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             strokeColor: '#ffffff',
             strokeWeight: 2,
           },
+          optimized: true, // Enable marker optimization for better performance
         });
 
         const textContent = `
@@ -613,7 +607,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         });
         markersRef.current = [];
 
-        // Create markers
+        // Create markers with optimization
         results.forEach((place) => {
           if (place.geometry?.location && map) {
             const marker = new window.google.maps.Marker({
@@ -627,6 +621,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 strokeColor: '#ffffff',
                 strokeWeight: 2,
               },
+              optimized: true, // Enable marker optimization for better performance
             });
 
             if (place.photos?.[0]) {
@@ -1158,7 +1153,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                             src={place.photos[0].getUrl({ maxWidth: 120, maxHeight: 120 })}
                             alt={place.name}
                             className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                            loading="eager"
+                            loading="lazy"
+                            decoding="async"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                               (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
@@ -1279,6 +1275,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                         src={selectedPlace.photos[currentPhotoIndex].getUrl({ maxWidth: 600, maxHeight: 400 })}
                         alt={selectedPlace.name}
                         className="w-full h-full object-cover"
+                        loading="eager"
+                        decoding="async"
                       />
                       {selectedPlace.photos.length > 1 && (
                         <>

@@ -10,74 +10,89 @@ import io
 
 class GeminiService:
     """Service for interacting with Google Gemini API."""
-    
+
     # Allowed cuisine types
     ALLOWED_CUISINES = {
-        "American", "Italian", "French", "Chinese", "Japanese", "Mexican", "Indian", "Thai", 
-        "Greek", "Spanish", "Korean", "Vietnamese", "Lebanese", "Turkish", "Moroccan", 
-        "Ethiopian", "Brazilian", "Peruvian", "Jamaican", "Cuban", "German", "Polish", 
-        "Russian", "Swedish", "Portuguese", "Filipino", "Malaysian", "Indonesian", 
-        "Singaporean", "Egyptian", "Iranian", "Afghan", "Nepalese", "Burmese", 
-        "Cambodian", "Georgian", "Armenian", "Argentinian", "Colombian", "Venezuelan", 
-        "Chilean", "Ecuadorian", "Bolivian", "Uruguayan", "Paraguayan", "Hungarian", 
+        "American", "Italian", "French", "Chinese", "Japanese", "Mexican", "Indian", "Thai",
+        "Greek", "Spanish", "Korean", "Vietnamese", "Lebanese", "Turkish", "Moroccan",
+        "Ethiopian", "Brazilian", "Peruvian", "Jamaican", "Cuban", "German", "Polish",
+        "Russian", "Swedish", "Portuguese", "Filipino", "Malaysian", "Indonesian",
+        "Singaporean", "Egyptian", "Iranian", "Afghan", "Nepalese", "Burmese",
+        "Cambodian", "Georgian", "Armenian", "Argentinian", "Colombian", "Venezuelan",
+        "Chilean", "Ecuadorian", "Bolivian", "Uruguayan", "Paraguayan", "Hungarian",
         "Austrian", "Swiss", "Belgian", "Dutch", "Danish", "Norwegian", "Finnish", "Icelandic"
     }
-    
-    def __init__(self):
-        """Initialize Gemini with API key from environment."""
+
+    def __init__(self, model_name: str = 'gemini-2.5-flash'):
+        """Initialize Gemini with API key from environment.
+
+        Args:
+            model_name: Gemini model to use. Options:
+                - 'gemini-2.5-flash' (default, most capable)
+                - 'gemini-2.5-flash-lite' (lite, faster/cheaper)
+        """
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable not set")
-        
+
         genai.configure(api_key=api_key)
-        # Use latest stable Gemini Flash model (supports vision + generateContent)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        # Use specified Gemini model (supports vision + generateContent)
+        self.model = genai.GenerativeModel(model_name)
+        print(f"🤖 Using Gemini model: {model_name}")
 
     def analyze_food_image(self, image_bytes: bytes) -> dict:
         """
         Send image to Gemini for analysis of food/cuisine.
-        
+
         Args:
             image_bytes: Raw image bytes
-            
+
         Returns:
             Dictionary with 'dish', 'cuisine', and 'description' keys
-            
+
         Raises:
             Exception: If Gemini API call fails
         """
         try:
             # Convert bytes to PIL Image
             image = Image.open(io.BytesIO(image_bytes))
-            
+
             # Create prompt for structured food analysis
-            prompt = """Analyze this food image and provide:
-1. DISH: The specific name of the dish or food item (e.g., "Spaghetti Carbonara", "California Roll", "Chocolate Cake")
+            prompt = """Analyze the ACTUAL FOOD visible in this image and provide:
+
+IMPORTANT: Only label the actual, visible food in the photo - ignore any text, menus, or names.
+
+1. DISH: The specific name of the dish or food item you SEE (e.g., "Spaghetti Carbonara", "California Roll", "Chocolate Cake")
+   - Base this on what the food LOOKS like, not on any text in the image
+   
 2. CUISINE: The type of cuisine - MUST be EXACTLY ONE from this list:
    American, Italian, French, Chinese, Japanese, Mexican, Indian, Thai, Greek, Spanish, Korean, Vietnamese, Lebanese, Turkish, Moroccan, Ethiopian, Brazilian, Peruvian, Jamaican, Cuban, German, Polish, Russian, Swedish, Portuguese, Filipino, Malaysian, Indonesian, Singaporean, Egyptian, Iranian, Afghan, Nepalese, Burmese, Cambodian, Georgian, Armenian, Argentinian, Colombian, Venezuelan, Chilean, Ecuadorian, Bolivian, Uruguayan, Paraguayan, Hungarian, Austrian, Swiss, Belgian, Dutch, Danish, Norwegian, Finnish, Icelandic
-3. DESCRIPTION: A brief 1-2 sentence description including key ingredients and presentation
+   
+3. DESCRIPTION: A brief 1-2 sentence description of the VISIBLE food including key ingredients and presentation
 
 Format your response EXACTLY as:
 DISH: [dish name]
 CUISINE: [one cuisine from the list above]
 DESCRIPTION: [description]
 
-IMPORTANT: For CUISINE, you MUST select EXACTLY ONE word from the cuisine list provided. Do not use any other cuisine names."""
+IMPORTANT: 
+- For CUISINE, you MUST select EXACTLY ONE word from the cuisine list provided
+- Label what you SEE in the photo, not what any text says"""
 
             # Call Gemini API with vision
             response = self.model.generate_content([prompt, image])
-            
+
             # Extract text from response
             if response.text:
                 text = response.text.strip()
-                
+
                 # Parse the structured response
                 result = {
                     'dish': 'Unknown Dish',
                     'cuisine': 'Unknown',
                     'description': text
                 }
-                
+
                 lines = text.split('\n')
                 for line in lines:
                     line = line.strip()
@@ -96,11 +111,13 @@ IMPORTANT: For CUISINE, you MUST select EXACTLY ONE word from the cuisine list p
                                     break
                             else:
                                 # If still not found, default to Unknown
-                                print(f"Warning: Gemini returned invalid cuisine '{cuisine}', defaulting to 'Unknown'")
+                                print(
+                                    f"Warning: Gemini returned invalid cuisine '{cuisine}', defaulting to 'Unknown'")
                                 result['cuisine'] = 'Unknown'
                     elif line.startswith('DESCRIPTION:'):
-                        result['description'] = line.replace('DESCRIPTION:', '').strip()
-                
+                        result['description'] = line.replace(
+                            'DESCRIPTION:', '').strip()
+
                 return result
             else:
                 return {
@@ -116,17 +133,17 @@ IMPORTANT: For CUISINE, you MUST select EXACTLY ONE word from the cuisine list p
     def analyze_food_with_restaurant_matching(self, image_bytes: bytes, nearby_restaurants: list) -> dict:
         """
         Analyze food image and match to nearby restaurant.
-        
+
         Args:
             image_bytes: Raw image bytes
             nearby_restaurants: List of nearby restaurant dicts from Places API
-            
+
         Returns:
             Dictionary with 'dish', 'cuisine', 'description', 'restaurant'
         """
         try:
             image = Image.open(io.BytesIO(image_bytes))
-            
+
             # Format restaurant list
             if nearby_restaurants:
                 restaurant_list = "\n".join([
@@ -135,7 +152,7 @@ IMPORTANT: For CUISINE, you MUST select EXACTLY ONE word from the cuisine list p
                 ])
             else:
                 restaurant_list = "No nearby restaurants found"
-            
+
             prompt = f"""Analyze this food image and match it to a nearby restaurant.
 
 NEARBY RESTAURANTS:
@@ -164,18 +181,18 @@ DESCRIPTION: [brief description]
 Be specific. If unsure about restaurant, say "Unknown"."""
 
             response = self.model.generate_content([prompt, image])
-            
+
             if response.text:
                 text = response.text.strip()
                 print(f"[GEMINI] Response:\n{text}")
-                
+
                 result = {
                     'dish': 'Unknown Dish',
                     'cuisine': 'Unknown',
                     'restaurant': 'Unknown',
                     'description': text
                 }
-                
+
                 lines = text.split('\n')
                 for line in lines:
                     line = line.strip()
@@ -199,13 +216,16 @@ Be specific. If unsure about restaurant, say "Unknown"."""
                                     result['restaurant'] = r['name']
                                     break
                             else:
-                                result['restaurant'] = restaurant  # Use as-is if no match
+                                # Use as-is if no match
+                                result['restaurant'] = restaurant
                         else:
                             result['restaurant'] = 'Unknown'
                     elif line.startswith('DESCRIPTION:'):
-                        result['description'] = line.replace('DESCRIPTION:', '').strip()
-                
-                print(f"[GEMINI] Parsed: dish={result['dish']}, cuisine={result['cuisine']}, restaurant={result['restaurant']}")
+                        result['description'] = line.replace(
+                            'DESCRIPTION:', '').strip()
+
+                print(
+                    f"[GEMINI] Parsed: dish={result['dish']}, cuisine={result['cuisine']}, restaurant={result['restaurant']}")
                 return result
             else:
                 return {
@@ -216,17 +236,24 @@ Be specific. If unsure about restaurant, say "Unknown"."""
                 }
         except Exception as e:
             print(f"[GEMINI ERROR] {str(e)}")
-            raise Exception(f"Failed to analyze with restaurant matching: {str(e)}")
+            raise Exception(
+                f"Failed to analyze with restaurant matching: {str(e)}")
 
 
-# Singleton instance
-_gemini_service: Optional[GeminiService] = None
+# Singleton instance - keyed by model name
+_gemini_services: dict[str, GeminiService] = {}
 
 
-def get_gemini_service() -> GeminiService:
-    """Get or create Gemini service instance."""
-    global _gemini_service
-    if _gemini_service is None:
-        _gemini_service = GeminiService()
-    return _gemini_service
+def get_gemini_service(model_name: str = 'gemini-2.5-flash') -> GeminiService:
+    """Get or create Gemini service instance.
 
+    Args:
+        model_name: Gemini model to use. Cached per model.
+
+    Returns:
+        GeminiService instance for the specified model
+    """
+    global _gemini_services
+    if model_name not in _gemini_services:
+        _gemini_services[model_name] = GeminiService(model_name)
+    return _gemini_services[model_name]
