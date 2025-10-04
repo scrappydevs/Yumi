@@ -34,7 +34,7 @@ export function useSimpleTTS() {
           resolve();
         };
         audio.onerror = (e) => {
-          console.error('[TTS] Error:', e);
+          console.error('[TTS] Audio error - likely rate limit or network issue. Failing silently.');
           setIsSpeaking(false);
           resolve();
         };

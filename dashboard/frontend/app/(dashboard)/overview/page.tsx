@@ -498,13 +498,15 @@ export default function DiscoverPage() {
         
         // Wait for step 2 speech to complete before continuing
         await new Promise(resolve => setTimeout(resolve, 800));
-        
+
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
+        console.log(`   Query: "${searchQuery}"`);
+        console.log(`   Location: (${coords.lat}, ${coords.lng})`);
         if (isGroupSearch) {
           console.log(`👥 Group search with ${mentions.length} friends: ${mentions.map(m => m.username).join(', ')}`);
         }
-        
+
         const searchFormData = new FormData();
         searchFormData.append('query', searchQuery);  // Use saved query
         searchFormData.append('latitude', coords.lat.toString());
@@ -518,10 +520,11 @@ export default function DiscoverPage() {
         }
         
         // Use appropriate endpoint based on whether it's a group search
-        const searchEndpoint = isGroupSearch 
+        const searchEndpoint = isGroupSearch
           ? '/api/restaurants/search-group'
           : '/api/restaurants/search';
-        
+
+        console.log(`📡 Calling ${searchEndpoint}...`);
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
@@ -529,15 +532,18 @@ export default function DiscoverPage() {
           },
           body: searchFormData,
         });
-        
+
+        console.log(`📡 Response status: ${response.status}`);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
+          console.error('❌ Search failed:', errorData);
           throw new Error(errorData.detail || 'Failed to search restaurants');
         }
-        
+
         const data = await response.json();
         console.log('✅ LLM analysis complete');
-        console.log(`📊 Received ${data.all_nearby_restaurants?.length || 0} filtered restaurants`);
+        console.log(`📊 Received ${data.top_restaurants?.length || 0} top restaurants`);
+        console.log(`📊 Received ${data.all_nearby_restaurants?.length || 0} nearby restaurants`);
         
         // PHASE 3: Show final results
         if (data.top_restaurants && data.top_restaurants.length > 0) {
@@ -744,9 +750,10 @@ export default function DiscoverPage() {
         
         // Speak result if not muted
         if (!isMuted) {
+          const count = data.top_restaurants?.length || data.restaurants?.length || 0;
           const resultPhrase = isGroupSearch
-            ? `Found ${data.top_restaurants.length} great options for your group`
-            : `Found ${data.top_restaurants.length} great options for you`;
+            ? `Found ${count} great options for your group`
+            : `Found ${count} great options for you`;
           await speak(resultPhrase, volume);
         }
         
