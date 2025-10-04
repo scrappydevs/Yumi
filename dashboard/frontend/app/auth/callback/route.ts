@@ -23,13 +23,13 @@ export async function GET(request: NextRequest) {
     if (user) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('onboarded, phone')
+        .select('onboarded')
         .eq('id', user.id)
         .single()
       
-      // If profile doesn't exist or no phone/not onboarded, send to welcome
-      if (profileError || !profile?.phone || !profile?.onboarded) {
-        return NextResponse.redirect(`${origin}/welcome`)
+      // If profile doesn't exist or not onboarded, send to home for onboarding
+      if (profileError || !profile?.onboarded) {
+        return NextResponse.redirect(`${origin}/`)
       }
       
       // User is fully set up, send to overview

@@ -150,7 +150,7 @@ export function OpenIMessageCard({
           data-test="copy-body"
           aria-label="Copy message"
         >
-          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere pr-8">
             {presetBody}
           </p>
           <div className="absolute top-3 right-3">

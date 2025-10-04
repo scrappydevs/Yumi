@@ -1284,7 +1284,8 @@ export default function DiscoverPage() {
               value={prompt}
               onChange={setPrompt}
               onMentionsChange={(newMentions) => setMentions(newMentions)}
-              placeholder="Where should we eat? (Type @ to mention friends)"
+              placeholder={isThinking ? "AI is thinking..." : "Where should we eat? (Type @ to mention friends)"}
+              disabled={isThinking}
               className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
             />
             
