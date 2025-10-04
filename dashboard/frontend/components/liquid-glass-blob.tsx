@@ -149,30 +149,32 @@ export function LiquidGlassBlob({ isAnimating = false, className = '' }: LiquidG
             <mesh scale={100}>
               <sphereGeometry args={[1, 64, 64]} />
               <meshBasicMaterial side={THREE.BackSide}>
-                <primitive
-                  attach="map"
-                  object={(() => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 512;
-                    canvas.height = 512;
-                    const ctx = canvas.getContext('2d')!;
-                    
-                    // Create vibrant gradient: purple-blue with high contrast
-                    const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-                    gradient.addColorStop(0, '#F5F3FF');    // Light purple top
-                    gradient.addColorStop(0.25, '#DDD6FE'); // Vibrant purple
-                    gradient.addColorStop(0.5, '#C4B5FD');  // Strong purple
-                    gradient.addColorStop(0.75, '#93C5FD'); // Strong blue
-                    gradient.addColorStop(1, '#EFF6FF');    // Light blue bottom
-                    
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, 512, 512);
-                    
-                    const texture = new THREE.CanvasTexture(canvas);
-                    texture.needsUpdate = true;
-                    return texture;
-                  })()}
-                />
+                {typeof window !== 'undefined' && (
+                  <primitive
+                    attach="map"
+                    object={(() => {
+                      const canvas = document.createElement('canvas');
+                      canvas.width = 512;
+                      canvas.height = 512;
+                      const ctx = canvas.getContext('2d')!;
+                      
+                      // Create vibrant gradient: purple-blue with high contrast
+                      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+                      gradient.addColorStop(0, '#F5F3FF');    // Light purple top
+                      gradient.addColorStop(0.25, '#DDD6FE'); // Vibrant purple
+                      gradient.addColorStop(0.5, '#C4B5FD');  // Strong purple
+                      gradient.addColorStop(0.75, '#93C5FD'); // Strong blue
+                      gradient.addColorStop(1, '#EFF6FF');    // Light blue bottom
+                      
+                      ctx.fillStyle = gradient;
+                      ctx.fillRect(0, 0, 512, 512);
+                      
+                      const texture = new THREE.CanvasTexture(canvas);
+                      texture.needsUpdate = true;
+                      return texture;
+                    })()}
+                  />
+                )}
               </meshBasicMaterial>
             </mesh>
           </Environment>
