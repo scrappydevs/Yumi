@@ -12,7 +12,14 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 from audio_service import get_audio_service
-from services.vad_service import get_vad_service
+
+# Optional VAD service (requires pydub which has Python 3.13 issues)
+try:
+    from services.vad_service import get_vad_service
+    VAD_AVAILABLE = True
+except ImportError:
+    VAD_AVAILABLE = False
+    print("[AUDIO] Warning: VAD service not available (pydub/audioop issues)")
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
@@ -356,6 +363,12 @@ async def vad_analyze(request: VADRequest):
     - average_score: Rolling average over recent chunks
     - is_speech: True if vad_score > 0.5
     """
+    if not VAD_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="VAD service not available (pydub/audioop compatibility issues with Python 3.13)"
+        )
+    
     try:
         vad_service = get_vad_service()
         result = vad_service.analyze_audio_base64(
@@ -392,6 +405,12 @@ async def vad_reset():
     Call this endpoint to reset the VAD model state.
     Useful when starting a new recording session.
     """
+    if not VAD_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="VAD service not available"
+        )
+    
     try:
         vad_service = get_vad_service()
         vad_service.reset()
@@ -411,14 +430,16 @@ async def audio_health_check():
     """Check if audio services are properly configured"""
     try:
         audio_service = get_audio_service()
-        vad_service = get_vad_service()
+        
+        services = {
+            "elevenlabs": "configured",
+            "whisper": "disabled (optional)",
+            "vad": "available" if VAD_AVAILABLE else "disabled (pydub/audioop compatibility)"
+        }
+        
         return {
             "status": "healthy",
-            "services": {
-                "elevenlabs": "configured",
-                "whisper": "ready",
-                "vad": "ready"
-            },
+            "services": services,
             "default_voice": audio_service.default_voice_id,
             "whisper_model": audio_service._whisper_model_size
         }
