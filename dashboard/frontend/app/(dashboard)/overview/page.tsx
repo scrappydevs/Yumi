@@ -225,17 +225,19 @@ export default function DiscoverPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [currentPhrase, setCurrentPhrase] = useState('Finding restaurants near you');
+  const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-  // Rotating loading phrases
+  // Rotating loading phrases - more varied and engaging
   const loadingPhrases = [
-    'Finding restaurants near you',
-    'Analyzing your preferences',
-    'Discovering hidden gems',
-    'Matching your taste profile',
-    'Exploring local favorites',
-    'Curating perfect matches',
+    'Finding the perfect spot for you',
+    'Reading the culinary landscape',
+    'Consulting the food gods',
+    'Matching your vibe',
+    'Uncovering hidden gems',
+    'Decoding your taste DNA',
+    'Scanning the flavor matrix',
+    'Channeling your cravings',
   ];
   const [searchError, setSearchError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0.8); // 80% default volume
@@ -263,13 +265,25 @@ export default function DiscoverPage() {
     }
 
     let phraseIndex = 0;
+    
+    // Speak the first phrase when thinking starts
+    if (!isMuted) {
+      speak(loadingPhrases[0]);
+    }
+
     const interval = setInterval(() => {
       phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-      setCurrentPhrase(loadingPhrases[phraseIndex]);
+      const newPhrase = loadingPhrases[phraseIndex];
+      setCurrentPhrase(newPhrase);
+      
+      // Speak each new phrase if not muted
+      if (!isMuted) {
+        speak(newPhrase);
+      }
     }, 3000); // Change phrase every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isThinking, loadingPhrases]);
+  }, [isThinking, loadingPhrases, isMuted, speak]);
 
   useEffect(() => {
     if (isThinking) {
