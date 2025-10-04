@@ -82,7 +82,7 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
       
       {/* Header */}
       <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-center px-4">
-        <div className="flex items-center justify-center gap-0.5 mt-3">
+        <div className="flex items-center justify-center mt-3">
           {/* Yummy Logo */}
           {!isCollapsed && (
             <img 
