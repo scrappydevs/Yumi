@@ -11,59 +11,78 @@ struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @State private var showingSearch = false
     @State private var showingBlend = false
+    @State private var hasLoadedOnce = false
+    
+    // Computed property to show alert only when no sheets are open
+    private var shouldShowAlert: Bool {
+        !showingSearch && !showingBlend && viewModel.errorMessage != nil
+    }
     
     var body: some View {
         NavigationView {
-            Group {
-                if viewModel.isLoading && viewModel.friends.isEmpty {
-                    ProgressView("Loading friends...")
-                } else if viewModel.friends.isEmpty {
-                    emptyStateView
-                } else {
-                    friendsListView
-                }
-            }
-            .navigationTitle("Friends")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { showingBlend = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                            Text("Blend")
+            contentView
+                .navigationTitle("Friends")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { 
+                            viewModel.errorMessage = nil // Clear any errors before showing sheet
+                            showingBlend = true 
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                Text("Blend")
+                            }
+                        }
+                        .disabled(viewModel.friends.isEmpty)
+                    }
+                    
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { 
+                            viewModel.errorMessage = nil // Clear any errors before showing sheet
+                            showingSearch = true 
+                        }) {
+                            Image(systemName: "person.badge.plus")
                         }
                     }
-                    .disabled(viewModel.friends.isEmpty)
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingSearch = true }) {
-                        Image(systemName: "person.badge.plus")
+                .sheet(isPresented: $showingSearch) {
+                    SearchUsersView(viewModel: viewModel)
+                }
+                .fullScreenCover(isPresented: $showingBlend) {
+                    BlendPreferencesView(viewModel: viewModel, selectedFriend: nil)
+                }
+                .refreshable {
+                    await viewModel.loadData()
+                }
+                .alert("Error", isPresented: Binding(
+                    get: { shouldShowAlert },
+                    set: { if !$0 { viewModel.errorMessage = nil } }
+                )) {
+                    Button("OK") {
+                        viewModel.errorMessage = nil
+                    }
+                } message: {
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
                     }
                 }
-            }
-            .sheet(isPresented: $showingSearch) {
-                SearchUsersView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingBlend) {
-                BlendPreferencesView(viewModel: viewModel)
-            }
-            .task {
+        }
+        .task {
+            if !hasLoadedOnce {
+                hasLoadedOnce = true
                 await viewModel.loadData()
             }
-            .refreshable {
-                await viewModel.loadData()
-            }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )) {
-                Button("OK") {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                }
+        }
+    }
+    
+    private var contentView: some View {
+        Group {
+            if viewModel.isLoading && viewModel.friends.isEmpty {
+                ProgressView("Loading friends...")
+            } else if viewModel.friends.isEmpty {
+                emptyStateView
+            } else {
+                friendsListView
             }
         }
     }
@@ -107,7 +126,7 @@ struct FriendsView: View {
 struct FriendRowView: View {
     let profile: Profile
     @ObservedObject var viewModel: FriendsViewModel
-    @State private var showingConfirmation = false
+    @State private var showingBlend = false
     
     var body: some View {
         HStack(spacing: 15) {
@@ -145,23 +164,37 @@ struct FriendRowView: View {
             
             Spacer()
             
-            // Remove friend button
-            Button(action: { showingConfirmation = true }) {
-                Image(systemName: "person.fill.xmark")
-                    .foregroundColor(.red)
+            // Blend button for this friend
+            Button(action: { 
+                viewModel.errorMessage = nil // Clear any errors before showing sheet
+                showingBlend = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                    Text("Blend")
+                }
+                .font(.caption)
+                .fontWeight(.medium)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.purple.opacity(0.15))
+                .foregroundColor(.purple)
+                .cornerRadius(8)
             }
             .buttonStyle(.borderless)
         }
         .padding(.vertical, 8)
-        .confirmationDialog("Remove Friend", isPresented: $showingConfirmation) {
-            Button("Remove Friend", role: .destructive) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
                 Task {
                     await viewModel.removeFriend(profile)
                 }
+            } label: {
+                Label("Remove", systemImage: "person.fill.xmark")
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Are you sure you want to remove @\(profile.username) from your friends?")
+        }
+        .fullScreenCover(isPresented: $showingBlend) {
+            BlendPreferencesView(viewModel: viewModel, selectedFriend: profile)
         }
     }
     

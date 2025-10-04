@@ -10,26 +10,34 @@ import SwiftUI
 struct BlendPreferencesView: View {
     @ObservedObject var viewModel: FriendsViewModel
     @Environment(\.dismiss) private var dismiss
+    let selectedFriend: Profile? // Optional: if provided, blend with just this friend
+    
+    var navigationTitle: String {
+        if let friend = selectedFriend {
+            return "Blend with \(friend.displayNameOrUsername)"
+        }
+        return "Group Taste Profile"
+    }
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if viewModel.isBlending {
-                        loadingView
-                    } else if let blended = viewModel.blendedPreferences {
+        NavigationStack {
+            Group {
+                if viewModel.isBlending {
+                    loadingView
+                } else if let blended = viewModel.blendedPreferences {
+                    ScrollView {
                         blendedContentView(blended: blended)
-                    } else {
-                        emptyStateView
                     }
+                    .background(Color(.systemGroupedBackground))
+                } else {
+                    emptyStateView
                 }
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Group Taste Profile")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -37,34 +45,25 @@ struct BlendPreferencesView: View {
         }
         .task {
             if viewModel.blendedPreferences == nil {
-                await viewModel.blendPreferences()
+                if let friend = selectedFriend {
+                    // Blend with just this friend
+                    await viewModel.blendPreferences(with: [friend])
+                } else {
+                    // Blend with all friends
+                    await viewModel.blendPreferences()
+                }
             }
+        }
+        .onDisappear {
+            // Clear blended preferences when closing so next open recalculates
+            viewModel.blendedPreferences = nil
         }
     }
     
     // MARK: - Loading View
     
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
-            ProgressView()
-                .scaleEffect(1.5)
-            
-            Text("Blending preferences...")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            
-            Text("Analyzing your group's taste profile 🍽️")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        BlendLoadingView(friendName: selectedFriend?.displayNameOrUsername)
     }
     
     // MARK: - Empty State
@@ -215,7 +214,7 @@ struct BlendPreferencesView: View {
                         .padding(.horizontal)
                     
                     HStack {
-                        ForEach(blended.userNames.prefix(5), id: \.self) { name in
+                        ForEach(Array(blended.userNames.prefix(5).enumerated()), id: \.offset) { index, name in
                             Text(name)
                                 .font(.caption2)
                                 .padding(.horizontal, 10)
@@ -314,6 +313,142 @@ struct FlowLayout: Layout {
             self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
         }
     }
+}
+
+// MARK: - Blend Loading Animation
+
+struct BlendLoadingView: View {
+    @State private var rotationAngle: Double = 0
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var currentMessageIndex = 0
+    let friendName: String?
+    
+    var messages: [String] {
+        if let name = friendName {
+            return [
+                "Analyzing your tastes...",
+                "Blending with \(name)...",
+                "Finding common ground...",
+                "Almost there...",
+                "Just a moment..."
+            ]
+        } else {
+            return [
+                "Analyzing group preferences...",
+                "Finding common cuisines...",
+                "Blending taste profiles...",
+                "Almost there...",
+                "Just a moment..."
+            ]
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            // Pure white background
+            Color.white
+                .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                Spacer()
+                
+                // Animated Icon Stack
+                ZStack {
+                    // Outer rotating ring
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.3), .blue.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 3
+                        )
+                        .frame(width: 120, height: 120)
+                        .rotationEffect(.degrees(rotationAngle))
+                    
+                    // Pulsing sparkles (blend theme)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 50))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .blue],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .scaleEffect(pulseScale)
+                }
+                
+                // Animated Text
+                VStack(spacing: 16) {
+                    Text(messages[currentMessageIndex])
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .move(edge: .top).combined(with: .opacity)
+                        ))
+                        .id("message-\(currentMessageIndex)")
+                    
+                    // Animated dots
+                    HStack(spacing: 8) {
+                        ForEach(0..<3) { index in
+                            Circle()
+                                .fill(Color.secondary.opacity(0.6))
+                                .frame(width: 8, height: 8)
+                                .scaleEffect(pulseScale)
+                                .animation(
+                                    .easeInOut(duration: 0.6)
+                                        .repeatForever()
+                                        .delay(Double(index) * 0.2),
+                                    value: pulseScale
+                                )
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // Fun footer text
+                Text("🍽️ Powered by Gemini AI")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 40)
+            }
+        }
+        .onAppear {
+            startAnimations()
+        }
+    }
+    
+    private func startAnimations() {
+        // Rotate the outer ring continuously
+        withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
+            rotationAngle = 360
+        }
+        
+        // Pulse the sparkles
+        withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+            pulseScale = 1.2
+        }
+        
+        // Cycle through messages
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { timer in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                currentMessageIndex = (currentMessageIndex + 1) % messages.count
+            }
+        }
+    }
+}
+
+#Preview("Blend with Friend") {
+    BlendLoadingView(friendName: "Julian")
+}
+
+#Preview("Blend with Group") {
+    BlendLoadingView(friendName: nil)
 }
 
 #Preview {

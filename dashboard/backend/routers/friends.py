@@ -136,11 +136,19 @@ async def add_friend(
         # Add friend to array
         new_friends = current_friends + [request.friend_id]
         
+        print(f"[ADD FRIEND] Current friends: {current_friends}")
+        print(f"[ADD FRIEND] New friends after adding: {new_friends}")
+        
         # Update user's friends array
-        supabase.table("profiles")\
+        update_response = supabase.table("profiles")\
             .update({"friends": new_friends})\
             .eq("id", user_id)\
             .execute()
+        
+        print(f"[ADD FRIEND] Update response: {update_response.data}")
+        
+        if not update_response.data:
+            print(f"[ADD FRIEND] ⚠️ Warning: Update returned no data")
         
         # Also add current user to friend's friends array (mutual friendship)
         friend_response = supabase.table("profiles")\
@@ -151,12 +159,18 @@ async def add_friend(
         
         if friend_response.data:
             friend_current_friends = friend_response.data.get("friends", []) or []
+            print(f"[ADD FRIEND] Friend's current friends: {friend_current_friends}")
+            
             if user_id not in friend_current_friends:
                 friend_new_friends = friend_current_friends + [user_id]
-                supabase.table("profiles")\
+                print(f"[ADD FRIEND] Friend's new friends: {friend_new_friends}")
+                
+                friend_update_response = supabase.table("profiles")\
                     .update({"friends": friend_new_friends})\
                     .eq("id", request.friend_id)\
                     .execute()
+                
+                print(f"[ADD FRIEND] Friend update response: {friend_update_response.data}")
         
         print(f"[ADD FRIEND] ✅ Friend added successfully")
         return {"message": "Friend added successfully", "status": "success"}
@@ -210,11 +224,19 @@ async def remove_friend(
         # Remove friend from array
         new_friends = [f for f in current_friends if f != request.friend_id]
         
+        print(f"[REMOVE FRIEND] Current friends: {current_friends}")
+        print(f"[REMOVE FRIEND] New friends after removal: {new_friends}")
+        
         # Update user's friends array
-        supabase.table("profiles")\
+        update_response = supabase.table("profiles")\
             .update({"friends": new_friends})\
             .eq("id", user_id)\
             .execute()
+        
+        print(f"[REMOVE FRIEND] Update response: {update_response.data}")
+        
+        if not update_response.data:
+            print(f"[REMOVE FRIEND] ⚠️ Warning: Update returned no data")
         
         # Also remove current user from friend's friends array
         friend_response = supabase.table("profiles")\
@@ -225,12 +247,18 @@ async def remove_friend(
         
         if friend_response.data:
             friend_current_friends = friend_response.data.get("friends", []) or []
+            print(f"[REMOVE FRIEND] Friend's current friends: {friend_current_friends}")
+            
             if user_id in friend_current_friends:
                 friend_new_friends = [f for f in friend_current_friends if f != user_id]
-                supabase.table("profiles")\
+                print(f"[REMOVE FRIEND] Friend's new friends: {friend_new_friends}")
+                
+                friend_update_response = supabase.table("profiles")\
                     .update({"friends": friend_new_friends})\
                     .eq("id", request.friend_id)\
                     .execute()
+                
+                print(f"[REMOVE FRIEND] Friend update response: {friend_update_response.data}")
         
         print(f"[REMOVE FRIEND] ✅ Friend removed successfully")
         return {"message": "Friend removed successfully", "status": "success"}

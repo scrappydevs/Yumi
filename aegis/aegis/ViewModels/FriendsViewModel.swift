@@ -132,29 +132,43 @@ class FriendsViewModel: ObservableObject {
     }
     
     func addFriend(_ profile: Profile) async {
+        print("➕ [FRIENDS VM] Adding friend: \(profile.username)")
+        
         guard let authToken = authService.getAuthToken() else {
+            print("❌ [FRIENDS VM] No auth token for add friend")
             errorMessage = "Not authenticated"
             return
         }
 
         do {
+            print("🔄 [FRIENDS VM] Calling addFriend API...")
             try await networkService.addFriend(friendId: profile.id, authToken: authToken)
+            print("✅ [FRIENDS VM] Friend added successfully, refreshing data...")
             await loadData() // Refresh both profile and friends
+            print("✅ [FRIENDS VM] Data refreshed after adding friend")
         } catch {
+            print("❌ [FRIENDS VM] Add friend error: \(error)")
             errorMessage = "Failed to add friend: \(error.localizedDescription)"
         }
     }
 
     func removeFriend(_ profile: Profile) async {
+        print("➖ [FRIENDS VM] Removing friend: \(profile.username)")
+        
         guard let authToken = authService.getAuthToken() else {
+            print("❌ [FRIENDS VM] No auth token for remove friend")
             errorMessage = "Not authenticated"
             return
         }
 
         do {
+            print("🔄 [FRIENDS VM] Calling removeFriend API...")
             try await networkService.removeFriend(friendId: profile.id, authToken: authToken)
+            print("✅ [FRIENDS VM] Friend removed successfully, refreshing data...")
             await loadData() // Refresh both profile and friends
+            print("✅ [FRIENDS VM] Data refreshed after removing friend")
         } catch {
+            print("❌ [FRIENDS VM] Remove friend error: \(error)")
             errorMessage = "Failed to remove friend: \(error.localizedDescription)"
         }
     }

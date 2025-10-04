@@ -47,12 +47,18 @@ async def blend_preferences(
         Blended preferences with natural language summary and structured data
     """
     try:
-        print(f"[BLEND PREFERENCES] Request from user: {user_id}")
+        print(f"\n{'='*60}")
+        print(f"[BLEND PREFERENCES] 🎨 NEW BLEND REQUEST")
+        print(f"{'='*60}")
+        print(f"[BLEND PREFERENCES] User ID: {user_id}")
+        print(f"[BLEND PREFERENCES] Request friend_ids: {request.friend_ids}")
+        print(f"[BLEND PREFERENCES] Number of friend IDs in request: {len(request.friend_ids)}")
         
         supabase = get_supabase()
         
         # If no specific friends provided, get all friends
         if not request.friend_ids:
+            print(f"[BLEND PREFERENCES] No specific friends provided, fetching all friends...")
             user_response = supabase.table("profiles")\
                 .select("friends")\
                 .eq("id", user_id)\
@@ -61,11 +67,15 @@ async def blend_preferences(
             
             if user_response.data:
                 request.friend_ids = user_response.data.get("friends", []) or []
+                print(f"[BLEND PREFERENCES] Fetched {len(request.friend_ids)} friends from profile")
+        else:
+            print(f"[BLEND PREFERENCES] Using {len(request.friend_ids)} specific friend(s) from request")
         
         # Create list of all users (current user + friends)
         all_user_ids = [user_id] + request.friend_ids
         
-        print(f"[BLEND PREFERENCES] Blending for {len(all_user_ids)} users total")
+        print(f"[BLEND PREFERENCES] All user IDs to blend: {all_user_ids}")
+        print(f"[BLEND PREFERENCES] Total users: {len(all_user_ids)}")
         
         # Fetch all user profiles
         profiles_response = supabase.table("profiles")\
