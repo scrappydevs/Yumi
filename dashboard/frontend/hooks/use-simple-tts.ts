@@ -128,8 +128,8 @@ export function useSimpleTTS() {
 
   // Helper function to create audio with fallback
   const createAudioWithFallback = async (apiUrl: string, text: string, volume: number): Promise<HTMLAudioElement> => {
-    // First try streaming endpoint
-    const streamingUrl = `${apiUrl}/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=kdmDKE6EkgrWrrykO9Qt&stability=0.97&similarity_boost=0.65`;
+    // First try streaming endpoint - using Fahco4VZzobUeiPqni1S voice
+    const streamingUrl = `${apiUrl}/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=Fahco4VZzobUeiPqni1S&stability=0.97&similarity_boost=0.65`;
     
     try {
       const audio = new Audio(streamingUrl);
@@ -170,7 +170,7 @@ export function useSimpleTTS() {
           },
           body: JSON.stringify({
             text: text,
-            voice_id: 'kdmDKE6EkgrWrrykO9Qt',
+            voice_id: 'Fahco4VZzobUeiPqni1S',
             output_format: 'mp3_44100_128'
           })
         });
