@@ -14,7 +14,7 @@ async def get_user_profile(user_id: str, current_user_id: str = None):
     try:
         # Get user profile
         profile_result = supabase.table('profiles')\
-            .select('id, username, display_name, avatar_url, friends')\
+            .select('id, username, display_name, avatar_url, friends, preferences')\
             .eq('id', user_id)\
             .single()\
             .execute()
@@ -28,6 +28,27 @@ async def get_user_profile(user_id: str, current_user_id: str = None):
             'display_name': profile_result.data['display_name'],
             'avatar_url': profile_result.data['avatar_url'],
         }
+        
+        # Add taste profile summary if available
+        taste_profile_summary = profile_result.data.get('preferences')
+        if taste_profile_summary:
+            # Handle both JSON string and text formats
+            if isinstance(taste_profile_summary, str):
+                # Check if it's empty or just whitespace
+                if taste_profile_summary.strip():
+                    try:
+                        # Try to parse as JSON (old format)
+                        parsed_json = json.loads(taste_profile_summary)
+                        # If it's a dict or list, it's structured data, not a summary
+                        if isinstance(parsed_json, (dict, list)):
+                            # Don't add structured data as summary
+                            pass
+                        else:
+                            # It's a JSON-encoded string (shouldn't happen but handle it)
+                            user_data['taste_profile_summary'] = str(parsed_json)
+                    except (json.JSONDecodeError, ValueError):
+                        # Plain text summary - this is what we want!
+                        user_data['taste_profile_summary'] = taste_profile_summary
         
         # Calculate mutual friends if current_user_id is provided
         if current_user_id and current_user_id != user_id:
@@ -166,6 +187,7 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
             
             if similarity_result.data:
                 has_similarity_data = True
+                print(f"📊 Found {len(similarity_result.data)} similarity records")
                 for sim in similarity_result.data or []:
                     # Determine source and target
                     source = sim['user_id_1'] if sim['user_id_1'] == user_id else sim['user_id_2']
@@ -173,12 +195,44 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
                     
                     # Only include if both users are in our friend list
                     if target in friend_ids or source == user_id:
+                        score = sim.get('similarity_score', 0.5)
+                        explanation = sim.get('similarity_explanation') or sim.get('explanation', 'Similar food preferences')
+                        
+                        # Parse JSON fields from database
+                        shared_restaurants = sim.get('shared_restaurants', [])
+                        if isinstance(shared_restaurants, str):
+                            try:
+                                shared_restaurants = json.loads(shared_restaurants)
+                            except (json.JSONDecodeError, TypeError):
+                                shared_restaurants = []
+                        
+                        shared_cuisines = sim.get('shared_cuisines', [])
+                        if isinstance(shared_cuisines, str):
+                            try:
+                                shared_cuisines = json.loads(shared_cuisines)
+                            except (json.JSONDecodeError, TypeError):
+                                shared_cuisines = []
+                        
+                        taste_profile_overlap = sim.get('taste_profile_overlap', {})
+                        if isinstance(taste_profile_overlap, str):
+                            try:
+                                taste_profile_overlap = json.loads(taste_profile_overlap)
+                            except (json.JSONDecodeError, TypeError):
+                                taste_profile_overlap = {}
+                        
                         similarities.append({
                             'source': source,
                             'target': target,
-                            'similarity_score': sim.get('similarity_score', 0.5),
-                            'explanation': sim.get('explanation', 'Similar food preferences'),
+                            'similarity_score': score,
+                            'explanation': explanation,
+                            'shared_restaurants': shared_restaurants,
+                            'shared_cuisines': shared_cuisines,
+                            'taste_profile_overlap': taste_profile_overlap,
                         })
+                        # Debug: Show shared data
+                        cuisines_str = f", {len(shared_cuisines)} cuisines" if shared_cuisines else ""
+                        restaurants_str = f", {len(shared_restaurants)} restaurants" if shared_restaurants else ""
+                        print(f"  ↔️  {source[:8]}... <-> {target[:8]}...: {score:.2f}{cuisines_str}{restaurants_str}")
         except Exception as e:
             print(f"Note: similarity data not available: {e}")
         
@@ -191,6 +245,9 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
                     'target': friend['id'],
                     'similarity_score': 0.5,
                     'explanation': 'Friends on Yumi',
+                    'shared_restaurants': [],
+                    'shared_cuisines': [],
+                    'taste_profile_overlap': {},
                 })
         
         graph_data = {
@@ -247,7 +304,7 @@ async def compute_friend_similarities(user_id: str):
         
         # 3. For each friend, compute similarity
         try:
-            from ..services.similarity_engine import compute_similarity
+            from services.taste_similarity_engine import compute_similarity
             
             computed_count = 0
             for friend_id in friend_ids:
@@ -266,17 +323,35 @@ async def compute_friend_similarities(user_id: str):
                     friend_id
                 )
                 
-                # Store in database (ensure lower UUID first)
-                user_id_1 = min(user_id, friend_id)
-                user_id_2 = max(user_id, friend_id)
+                print(f"  ✅ Computed similarity: {similarity_data.get('similarity_score', 0):.3f} - {similarity_data.get('explanation', '')}")
                 
-                supabase.table('friend_similarities').upsert({
-                    'user_id_1': user_id_1,
-                    'user_id_2': user_id_2,
-                    **similarity_data
-                }).execute()
-                
-                computed_count += 1
+                # Store in database with correct schema
+                try:
+                    user_id_1 = min(user_id, friend_id)
+                    user_id_2 = max(user_id, friend_id)
+                    
+                    from datetime import datetime, timedelta
+                    now = datetime.utcnow()
+                    expires_at = now + timedelta(days=7)  # Cache for 7 days
+                    
+                    supabase.table('friend_similarities').upsert({
+                        'user_id_1': user_id_1,
+                        'user_id_2': user_id_2,
+                        'similarity_score': similarity_data.get('similarity_score', 0),
+                        'shared_restaurants': similarity_data.get('shared_restaurants', []),
+                        'shared_cuisines': similarity_data.get('cuisine_overlap', []),
+                        'taste_profile_overlap': {},  # Not computed in text-based approach
+                        'similarity_explanation': similarity_data.get('explanation', ''),
+                        'computed_at': now.isoformat(),
+                        'expires_at': expires_at.isoformat(),
+                    }).execute()
+                    
+                    computed_count += 1
+                    print(f"  💾 Stored in database")
+                except Exception as store_error:
+                    print(f"  ⚠️  Could not store in database: {store_error}")
+                    # Still count as computed even if storage fails
+                    computed_count += 1
             
             return {'computed': computed_count, 'message': f'Computed {computed_count} similarities'}
         except Exception as e:
