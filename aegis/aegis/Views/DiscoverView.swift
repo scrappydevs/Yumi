@@ -8,10 +8,13 @@
 import SwiftUI
 
 struct DiscoverView: View {
+    var onLoaded: (() -> Void)? = nil // Callback when initial load completes
+    
     @State private var restaurants: [Restaurant] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var reasoning: String = ""
+    @State private var hasCalledOnLoaded = false // Track if we've called the callback
     
     // Search state
     @State private var searchQuery: String = ""
@@ -209,11 +212,25 @@ struct DiscoverView: View {
             reasoning = response.reasoning ?? ""
             
         } catch {
+            // Don't call onLoaded on cancellation (view was dismissed)
+            if (error as NSError).code == NSURLErrorCancelled || 
+               String(describing: error).contains("CancellationError") {
+                print("⚠️ [DISCOVER] Task cancelled, not calling onLoaded")
+                return
+            }
+            
             errorMessage = "Failed to load recommendations: \(error.localizedDescription)"
             print("❌ [DISCOVER] Error: \(error)")
         }
         
         isLoading = false
+        
+        // Call onLoaded callback once (even if there was an error)
+        if !hasCalledOnLoaded {
+            hasCalledOnLoaded = true
+            onLoaded?()
+            print("🎯 [DISCOVER] Called onLoaded callback")
+        }
     }
     
     private func performSearch() async {

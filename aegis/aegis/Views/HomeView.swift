@@ -14,11 +14,14 @@ struct IdentifiableImage: Identifiable {
 }
 
 struct HomeView: View {
+    var onLoaded: (() -> Void)? = nil // Callback when initial load completes
+    
     @ObservedObject private var authService = AuthService.shared
     @ObservedObject private var locationService = LocationService.shared
 
     @State private var reviews: [Review] = []
     @State private var isLoading = false
+    @State private var hasCalledOnLoaded = false // Track if we've called the callback
 
     var body: some View {
         NavigationView {
@@ -96,16 +99,38 @@ struct HomeView: View {
     }
 
     private func loadReviews() async {
-        guard let authToken = authService.getAuthToken() else { return }
+        guard let authToken = authService.getAuthToken() else {
+            // No auth token, still call callback
+            if !hasCalledOnLoaded {
+                hasCalledOnLoaded = true
+                onLoaded?()
+                print("🎯 [HOME] Called onLoaded callback (no auth)")
+            }
+            return
+        }
 
         isLoading = true
         do {
             reviews = try await NetworkService.shared.fetchUserReviews(authToken: authToken)
-            print("✅ Loaded \(reviews.count) reviews")
+            print("✅ [HOME] Loaded \(reviews.count) reviews")
         } catch {
-            print("❌ Failed to load reviews: \(error)")
+            // Don't call onLoaded on cancellation (view was dismissed)
+            if (error as NSError).code == NSURLErrorCancelled {
+                print("⚠️ [HOME] Task cancelled, not calling onLoaded")
+                isLoading = false
+                return
+            }
+            
+            print("❌ [HOME] Failed to load reviews: \(error)")
         }
         isLoading = false
+        
+        // Call onLoaded callback once (even if there was an error)
+        if !hasCalledOnLoaded {
+            hasCalledOnLoaded = true
+            onLoaded?()
+            print("🎯 [HOME] Called onLoaded callback")
+        }
     }
 }
 

@@ -440,7 +440,7 @@ class NetworkService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
         request.httpBody = body
-        request.timeoutInterval = 30 // LLM can take time
+        request.timeoutInterval = 60 // LLM can take time (Gemini needs up to 60s)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -500,7 +500,7 @@ class NetworkService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
         request.httpBody = body
-        request.timeoutInterval = 30 // LLM can take time
+        request.timeoutInterval = 80 // LLM can take time (Gemini needs up to 60s)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -514,6 +514,12 @@ class NetworkService {
                 print("❌ [SEARCH] Response: \(responseText)")
             }
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        // Debug: Print the actual JSON response
+        if let responseText = String(data: data, encoding: .utf8) {
+            print("🔍 [SEARCH DEBUG] Raw JSON response:")
+            print(responseText.prefix(500)) // First 500 chars
         }
         
         let decoder = JSONDecoder()
@@ -533,16 +539,36 @@ class NetworkService {
             }
         }
         
-        let searchResponse = try decoder.decode(SearchResponse.self, from: data)
-        print("✅ [SEARCH] Received \(searchResponse.topRestaurants.count) restaurants")
-        
-        // Convert to DiscoverResponse format
-        return DiscoverResponse(
-            status: searchResponse.status,
-            restaurants: searchResponse.topRestaurants,
-            reasoning: searchResponse.reasoning,
-            location: searchResponse.location
-        )
+        do {
+            let searchResponse = try decoder.decode(SearchResponse.self, from: data)
+            print("✅ [SEARCH] Successfully decoded response")
+            return DiscoverResponse(
+                status: searchResponse.status,
+                restaurants: searchResponse.topRestaurants,
+                reasoning: searchResponse.reasoning,
+                location: searchResponse.location
+            )
+        } catch {
+            print("❌ [SEARCH DECODE ERROR] Failed to decode: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("❌ Missing key: \(key.stringValue)")
+                    print("❌ Context: \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("❌ Type mismatch for type: \(type)")
+                    print("❌ Context: \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("❌ Value not found for type: \(type)")
+                    print("❌ Context: \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("❌ Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    print("❌ Unknown decoding error")
+                }
+            }
+            throw error
+        }
     }
 }
 

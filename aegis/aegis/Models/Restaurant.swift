@@ -55,6 +55,31 @@ struct Restaurant: Codable, Identifiable {
         case matchScore = "match_score"
         case reasoning
     }
+    
+    // Custom decoder to handle price_level as either String or Int
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        placeId = try container.decode(String.self, forKey: .placeId)
+        name = try container.decode(String.self, forKey: .name)
+        cuisine = try container.decodeIfPresent(String.self, forKey: .cuisine)
+        distanceMeters = try container.decodeIfPresent(Double.self, forKey: .distanceMeters)
+        rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        atmosphere = try container.decodeIfPresent(String.self, forKey: .atmosphere)
+        matchScore = try container.decodeIfPresent(Double.self, forKey: .matchScore)
+        reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning)
+        
+        // Handle price_level as either String or Int
+        if let priceLevelInt = try? container.decodeIfPresent(Int.self, forKey: .priceLevel) {
+            priceLevel = priceLevelInt
+        } else if let priceLevelString = try? container.decodeIfPresent(String.self, forKey: .priceLevel) {
+            priceLevel = Int(priceLevelString)
+        } else {
+            priceLevel = nil
+        }
+    }
 }
 
 // MARK: - Location Coordinates
