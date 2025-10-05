@@ -159,7 +159,7 @@ export function OpenIMessageCard({
             aria-label="Copy message"
           >
             <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
-            <p className="text-sm text-[hsl(var(--foreground))] whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere pr-8 relative z-10">
+            <p className="text-sm text-[hsl(var(--foreground))] leading-relaxed pr-8 relative z-10 break-all">
               {presetBody}
             </p>
             <div className="absolute top-3 right-3 z-10">

@@ -147,12 +147,36 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   }, [isOpen, initialMode, reservationId, showIntro, prefillInvitee, prefillRestaurant])
 
   useEffect(() => {
-    if (prefillInvitee?.phone) {
-      setInvitees([{
-        phone: prefillInvitee.phone,
-        profileId: prefillInvitee.id
-      }])
+    const fetchPhoneAndSetInvitee = async () => {
+      if (prefillInvitee?.id) {
+        // Try to fetch phone from profile if not provided
+        let phone = prefillInvitee.phone
+        
+        if (!phone) {
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('phone')
+              .eq('id', prefillInvitee.id)
+              .single()
+            
+            if (data?.phone) {
+              phone = data.phone
+              console.log(`📱 Auto-fetched phone for prefilled invitee: ${phone}`)
+            }
+          } catch (err) {
+            console.error('Failed to fetch phone for prefilled invitee:', err)
+          }
+        }
+        
+        setInvitees([{
+          phone: phone || '',
+          profileId: prefillInvitee.id
+        }])
+      }
     }
+    
+    fetchPhoneAndSetInvitee()
   }, [prefillInvitee])
 
   const loadCreateData = async () => {
@@ -309,12 +333,32 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     setInvitees(invitees.filter((_, i) => i !== index))
   }
 
-  const updateInvitee = (index: number, field: 'phone' | 'profileId', value: string) => {
+  const updateInvitee = async (index: number, field: 'phone' | 'profileId', value: string) => {
     const updated = [...invitees]
     if (field === 'phone') {
       updated[index].phone = value
     } else {
       updated[index].profileId = value || undefined
+      
+      // Auto-fetch phone number from profile when profile is selected
+      if (value) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('phone')
+            .eq('id', value)
+            .single()
+          
+          if (data?.phone && !error) {
+            updated[index].phone = data.phone
+            console.log(`📱 Auto-filled phone for profile ${value}: ${data.phone}`)
+          } else {
+            console.warn(`⚠️ No phone found for profile ${value}`)
+          }
+        } catch (err) {
+          console.error('Failed to fetch phone from profile:', err)
+        }
+      }
     }
     setInvitees(updated)
   }
@@ -354,14 +398,14 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
 
       console.log('✅ Reservation created:', response)
 
-      // For party size 1, just show success and close (no invites to send)
+      // For party size 1, just close immediately (no invites to send)
       if (partySize === 1) {
-        setSuccess(true)
-        // Auto-close after a brief success message
+        // Close modal immediately without showing intermediate success state
+        onClose()
+        // Reset form after modal close animation completes
         setTimeout(() => {
-          onClose()
           resetForm()
-        }, 1500)
+        }, 500)
         return
       }
 
@@ -408,7 +452,8 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     setInviteMessage('')
     setInvitePhone('')
     setCopied(false)
-    setInviteeAvatarUrl(null)
+    // Don't reset inviteeAvatarUrl - keep it persistent across submissions
+    // setInviteeAvatarUrl(null)
   }
 
   const handleDownloadICS = () => {
@@ -590,35 +635,46 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                   <Label className="text-sm font-semibold text-black mb-2 block">Invitees</Label>
                   <div className="space-y-3">
                     {invitees.map((invitee, index) => (
-                      <div key={`invitee-${index}-${invitee.phone || index}`} className="flex gap-2">
-                        <Input
-                          placeholder="+17149410453"
-                          value={invitee.phone}
-                          onChange={(e) => updateInvitee(index, 'phone', e.target.value)}
-                          required
-                          className="flex-1 glass-layer-1 border-0 text-black shadow-soft"
-                        />
-                        <select
-                          value={invitee.profileId || ''}
-                          onChange={(e) => updateInvitee(index, 'profileId', e.target.value)}
-                          className="flex-1 p-3 glass-layer-1 rounded-xl border-0 text-black shadow-soft"
-                        >
-                          <option value="">Select profile (optional)</option>
-                          {profiles.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.display_name} (@{p.username})
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeInvitee(index)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <div key={`invitee-${index}-${invitee.phone || index}`} className="flex flex-col gap-2">
+                        {/* Profile Selector (Primary) */}
+                        <div className="flex gap-2">
+                          <select
+                            value={invitee.profileId || ''}
+                            onChange={(e) => updateInvitee(index, 'profileId', e.target.value)}
+                            className="flex-1 p-3 glass-layer-1 rounded-xl border-0 text-black shadow-soft"
+                          >
+                            <option value="">Select friend...</option>
+                            {profiles.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.display_name} (@{p.username})
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeInvitee(index)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        
+                        {/* Phone Input (Auto-filled or manual) */}
+                        {invitee.profileId ? (
+                          <div className="flex items-center gap-2 text-xs text-gray-600 pl-3">
+                            <span>📱 {invitee.phone || 'Loading phone...'}</span>
+                          </div>
+                        ) : (
+                          <Input
+                            placeholder="Or enter phone: +17149410453"
+                            value={invitee.phone}
+                            onChange={(e) => updateInvitee(index, 'phone', e.target.value)}
+                            required={!invitee.profileId}
+                            className="glass-layer-1 border-0 text-black shadow-soft text-sm"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -635,13 +691,20 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
               )}
 
               {/* Submit */}
-              <Button
+              <motion.button
                 type="submit"
                 disabled={loading}
-                className="w-full gradient-purple-blue text-white h-14 shadow-lg hover:shadow-xl transition-shadow"
+                className="w-full glass-layer-1 h-14 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                whileHover={!loading ? { scale: 1.02 } : {}}
+                whileTap={!loading ? { scale: 0.98 } : {}}
               >
-                {loading ? 'Sending...' : 'Send Reservation'}
-              </Button>
+                {/* Specular highlight */}
+                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-full" />
+                
+                <span className="font-semibold relative z-10">
+                  {loading ? 'Sending...' : 'Send Reservation'}
+                </span>
+              </motion.button>
             </motion.form>
           )}
 
@@ -720,7 +783,10 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 <Button
                   onClick={() => {
                     onClose()
-                    resetForm()
+                    // Reset form after modal close animation completes
+                    setTimeout(() => {
+                      resetForm()
+                    }, 500)
                   }}
                   variant="outline"
                   className="flex-1 h-12"

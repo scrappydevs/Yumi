@@ -266,6 +266,7 @@ export function MentionInput({
                 {filteredFriends.map((friend, index) => (
                   <button
                     key={friend.id}
+                    type="button"
                     data-index={index}
                     onClick={() => selectFriend(friend)}
                     onMouseEnter={() => setSelectedIndex(index)}

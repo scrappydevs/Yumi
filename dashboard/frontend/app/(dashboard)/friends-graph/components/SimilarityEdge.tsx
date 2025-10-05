@@ -314,7 +314,7 @@ function SimilarityEdge({
                           fontWeight: 500,
                         }}
                       >
-                        {tasteOverlap.price_compatible ? '$ compatible' : '$ different'}
+                        {tasteOverlap.price_compatible ? 'similar budget' : 'different budgets'}
                       </span>
                     )}
                   </div>

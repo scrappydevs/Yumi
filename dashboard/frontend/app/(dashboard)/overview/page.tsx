@@ -208,7 +208,7 @@ export default function DiscoverPage() {
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const [volume, setVolume] = useState(0.8); // 80% default volume
   const [friendsData, setFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string, recent_activity?: string}>>([]);
-  const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, recentReviews?: any[], favoriteRestaurants?: any[]} | null>(null);
+  const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, preferences?: any} | null>(null);
   const [mentionedFriendsData, setMentionedFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string}>>([]);
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
@@ -372,8 +372,13 @@ export default function DiscoverPage() {
 
   // Load mentioned friends' full profiles
   useEffect(() => {
-    if (!user || mentions.length === 0) {
-      setMentionedFriendsData([]);
+    if (!user) {
+      return;
+    }
+
+    // Don't clear mentioned friends when mentions is empty
+    // This allows them to persist during thinking/results states
+    if (mentions.length === 0) {
       return;
     }
 
@@ -507,17 +512,9 @@ export default function DiscoverPage() {
     
     const searchQuery = prompt;  // Save the query before clearing
     const searchMentions = [...mentions];  // Save mentions before clearing
-    const searchMentionedFriends = [...mentionedFriendsData];  // Save mentioned friends to keep them visible
+    // mentionedFriendsData will persist automatically now (no longer cleared by useEffect)
     setPrompt('');  // Clear the input immediately
     setMentions([]);  // Clear mentions from input
-    
-    // Keep mentioned friends visible during search - restore immediately after useEffect clears it
-    // Use setTimeout to restore after the useEffect has run
-    setTimeout(() => {
-      if (searchMentionedFriends.length > 0) {
-        setMentionedFriendsData(searchMentionedFriends);
-      }
-    }, 0);
     
     setIsThinking(true);
     setShowingResults(false);  // Reset results state
@@ -543,7 +540,8 @@ export default function DiscoverPage() {
       setSearchError(timeoutText);
       setIsThinking(false);
       setShowingResults(false);
-      setMentionedFriendsData([]);  // Clear mentioned friends on timeout
+      // Keep mentioned friends visible even on timeout
+      // setMentionedFriendsData([]);
       if (!isMuted) {
         speak(timeoutText);
       }
@@ -1033,22 +1031,6 @@ export default function DiscoverPage() {
         )}
       </div>
 
-      {/* Test AI Button - Bottom Left */}
-      <div className="absolute bottom-6 left-6 z-10">
-        <motion.button
-          onClick={() => setIsThinking(!isThinking)}
-          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-xs font-medium">
-            {isThinking ? 'Thinking...' : 'Test AI'}
-          </span>
-        </motion.button>
-      </div>
-
       {/* Location Tagger - Top Right */}
       <div className="absolute top-6 right-6 z-10">
         <motion.div
@@ -1116,7 +1098,7 @@ export default function DiscoverPage() {
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                 
                 <div className="relative py-2">
-                  {['Boston', 'New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
+                  {['Boston'].map((loc) => (
                     <motion.button
                       key={loc}
                       className="w-full px-2 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
@@ -1295,8 +1277,8 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              // Different radius for each state: thinking (larger), results (medium), latent (medium)
-              const baseRadius = isThinking ? 440 : showingResults ? 360 : 320;
+              // Different radius for each state: thinking (medium), results (closer), latent (close)
+              const baseRadius = isThinking ? 360 : showingResults ? 340 : 320;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1487,26 +1469,36 @@ export default function DiscoverPage() {
                   cursor: (isThinking || showingResults) ? 'default' : 'pointer',
                 }}
                 onMouseEnter={async () => {
-                  // Fetch friend's recent activity
+                  // Fetch friend's preferences
                   try {
                     const supabase = createClient();
                     
-                    // Get recent reviews
-                    const { data: reviews } = await supabase
-                      .from('reviews')
-                      .select('restaurant_name, rating, comment, created_at')
-                      .eq('user_id', friend.id)
-                      .order('created_at', { ascending: false })
-                      .limit(3);
+                    // Get preferences from profile
+                    const { data: profile } = await supabase
+                      .from('profiles')
+                      .select('preferences')
+                      .eq('id', friend.id)
+                      .single();
                     
-                    console.log(`👤 Loaded activity for ${friend.display_name || friend.username}: ${reviews?.length || 0} reviews`);
+                    let parsedPreferences = null;
+                    if (profile?.preferences) {
+                      try {
+                        parsedPreferences = typeof profile.preferences === 'string' 
+                          ? JSON.parse(profile.preferences) 
+                          : profile.preferences;
+                      } catch {
+                        console.warn('Could not parse preferences for friend:', friend.id);
+                      }
+                    }
+                    
+                    console.log(`👤 Loaded preferences for ${friend.display_name || friend.username}`);
                     
                     setHoveredFriend({
                       ...friend,
-                      recentReviews: reviews || [],
+                      preferences: parsedPreferences,
                     });
                   } catch (error) {
-                    console.error('Error loading friend activity:', error);
+                    console.error('Error loading friend preferences:', error);
                     setHoveredFriend({...friend});
                   }
                 }}
@@ -1666,46 +1658,67 @@ export default function DiscoverPage() {
                   </div>
                 </div>
                 
-                {/* Recent Reviews */}
-                {hoveredFriend.recentReviews && hoveredFriend.recentReviews.length > 0 ? (
+                {/* Taste Preferences */}
+                {hoveredFriend.preferences && (
+                  hoveredFriend.preferences.cuisines?.length > 0 || 
+                  hoveredFriend.preferences.atmosphere?.length > 0 || 
+                  hoveredFriend.preferences.priceRange
+                ) && (
                   <div className="pt-2 border-t border-gray-200/50">
                     <p className="text-sm font-medium text-gray-700 mb-3">
-                      Recent Activity
+                      Taste Preferences
                     </p>
                     <div className="space-y-3">
-                      {hoveredFriend.recentReviews.map((review: any, idx: number) => (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {review.restaurant_name}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              <span className="text-sm font-medium text-gray-700">
-                                {review.rating}
+                      {/* Favorite Cuisines */}
+                      {hoveredFriend.preferences.cuisines?.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                            Cuisines
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {hoveredFriend.preferences.cuisines.slice(0, 6).map((cuisine: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-medium"
+                              >
+                                {cuisine}
                               </span>
-                            </div>
+                            ))}
                           </div>
-                          {review.comment && (
-                            <p className="text-xs text-gray-600 line-clamp-2">
-                              "{review.comment}"
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400">
-                            {new Date(review.created_at).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
+                        </div>
+                      )}
+                      
+                      {/* Atmosphere */}
+                      {hoveredFriend.preferences.atmosphere?.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                            Atmosphere
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {hoveredFriend.preferences.atmosphere.slice(0, 6).map((vibe: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2.5 py-1 rounded-lg bg-pink-50 text-pink-700 font-medium"
+                              >
+                                {vibe}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Price Range */}
+                      {hoveredFriend.preferences.priceRange && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                            Price Range
+                          </p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {hoveredFriend.preferences.priceRange}
                           </p>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="pt-2 border-t border-gray-200/50">
-                    <p className="text-sm text-gray-500 italic">
-                      No recent activity yet
-                    </p>
                   </div>
                 )}
               </div>
