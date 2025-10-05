@@ -18,8 +18,8 @@ class AppLoadingViewModel: ObservableObject {
     private let minimumLoadingTime: TimeInterval = 1.0
     private var loadingStartTime: Date?
     
-    // Maximum loading time before forcing complete (60 seconds - enough for LLM)
-    private let maximumLoadingTime: TimeInterval = 80.0
+    // Maximum loading time before forcing complete (8 seconds timeout)
+    private let maximumLoadingTime: TimeInterval = 8.0
     
     var allLoaded: Bool {
         discoverLoaded && reviewsLoaded

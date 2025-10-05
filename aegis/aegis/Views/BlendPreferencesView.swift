@@ -105,10 +105,26 @@ struct BlendPreferencesView: View {
     
     private func blendedContentView(blended: BlendedPreferences) -> some View {
         VStack(spacing: 20) {
-            // Header emoji
-            Text("🍽️")
-                .font(.system(size: 60))
-                .padding(.top, 20)
+            // Profile Pictures Header
+            if let myProfile = viewModel.myProfile {
+                if blended.userCount == 2, let friend = selectedFriend {
+                    // Two person blend - show both avatars overlapping
+                    ZStack {
+                        // Friend avatar (left)
+                        ProfileAvatarView(avatarUrl: friend.avatarUrl, size: 70)
+                            .offset(x: -25)
+                        
+                        // Current user avatar (right)
+                        ProfileAvatarView(avatarUrl: myProfile.avatarUrl, size: 70)
+                            .offset(x: 25)
+                    }
+                    .padding(.top, 20)
+                } else {
+                    // Group blend - show current user avatar only
+                    ProfileAvatarView(avatarUrl: myProfile.avatarUrl, size: 70)
+                        .padding(.top, 20)
+                }
+            }
             
             // Group info
             Text("\(blended.userCount) \(blended.userCount == 1 ? "Person" : "People")")
@@ -121,7 +137,7 @@ struct BlendPreferencesView: View {
             
             // Main description card
             VStack(alignment: .leading, spacing: 12) {
-                Text("Your Group's Vibe")
+                Text("Your Blend's Vibe")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -257,6 +273,65 @@ struct BlendPreferencesView: View {
             .background(Color.purple.opacity(0.1))
             .foregroundColor(.purple)
             .cornerRadius(8)
+    }
+}
+
+// MARK: - Profile Avatar View
+
+struct ProfileAvatarView: View {
+    let avatarUrl: String?
+    let size: CGFloat
+    
+    var body: some View {
+        Group {
+            if let urlString = avatarUrl, !urlString.isEmpty, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: size, height: size)
+                            .overlay {
+                                ProgressView()
+                            }
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size, height: size)
+                            .clipShape(Circle())
+                    case .failure:
+                        defaultAvatar
+                    @unknown default:
+                        defaultAvatar
+                    }
+                }
+            } else {
+                defaultAvatar
+            }
+        }
+        .overlay {
+            Circle()
+                .stroke(Color.white, lineWidth: 3)
+        }
+        .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
+    }
+    
+    private var defaultAvatar: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [.blue.opacity(0.6), .purple.opacity(0.6)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: size, height: size)
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: size * 0.5))
+                    .foregroundColor(.white)
+            }
     }
 }
 
