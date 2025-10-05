@@ -56,8 +56,8 @@ class RestaurantSearchService:
         # - Group preference blending
         self.gemini_service = get_gemini_service('gemini-2.5-flash')
 
-        # Use Lite model for fast cuisine detection
-        self.gemini_lite_service = get_gemini_service('gemini-1.5-flash-8b')
+        # Use 2.5 Flash Lite for fast cuisine detection (lightweight)
+        self.gemini_lite_service = get_gemini_service('gemini-2.5-flash-lite')
 
         self.supabase_service = get_supabase_service()
         self.taste_profile_service = get_taste_profile_service()
@@ -65,41 +65,6 @@ class RestaurantSearchService:
 
         print(
             f"[RESTAURANT SEARCH] Service initialized (using Gemini Flash for complex queries)")
-
-    async def _trigger_tts_and_stream(self, text: str):
-        """
-        Trigger TTS and WAIT for it to complete streaming.
-
-        This ensures audio plays immediately and finishes before continuing.
-        No queuing, no multithreading - just sequential execution.
-
-        Args:
-            text: Text to speak
-        """
-        try:
-            print(f"[TTS] 🎤 Starting speech: '{text}'")
-
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                url = "http://localhost:8000/api/audio/tts/stream"
-                params = {
-                    "text": text,
-                    "voice_id": "Fahco4VZzobUeiPqni1S",
-                    "stability": 0.97,
-                    "similarity_boost": 0.65
-                }
-
-                # Stream the response and consume all chunks
-                # This triggers the actual streaming and ensures it completes
-                async with client.stream('GET', url, params=params) as response:
-                    response.raise_for_status()
-                    async for chunk in response.aiter_bytes():
-                        pass  # Consume chunks (triggers streaming on backend)
-
-            print(f"[TTS] ✅ Speech completed: '{text}'")
-
-        except Exception as e:
-            # Non-critical failure - log and continue
-            print(f"[TTS] ⚠️ Speech failed (non-critical): {e}")
 
     async def _detect_cuisine_from_query(self, query: str) -> Optional[str]:
         """
@@ -135,7 +100,7 @@ Return ONLY valid JSON (no markdown):
 
 Supported cuisines: mexican, italian, japanese, chinese, thai, indian, french, korean, vietnamese, greek, american, seafood, mediterranean, spanish, middle eastern, ethiopian, caribbean, brazilian"""
 
-            response = await self.gemini_lite_service.generate_content_async(prompt)
+            response = self.gemini_lite_service.model.generate_content(prompt)
             response_text = response.text.strip()
 
             # Remove markdown if present
@@ -1175,6 +1140,10 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 "latitude": latitude,
                 "longitude": longitude
             }
+
+            # Add TTS message for frontend to play
+            restaurant_count = len(result.get('top_restaurants', []))
+            result["tts_message"] = f"Found {restaurant_count} great option{'s' if restaurant_count != 1 else ''} for your group"
 
             print(
                 f"[GROUP RESTAURANT SEARCH] ✅ Returning {len(result.get('top_restaurants', []))} restaurants for group")
