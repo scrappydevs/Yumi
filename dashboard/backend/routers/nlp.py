@@ -162,10 +162,10 @@ Return ONLY valid JSON (no markdown, no explanations):
 If no friends are mentioned in a dining context, return: {{"matches": []}}"""
 
         print(f"[NLP] 🤖 Sending to Gemini for analysis...")
-        print(f"[NLP] Using model: gemini-2.5-flash (better reasoning)")
+        print(f"[NLP] Using model: gemini-2.5-flash-lite (faster)")
 
-        # Call Gemini service with BETTER model for accurate name matching (gemini-2.5-flash)
-        gemini_service = get_gemini_service(model_name='gemini-2.5-flash')
+        # Call Gemini service with LITE model for faster friend tagging
+        gemini_service = get_gemini_service(model_name='gemini-2.5-flash-lite')
         response = gemini_service.model.generate_content(prompt)
         response_text = response.text.strip()
 

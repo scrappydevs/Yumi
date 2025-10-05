@@ -217,26 +217,51 @@ export function MentionInput({
 
   return (
     <div className="relative w-full flex items-center gap-2">
-      {/* Selected Mentions Display - Inline badges */}
+      {/* Selected Mentions Display - Condensed format for multiple tags */}
       {selectedMentions.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {selectedMentions.map((mention) => (
+          {selectedMentions.length === 1 ? (
+            // Single mention: show full badge with name and X button
             <Badge
-              key={mention.id}
+              key={selectedMentions[0].id}
               variant="secondary"
               className="flex items-center gap-1 px-2 py-0.5 text-xs"
             >
               <User className="w-3 h-3" />
-              <span>{mention.display_name || mention.username}</span>
+              <span>{selectedMentions[0].display_name || selectedMentions[0].username}</span>
               <button
-                onClick={() => removeMention(mention.username)}
+                onClick={() => removeMention(selectedMentions[0].username)}
                 className="ml-1 hover:text-destructive"
                 type="button"
               >
                 <X className="w-3 h-3" />
               </button>
             </Badge>
-          ))}
+          ) : (
+            // Multiple mentions: show "FirstName +N" format with X button to remove all
+            <Badge
+              variant="secondary"
+              className="flex items-center gap-1 px-2 py-0.5 text-xs"
+            >
+              <User className="w-3 h-3" />
+              <span>
+                {selectedMentions[0].display_name || selectedMentions[0].username}
+                {selectedMentions.length > 1 && ` +${selectedMentions.length - 1}`}
+              </span>
+              <button
+                onClick={() => {
+                  // Clear all mentions
+                  setSelectedMentions([]);
+                  onMentionsChange([]);
+                }}
+                className="ml-1 hover:text-destructive"
+                type="button"
+                title={`Remove all ${selectedMentions.length} tagged friends`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
         </div>
       )}
 
