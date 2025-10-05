@@ -120,7 +120,7 @@ class RestaurantSearchService:
         self,
         latitude: float,
         longitude: float,
-        radius: int = 4828,  # 3 miles default
+        radius: int = 9656,  # 6 miles default
         limit: int = 50,
         min_rating: float = 4.0,
         cuisine_filter: Optional[str] = None
@@ -131,7 +131,7 @@ class RestaurantSearchService:
         Args:
             latitude: Latitude coordinate
             longitude: Longitude coordinate
-            radius: Search radius in meters (default: 4828m = 3 miles)
+            radius: Search radius in meters (default: 9656m = 6 miles)
             limit: Maximum number of restaurants to return (default: 50)
             min_rating: Minimum rating filter (default: 4.0)
             cuisine_filter: Optional cuisine type to filter by
@@ -331,11 +331,11 @@ class RestaurantSearchService:
             if detected_cuisine:
                 # PATH A: Cuisine detected in query
                 print(
-                    f"[RESTAURANT SEARCH] Path A: Getting {detected_cuisine} restaurants within 3 miles...")
+                    f"[RESTAURANT SEARCH] Path A: Getting {detected_cuisine} restaurants within 6 miles...")
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=4828,  # 3 miles
+                    radius=9656,  # 6 miles
                     limit=max_candidates,
                     min_rating=4.0,
                     cuisine_filter=detected_cuisine
@@ -348,7 +348,7 @@ class RestaurantSearchService:
                     restaurants = self.get_nearby_restaurants_tool(
                         latitude=latitude,
                         longitude=longitude,
-                        radius=4828,
+                        radius=9656,
                         limit=max_candidates,
                         min_rating=4.0
                     )
@@ -361,7 +361,7 @@ class RestaurantSearchService:
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=4828,  # 3 miles
+                    radius=9656,  # 6 miles
                     limit=max_candidates,
                     min_rating=4.0
                 )
@@ -720,7 +720,7 @@ IMPORTANT:
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=4828,
+                    radius=9656,
                     limit=20,
                     min_rating=4.0
                 )
@@ -797,7 +797,7 @@ IMPORTANT:
             restaurants = self.get_nearby_restaurants_tool(
                 latitude=latitude,
                 longitude=longitude,
-                radius=1000,
+                radius=9656,
                 limit=10
             )
 
@@ -1091,7 +1091,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=1000,
+                    radius=9656,
                     limit=10
                 )
                 print(

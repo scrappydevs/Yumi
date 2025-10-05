@@ -310,17 +310,12 @@ export default function DiscoverPage() {
    */
   const detectFriendMentions = async (text: string): Promise<Mention[]> => {
     try {
-      if (!text.trim() || friendsData.length === 0) {
-        console.warn('[Overview] ⚠️  Cannot detect mentions:', {
-          hasText: !!text.trim(),
-          friendsLoaded: friendsData.length,
-          friendsList: friendsData.map(f => f.username).join(', ')
-        });
+      if (!text.trim()) {
+        console.warn('[Overview] ⚠️  Empty text, skipping mention detection');
         return [];
       }
 
       console.log('[Overview] 🔍 Detecting friend mentions in:', text);
-      console.log('[Overview] 👥 Available friends:', friendsData.length);
 
       // Get auth session for JWT token
       const supabase = createClient();
@@ -331,14 +326,7 @@ export default function DiscoverPage() {
         return [];
       }
 
-      // Format friends for API
-      const friendsForApi = friendsData.map(f => ({
-        id: f.id,
-        username: f.username,
-        display_name: f.display_name || null
-      }));
-
-      // Call NLP detection API
+      // Call NLP detection API (backend fetches fresh friends list from DB)
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/nlp/detect-friend-mentions`, {
         method: 'POST',
         headers: {
@@ -346,8 +334,7 @@ export default function DiscoverPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text,
-          friends: friendsForApi
+          text
         }),
       });
 

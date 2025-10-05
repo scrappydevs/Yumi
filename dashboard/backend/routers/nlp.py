@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 from utils.auth import get_user_id_from_token
 from services.gemini_service import get_gemini_service
+from supabase_client import get_supabase
 import json
 
 router = APIRouter(prefix="/api/nlp", tags=["nlp"])
@@ -26,8 +27,6 @@ class FriendInfo(BaseModel):
 class DetectMentionsRequest(BaseModel):
     """Request model for friend mention detection"""
     text: str = Field(..., description="Transcribed text to analyze")
-    friends: List[FriendInfo] = Field(...,
-                                      description="List of user's friends")
 
 
 class DetectedMention(BaseModel):
@@ -60,7 +59,7 @@ async def detect_friend_mentions(
     in a dining/restaurant context (e.g., "sushi date night with Julian").
 
     Args:
-        request: DetectMentionsRequest with text and friends list
+        request: DetectMentionsRequest with text only
         user_id: Authenticated user ID from JWT token
 
     Returns:
@@ -74,7 +73,6 @@ async def detect_friend_mentions(
         print(f"[NLP] 🔍 FRIEND MENTION DETECTION")
         print(f"[NLP] User: {user_id}")
         print(f"[NLP] Text: '{request.text}'")
-        print(f"[NLP] Available friends: {len(request.friends)}")
 
         # Handle edge cases
         if not request.text.strip():
@@ -84,8 +82,47 @@ async def detect_friend_mentions(
                 original_text=request.text
             )
 
-        if not request.friends:
-            print("[NLP] ⚠️  No friends provided, returning no mentions")
+        # CRITICAL FIX: Fetch fresh friends list from database
+        # This ensures we always have up-to-date friends, even if just added
+        print(f"[NLP] 📡 Fetching fresh friends list from database...")
+        supabase = get_supabase()
+
+        # Get user's friends array
+        user_response = supabase.table("profiles")\
+            .select("friends")\
+            .eq("id", user_id)\
+            .single()\
+            .execute()
+
+        if not user_response.data:
+            print("[NLP] ⚠️  User profile not found")
+            return DetectMentionsResponse(
+                detected_mentions=[],
+                original_text=request.text
+            )
+
+        friend_ids = user_response.data.get("friends", [])
+
+        if not friend_ids:
+            print("[NLP] ⚠️  User has no friends")
+            return DetectMentionsResponse(
+                detected_mentions=[],
+                original_text=request.text
+            )
+
+        print(f"[NLP] Found {len(friend_ids)} friend IDs in database")
+
+        # Fetch friend profiles with username and display name
+        friends_response = supabase.table("profiles")\
+            .select("id, username, display_name")\
+            .in_("id", friend_ids)\
+            .execute()
+
+        friends = friends_response.data or []
+        print(f"[NLP] Available friends: {len(friends)}")
+
+        if not friends:
+            print("[NLP] ⚠️  No friend profiles found")
             return DetectMentionsResponse(
                 detected_mentions=[],
                 original_text=request.text
@@ -93,10 +130,10 @@ async def detect_friend_mentions(
 
         # Prepare friends list for LLM (with both username and display name)
         friends_list = []
-        for friend in request.friends:
-            friend_str = f"- ID: {friend.id}, Username: @{friend.username}"
-            if friend.display_name:
-                friend_str += f", Display Name: {friend.display_name}"
+        for friend in friends:
+            friend_str = f"- ID: {friend['id']}, Username: @{friend['username']}"
+            if friend.get('display_name'):
+                friend_str += f", Display Name: {friend['display_name']}"
             friends_list.append(friend_str)
 
         friends_text = "\n".join(friends_list)
