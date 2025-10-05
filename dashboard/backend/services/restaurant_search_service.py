@@ -9,6 +9,8 @@ This service orchestrates:
 import os
 import math
 import json
+import asyncio
+import httpx
 from difflib import get_close_matches
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from services.gemini_service import get_gemini_service
@@ -62,6 +64,41 @@ class RestaurantSearchService:
 
         print(
             f"[RESTAURANT SEARCH] Service initialized (using Gemini Flash for complex queries)")
+
+    async def _trigger_tts_and_stream(self, text: str):
+        """
+        Trigger TTS and WAIT for it to complete streaming.
+
+        This ensures audio plays immediately and finishes before continuing.
+        No queuing, no multithreading - just sequential execution.
+
+        Args:
+            text: Text to speak
+        """
+        try:
+            print(f"[TTS] 🎤 Starting speech: '{text}'")
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                url = "http://localhost:8000/api/audio/tts/stream"
+                params = {
+                    "text": text,
+                    "voice_id": "Fahco4VZzobUeiPqni1S",
+                    "stability": 0.97,
+                    "similarity_boost": 0.65
+                }
+
+                # Stream the response and consume all chunks
+                # This triggers the actual streaming and ensures it completes
+                async with client.stream('GET', url, params=params) as response:
+                    response.raise_for_status()
+                    async for chunk in response.aiter_bytes():
+                        pass  # Consume chunks (triggers streaming on backend)
+
+            print(f"[TTS] ✅ Speech completed: '{text}'")
+
+        except Exception as e:
+            # Non-critical failure - log and continue
+            print(f"[TTS] ⚠️ Speech failed (non-critical): {e}")
 
     def get_user_preferences_tool(self, user_id: str) -> Dict[str, Any]:
         """
@@ -783,12 +820,16 @@ IMPORTANT:
         print(f"[GROUP RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
         print(f"{'='*80}\n")
 
+        # 🎤 TTS: ONE PHRASE AT START (await to ensure it completes first)
+        await self._trigger_tts_and_stream("Hi, analyzing your results right now")
+
         try:
             print(f"[GROUP RESTAURANT SEARCH] ✅ Entered try block")
 
             # Step 1: Merge preferences from all users
             print(
                 f"[GROUP RESTAURANT SEARCH] Step 1: Merging preferences for {len(user_ids)} users...")
+
             merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(
                 user_ids)
             print(
@@ -1093,6 +1134,10 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
 
             print(
                 f"[GROUP RESTAURANT SEARCH] ✅ Returning {len(result.get('top_restaurants', []))} restaurants for group")
+
+            # 🎤 TTS: ONE PHRASE AT END (await to ensure it completes before returning)
+            await self._trigger_tts_and_stream("Found your restaurants")
+
             return result
 
         except Exception as e:

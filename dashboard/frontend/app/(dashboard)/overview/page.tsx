@@ -705,7 +705,7 @@ export default function DiscoverPage() {
       }
       
       // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
-      // For group searches, TTS will be triggered by streaming backend
+      // For group searches, backend triggers TTS internally at each step
       // For single searches, queue initial phrase
       if (!isGroupSearch) {
         const initialText = 'Let me find something perfect for you';
@@ -713,6 +713,9 @@ export default function DiscoverPage() {
         if (!isMuted) {
           speak(initialText); // No await - queue it
         }
+      } else {
+        // Group search: Backend handles TTS, just set initial status
+        setCurrentPhrase('Searching restaurants...');
       }
       
       console.log('📍 Fetching nearby restaurants...');
@@ -795,116 +798,37 @@ export default function DiscoverPage() {
           console.log(`📋 Including friend IDs: ${friendIds}`);
         }
         
-        // Use streaming endpoint for group searches (real-time TTS)
+        // Use appropriate endpoint based on whether it's a group search
         const searchEndpoint = isGroupSearch
-          ? '/api/restaurants/search-group-stream'
+          ? '/api/restaurants/search-group'
           : '/api/restaurants/search';
 
         console.log(`📡 Calling ${searchEndpoint}...`);
         console.log(`📡 Fetch URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`);
         console.log(`📡 Starting fetch at: ${new Date().toISOString()}`);
         
-        let data: any = null;
+        // Backend now handles TTS internally - just make the request
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: searchFormData,
+        });
+
+        console.log(`📡 Fetch completed at: ${new Date().toISOString()}`);
+        console.log(`📡 Response status: ${response.status}`);
+        console.log(`📡 Response ok: ${response.ok}`);
         
-        // Handle streaming for group searches
-        if (isGroupSearch) {
-          console.log('📡 Using streaming search...');
-          
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: searchFormData,
-          });
-          
-          if (!response.ok) {
-            console.error('❌ Streaming response not OK');
-            throw new Error('Failed to start search stream');
-          }
-          
-          if (!response.body) {
-            throw new Error('No response body for streaming');
-          }
-          
-          // Parse SSE stream
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-          
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) {
-              console.log('📡 Stream complete');
-              break;
-            }
-            
-            // Decode chunk and add to buffer
-            buffer += decoder.decode(value, { stream: true });
-            
-            // Process complete SSE messages (format: "data: {...}\n\n")
-            const lines = buffer.split('\n\n');
-            buffer = lines.pop() || ''; // Keep incomplete message in buffer
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const jsonStr = line.slice(6); // Remove "data: " prefix
-                
-                try {
-                  const message = JSON.parse(jsonStr);
-                  console.log('📡 SSE Message:', message);
-                  
-                  if (message.type === 'progress') {
-                    // Trigger TTS for progress update
-                    console.log(`🎤 Progress: ${message.message}`);
-                    setCurrentPhrase(message.message);
-                    if (!isMuted) {
-                      speak(message.message); // Queue TTS
-                    }
-                  } else if (message.type === 'complete') {
-                    // Final results
-                    console.log('✅ Search complete with results');
-                    data = message.data;
-                  } else if (message.type === 'error') {
-                    console.error('❌ Search error:', message.message);
-                    throw new Error(message.message);
-                  }
-                } catch (parseError) {
-                  console.error('❌ Failed to parse SSE message:', parseError);
-                }
-              }
-            }
-          }
-          
-          if (!data) {
-            throw new Error('No results received from stream');
-          }
-          
-        } else {
-          // Non-streaming search (single user)
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: searchFormData,
-          });
-
-          console.log(`📡 Fetch completed at: ${new Date().toISOString()}`);
-          console.log(`📡 Response status: ${response.status}`);
-          console.log(`📡 Response ok: ${response.ok}`);
-          
-          if (!response.ok) {
-            console.error('❌ Response not OK, trying to parse error...');
-            const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
-            console.error('❌ Search failed:', errorData);
-            throw new Error(errorData.detail || 'Failed to search restaurants');
-          }
-
-          console.log('📡 Parsing JSON response...');
-          data = await response.json();
+        if (!response.ok) {
+          console.error('❌ Response not OK, trying to parse error...');
+          const errorData = await response.json().catch(() => ({ detail: 'Search failed' }));
+          console.error('❌ Search failed:', errorData);
+          throw new Error(errorData.detail || 'Failed to search restaurants');
         }
+
+        console.log('📡 Parsing JSON response...');
+        const data = await response.json();
         console.log('✅ JSON parsed successfully');
         console.log('📊 Full response data:', JSON.stringify(data, null, 2));
         console.log(`📊 data.status: ${data.status}`);
