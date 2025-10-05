@@ -27,6 +27,7 @@ import { useVADRecording } from '@/hooks/use-vad-recording';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 import { trackClick } from '@/lib/track-interaction';
+import { useAudio } from '@/lib/audio-context';
 
 // Cuisine-based fallback images for restaurants without photos
 const CUISINE_FALLBACK_IMAGES: { [key: string]: string } = {
@@ -186,7 +187,7 @@ export default function DiscoverPage() {
   const [userCoords, setUserCoords] = useState<{lat: number, lng: number} | null>(null);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
-  const [isMuted, setIsMuted] = useState(false);
+  const { isMuted } = useAudio(); // Use shared audio context
   const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [glowingIndices, setGlowingIndices] = useState<Set<number>>(new Set());
@@ -392,16 +393,25 @@ export default function DiscoverPage() {
       } else if (showingResults) {
         speed = 0.6;  // Slower when showing results
       } else {
-        // Latent state: SUPER fast for first 2 cycles, then slow down
-        speed = rotationCyclesRef.current < 1 ? 5.0 : 0.8;
+        // Latent state: SUPER fast for first 0.7 cycles, then gradually slow down
+        if (rotationCyclesRef.current < 0.7) {
+          speed = 5.0;  // Fast speed
+        } else {
+          // Gradually slow down over the next 0.3 cycles
+          const slowdownProgress = Math.min((rotationCyclesRef.current - 0.7) / 0.3, 1);
+          speed = 5.0 - (4.2 * slowdownProgress);  // Interpolate from 5.0 to 0.8
+        }
       }
       
       setRotation((prev) => {
         const newRotation = (prev + speed) % 360;
-        // Track complete cycles (when we pass 360/0 degrees)
-        if (prev > newRotation && !isThinking && !showingResults) {
-          rotationCyclesRef.current += 1;
-          console.log(`🔄 Rotation cycle complete! Count: ${rotationCyclesRef.current}, Speed will be: ${rotationCyclesRef.current < 1 ? 5.0 : 0.8}`);
+        // Track fractional cycle progress in latent mode
+        if (!isThinking && !showingResults) {
+          rotationCyclesRef.current += speed / 360;
+          // Log on whole number crossings
+          if (Math.floor(prev / 360) < Math.floor((prev + speed) / 360)) {
+            console.log(`🔄 Rotation cycle milestone! Count: ${rotationCyclesRef.current.toFixed(2)}, Current speed: ${speed.toFixed(2)}`);
+          }
         }
         return newRotation;
       });
@@ -479,6 +489,7 @@ export default function DiscoverPage() {
 
         if (profile?.friends && profile.friends.length > 0) {
           // Fetch friend profiles with explicit ordering to prevent database-level inconsistency
+          // Fetch all friend profiles
           const { data: friends } = await supabase
             .from('profiles')
             .select('id, username, display_name, avatar_url')
@@ -490,6 +501,7 @@ export default function DiscoverPage() {
             console.log(`👥 Ignoring stale friends fetch #${currentFetchId}`);
             return;
           }
+            .in('id', profile.friends);
 
           if (friends) {
             // Friends already ordered by DB, but sort again as defensive measure
@@ -753,8 +765,8 @@ export default function DiscoverPage() {
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
-        // Show only ~10-15 images initially (so animation has images to swap in/out)
-        const initialCount = Math.min(15, allImages.length);
+        // Show only ~3 images initially (so animation has images to swap in/out)
+        const initialCount = Math.min(3, allImages.length);
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
@@ -1138,47 +1150,6 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-white">
       
-      {/* Sound Controls - Top Left */}
-      <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
-        <motion.button
-          onClick={() => {
-            setIsMuted(!isMuted);
-            if (!isMuted && isSpeaking) stop();
-          }}
-          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          {isMuted ? (
-            <VolumeX className="w-5 h-5 text-red-500" />
-          ) : (
-            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
-          )}
-        </motion.button>
-
-        {!isMuted && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 100, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="glass-layer-1 px-3 py-2.5 rounded-full shadow-soft flex items-center"
-          >
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={volume * 100}
-              onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
-              className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
-              }}
-            />
-          </motion.div>
-        )}
-      </div>
-
       {/* Test AI Button - Bottom Left */}
       <div className="absolute bottom-6 left-6 z-10">
         <motion.button
@@ -1472,9 +1443,9 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    // Instant movement during fast rotation (< 2 cycles), smooth during slow rotation
-                    left: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
-                    top: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    // Instant movement during fast rotation (< 0.7 cycles), smooth during slow rotation
+                    left: { duration: rotationCyclesRef.current < 0.7 ? 0 : 0, ease: 'linear' },
+                    top: { duration: rotationCyclesRef.current < 0.7 ? 0 : 0, ease: 'linear' },
                     opacity: { duration: 0.4, ease: 'easeInOut' },
                     scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
                     // No delay - all images appear at once to prevent repositioning
@@ -1630,7 +1601,7 @@ export default function DiscoverPage() {
                   marginLeft: `${marginOffset}px`,
                   marginTop: `${marginOffset}px`,
                   zIndex: isMentioned ? 10 : 5,
-                  cursor: 'pointer',
+                  cursor: (isThinking || showingResults) ? 'default' : 'pointer',
                 }}
                 onMouseEnter={async () => {
                   // Fetch friend's recent activity
@@ -1658,6 +1629,12 @@ export default function DiscoverPage() {
                 }}
                 onMouseLeave={() => setHoveredFriend(null)}
                 onClick={() => {
+                  // Don't allow toggling mentions during thinking or results
+                  if (isThinking || showingResults) {
+                    console.log('⚠️ Cannot toggle mentions while AI is thinking or showing results');
+                    return;
+                  }
+                  
                   // Toggle mention when clicking on friend avatar
                   if (isMentioned) {
                     // Remove mention
@@ -1719,7 +1696,7 @@ export default function DiscoverPage() {
                       boxShadow: isMentioned ? '0 2px 8px rgba(155, 135, 245, 0.4)' : '0 2px 6px rgba(0, 0, 0, 0.2)',
                     }}
                   >
-                    {isMentioned ? 'Included' : 'Click to add'}
+                    {isMentioned ? 'Included' : (isThinking || showingResults) ? '' : 'Click to add'}
                   </motion.div>
 
                   {/* Small name label on hover */}

@@ -31,6 +31,7 @@ type UserDetails = {
   display_name: string;
   avatar_url: string;
   preferences?: UserPreferences;
+  taste_profile_summary?: string;
   mutual_friends_count?: number;
 };
 
@@ -97,7 +98,7 @@ export function UserDetailPanel({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 100, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="w-72 h-[500px] glass-panel rounded-2xl overflow-hidden shadow-2xl"
+      className="w-96 h-[700px] glass-panel rounded-2xl overflow-hidden shadow-2xl"
       style={{
         backdropFilter: "blur(40px) saturate(180%)",
         background: "rgba(248, 250, 252, 0.85)",
@@ -144,6 +145,27 @@ export function UserDetailPanel({
               <p className="text-sm text-slate-500">@{user.username}</p>
             </div>
           </div>
+
+          {/* Taste Profile Summary */}
+          {user.taste_profile_summary && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-slate-700">
+                <User className="w-4 h-4" />
+                <h3 className="font-semibold">Taste Profile</h3>
+              </div>
+              <div 
+                className="p-4 rounded-xl text-sm text-slate-700 leading-relaxed whitespace-pre-line"
+                style={{
+                  backdropFilter: "blur(20px) saturate(150%)",
+                  background: "rgba(255, 255, 255, 0.7)",
+                  border: "1px solid rgba(148, 163, 184, 0.2)",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+                }}
+              >
+                {user.taste_profile_summary}
+              </div>
+            </div>
+          )}
 
           {/* Preferences sections */}
           {user.preferences && (
@@ -267,7 +289,7 @@ export function UserDetailPanel({
           )}
 
           {/* No preferences available */}
-          {!user.preferences && (
+          {!user.preferences && !user.taste_profile_summary && (
             <div className="text-center py-8 text-slate-500">
               <User className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No preference data available</p>

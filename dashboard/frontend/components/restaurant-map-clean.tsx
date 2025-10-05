@@ -73,7 +73,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [apiLoaded, setApiLoaded] = useState(false);
-  const [mapType, setMapType] = useState<'3d' | 'roadmap' | 'satellite'>('roadmap');
+  const [mapType, setMapType] = useState<'3d' | 'roadmap' | 'satellite'>('3d');
   const [visibleResults, setVisibleResults] = useState<PlaceResult[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -161,8 +161,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     console.log('🗺️ Initializing Google Map...');
     const newMap = new window.google.maps.Map(mapRef.current, {
       center: { lat: 42.3601, lng: -71.0589 }, // Boston, MA
-      zoom: 15,
-      mapTypeId: 'roadmap',
+      zoom: 16,
+      mapTypeId: 'satellite',
+      tilt: 67.5,
       disableDefaultUI: true,
       zoomControl: true,
       rotateControl: true,
@@ -886,7 +887,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                           <div className="flex-1">
                             <p className="text-sm font-semibold">Your Location</p>
                             <p className="text-xs text-gray-600 mt-1">
-                              {userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Getting location...'}
+                              {userLocation ? `${userLocation?.lat.toFixed(4)}, ${userLocation?.lng.toFixed(4)}` : 'Getting location...'}
                             </p>
                           </div>
                         </div>
