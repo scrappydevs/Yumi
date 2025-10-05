@@ -176,30 +176,22 @@ export default function ReservationsPage() {
             </p>
           </div>
           
-          <button
+          <motion.button
             onClick={() => {
               setModalMode('create')
               setSelectedReservationId(undefined)
               setModalOpen(true)
             }}
-            className="relative overflow-hidden h-10 px-6 rounded-xl flex items-center gap-2 font-semibold text-white transition-all hover:scale-105 active:scale-95"
-            style={{
-              background: 'rgba(139, 92, 246, 0.85)',
-              backdropFilter: 'blur(20px) saturate(180%)',
-              border: '0.5px solid rgba(255, 255, 255, 0.3)',
-              boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 4px 12px rgba(139, 92, 246, 0.3)',
-            }}
+            className="glass-layer-1 px-6 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             {/* Specular highlight */}
-            <div 
-              className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-xl"
-              style={{
-                background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%)',
-              }}
-            />
-            <Plus className="w-4 h-4 relative z-10" />
-            <span className="relative z-10">New Reservation</span>
-          </button>
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-full" />
+            
+            <Plus className="w-4 h-4" />
+            <span className="font-semibold">New Reservation</span>
+          </motion.button>
         </div>
       </div>
 

@@ -306,9 +306,18 @@ export default function NewReservationPage() {
             </Button>
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Sending...' : 'Send Reservation'}
-          </Button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full glass-layer-1 h-14 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-transform hover:scale-102 active:scale-98"
+          >
+            {/* Specular highlight */}
+            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-full" />
+            
+            <span className="font-semibold relative z-10">
+              {loading ? 'Sending...' : 'Send Reservation'}
+            </span>
+          </button>
         </form>
 
         <p className="text-xs text-gray-500 mt-4 text-center">

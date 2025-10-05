@@ -64,14 +64,14 @@ function FriendNodeComponent({ id, selected, data }: NodeProps<FriendNode>) {
         <div className="friend-name">{name}</div>
 
         {/* Stats */}
-        {mutualFriends && mutualFriends > 0 && (
+        {(mutualFriends || 0) > 0 && (
           <div className="friend-stats">
             {mutualFriends} mutual
           </div>
         )}
 
-        {/* Similarity indicator */}
-        {similarityStats && (
+        {/* Similarity indicator - don't show for current user */}
+        {!isCurrentUser && similarityStats && (
           <div className="similarity-indicator">
             <div
               className="similarity-bar"

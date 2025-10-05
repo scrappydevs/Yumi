@@ -118,11 +118,15 @@ function calculateForceDirectedPosition(
   }
   
   // Calculate distance from current user based on similarity
-  // Higher similarity (0.8+) → distance = 200px (very close to center)
-  // Medium similarity (0.5-0.7) → distance = 350px (medium distance)
-  // Low similarity (0.3) → distance = 500px (far from center)
-  // Formula: Higher similarity = CLOSER to current user
-  const distanceFromCenter = 500 - (similarityToCurrentUser * 300);
+  // Use exponential curve to make differences MORE dramatic
+  // Higher similarity (0.8+) → very close to center (~100px)
+  // Medium similarity (0.6) → medium distance (~150px)
+  // Low similarity (0.3) → far from center (~350px)
+  // Formula: distance = baseDistance * (1 - similarity)^exponent
+  // This creates a more dramatic difference: 30% is ~2.3x further than 60%
+  const baseDistance = 600;
+  const exponent = 1.5;
+  const distanceFromCenter = baseDistance * Math.pow((1 - similarityToCurrentUser), exponent);
   
   // Distribute friends in circular pattern around center
   const angle = (index / (allFriends.length - 1)) * 2 * Math.PI; // Exclude current user from count
