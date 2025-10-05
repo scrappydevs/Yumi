@@ -175,39 +175,42 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
                 'mutual_friends_count': len(mutual_friends),
             })
         
-        # Get similarity scores from database
+        # Get similarity scores from database - include ALL connections within friend network
         similarities = []
         has_similarity_data = False
         
         try:
+            # Get all similarities where BOTH users are in the friend network (including current user)
+            all_network_ids = list(friend_ids) + [user_id]
+            
             similarity_result = supabase.table('friend_similarities')\
                 .select('*')\
-                .or_(f'user_id_1.eq.{user_id},user_id_2.eq.{user_id}')\
+                .in_('user_id_1', all_network_ids)\
+                .in_('user_id_2', all_network_ids)\
                 .execute()
             
             if similarity_result.data:
                 has_similarity_data = True
-                print(f"📊 Found {len(similarity_result.data)} similarity records")
+                print(f"📊 Found {len(similarity_result.data)} similarity records within network")
                 for sim in similarity_result.data or []:
-                    # Determine source and target
-                    source = sim['user_id_1'] if sim['user_id_1'] == user_id else sim['user_id_2']
-                    target = sim['user_id_2'] if sim['user_id_1'] == user_id else sim['user_id_1']
+                    user_id_1 = sim['user_id_1']
+                    user_id_2 = sim['user_id_2']
                     
-                    # Only include if both users are in our friend list
-                    if target in friend_ids or source == user_id:
+                    # Only include if BOTH users are in the friend network
+                    if user_id_1 in all_network_ids and user_id_2 in all_network_ids:
                         score = sim.get('similarity_score', 0.5)
                         explanation = sim.get('similarity_explanation') or sim.get('explanation', 'Similar food preferences')
                         
                         similarities.append({
-                            'source': source,
-                            'target': target,
+                            'source': user_id_1,
+                            'target': user_id_2,
                             'similarity_score': score,
                             'explanation': explanation,
                             'shared_restaurants': sim.get('shared_restaurants', []),
                             'shared_cuisines': sim.get('shared_cuisines', []),
                             'taste_profile_overlap': sim.get('taste_profile_overlap', {}),
                         })
-                        print(f"  ↔️  {source[:8]}... <-> {target[:8]}...: {score:.2f}")
+                        print(f"  ↔️  {user_id_1[:8]}... <-> {user_id_2[:8]}...: {score:.2f}")
         except Exception as e:
             print(f"Note: similarity data not available: {e}")
         

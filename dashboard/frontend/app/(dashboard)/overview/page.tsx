@@ -1622,7 +1622,9 @@ export default function DiscoverPage() {
                           ? JSON.parse(profile.preferences) 
                           : profile.preferences;
                       } catch {
-                        console.warn('Could not parse preferences for friend:', friend.id);
+                        // Not JSON - probably natural language text format (expected)
+                        // Store as-is without parsing - no warning needed
+                        parsedPreferences = null;
                       }
                     }
                     
