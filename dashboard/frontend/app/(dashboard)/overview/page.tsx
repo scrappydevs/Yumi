@@ -705,12 +705,15 @@ export default function DiscoverPage() {
       }
       
       // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
-      // Step 1: Finding restaurants
-      const step1Text = 'Searching nearby restaurants';
-      setCurrentPhrase(step1Text);
+      // Queue all speech phrases immediately (plays while search runs)
+      const initialText = isGroupSearch 
+        ? 'Let me find the perfect place for you and your friends'
+        : 'Let me find something perfect for you';
+      setCurrentPhrase(initialText);
       if (!isMuted) {
-        await speak(step1Text);
+        speak(initialText); // No await - queue it
       }
+      
       console.log('📍 Fetching nearby restaurants...');
       const nearbyFormData = new FormData();
       nearbyFormData.append('latitude', coords.lat.toString());
@@ -755,16 +758,17 @@ export default function DiscoverPage() {
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
-        // Wait for "Searching nearby restaurants" speech to complete
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Step 2: Analyzing food preferences (don't await - let it happen in parallel)
-        const step2Text = isGroupSearch 
-          ? "Analyzing group taste profiles"
-          : 'Analyzing your taste profile';
+        // Queue next speech phrase immediately (no await)
+        const step2Text = 'Analyzing restaurant preferences';
         setCurrentPhrase(step2Text);
         if (!isMuted) {
-          speak(step2Text);  // No await - don't block LLM call!
+          speak(step2Text);  // No await - queue it
+        }
+        
+        // Queue third speech phrase immediately (no await)
+        const step3Text = 'Computing compatibility scores';
+        if (!isMuted) {
+          speak(step3Text);  // No await - queue it
         }
         
         // Don't wait for TTS - proceed immediately to LLM call
@@ -797,35 +801,7 @@ export default function DiscoverPage() {
         console.log(`📡 Fetch URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`);
         console.log(`📡 Starting fetch at: ${new Date().toISOString()}`);
         
-        // Add intermediate progress updates during the fetch
-        let progressPhaseIndex = 0;
-        const progressPhrases = [
-          'Computing compatibility scores',
-          'Ranking recommendations'
-        ];
-        
-        const progressTimer1 = setTimeout(() => {
-          if (progressPhaseIndex < progressPhrases.length) {
-            const phrase = progressPhrases[progressPhaseIndex];
-            setCurrentPhrase(phrase);
-            if (!isMuted) {
-              speak(phrase);
-            }
-            progressPhaseIndex++;
-          }
-        }, 3000); // First update after 3 seconds
-        
-        const progressTimer2 = setTimeout(() => {
-          if (progressPhaseIndex < progressPhrases.length) {
-            const phrase = progressPhrases[progressPhaseIndex];
-            setCurrentPhrase(phrase);
-            if (!isMuted) {
-              speak(phrase);
-            }
-            progressPhaseIndex++;
-          }
-        }, 6000); // Second update after 6 seconds
-        
+        // Start search (speech plays from queue in parallel)
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
@@ -833,10 +809,6 @@ export default function DiscoverPage() {
           },
           body: searchFormData,
         });
-        
-        // Clear progress timers immediately when fetch completes
-        clearTimeout(progressTimer1);
-        clearTimeout(progressTimer2);
 
         console.log(`📡 Fetch completed at: ${new Date().toISOString()}`);
         console.log(`📡 Response status: ${response.status}`);
@@ -2368,3 +2340,4 @@ export default function DiscoverPage() {
     </div>
   );
 }
+

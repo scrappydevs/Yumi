@@ -291,7 +291,7 @@ class RestaurantSearchService:
             max_candidates: Maximum number of candidate restaurants to consider (default: 50)
 
         Returns:
-            Search results with top 3-4 restaurants and reasoning
+            Search results with top 5-6 restaurants and reasoning
         """
         import time
         search_start = time.time()
@@ -773,7 +773,7 @@ IMPORTANT:
             longitude: Location longitude
 
         Returns:
-            Search results with top 3 restaurants matching merged group preferences
+            Search results with top 5-6 restaurants matching merged group preferences
         """
         print(f"\n{'='*80}")
         print(f"[GROUP RESTAURANT SEARCH] 🔍 STARTING GROUP SEARCH")
