@@ -599,11 +599,7 @@ IMPORTANT:
 
             try:
                 model = self.gemini_service.model
-                response = model.generate_content(
-                    prompt,
-                    # Increased from 30s to 60s
-                    request_options={'timeout': 60}
-                )
+                response = model.generate_content(prompt)
                 llm_elapsed = time.time() - step4_start
                 print(
                     f"[RESTAURANT SEARCH] ✅ Gemini responded in {llm_elapsed:.2f}s")
@@ -630,6 +626,15 @@ IMPORTANT:
             try:
                 result = json.loads(response_text)
                 print(f"[RESTAURANT SEARCH]    ✅ JSON parsed successfully")
+
+                # Debug: Check if LLM returned reasoning in JSON
+                print(f"[RESTAURANT SEARCH]    📋 LLM JSON has {len(result.get('top_restaurants', []))} restaurants")
+                for i, r in enumerate(result.get('top_restaurants', []), 1):
+                    has_reasoning = 'reasoning' in r and r.get('reasoning')
+                    status = "✅" if has_reasoning else "❌"
+                    reasoning_preview = r.get('reasoning', 'NONE')[:50] if has_reasoning else "NONE"
+                    print(f"[RESTAURANT SEARCH]       {status} Restaurant {i} ({r.get('name')}): reasoning={reasoning_preview}...")
+
             except json.JSONDecodeError as e:
                 print(f"[RESTAURANT SEARCH]    ❌ JSON parse error: {str(e)}")
                 print(
@@ -703,6 +708,8 @@ IMPORTANT:
                         f"[RESTAURANT SEARCH]       - Distance: {matching.get('distance_meters', 'N/A')}m")
                     print(
                         f"[RESTAURANT SEARCH]       - Match score: {enriched.get('match_score', 'N/A')}")
+                    print(
+                        f"[RESTAURANT SEARCH]       - Reasoning: {enriched.get('reasoning', 'MISSING')[:50]}...")
                 else:
                     # Fallback: keep LLM result as-is (shouldn't happen, but safety)
                     print(f"[RESTAURANT SEARCH]    ⚠️ No match found in database!")
@@ -762,6 +769,10 @@ IMPORTANT:
                 f"[RESTAURANT SEARCH]    - Step 4 (LLM Call): ~{llm_elapsed:.2f}s")
             print(
                 f"[RESTAURANT SEARCH] Returning {len(result.get('top_restaurants', []))} top restaurants")
+            # Debug: Check if reasoning is present in final results
+            for r in result.get('top_restaurants', []):
+                has_reasoning = 'reasoning' in r and r['reasoning']
+                print(f"[RESTAURANT SEARCH]    - {r.get('name')}: reasoning={'YES' if has_reasoning else 'NO/EMPTY'}")
             print(f"{'='*80}\n")
 
             # Clean up
@@ -1042,11 +1053,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             print(
                 f"[GROUP RESTAURANT SEARCH] 🤖 Calling Gemini API (timeout: 60s)...", flush=True)
             try:
-                response = self.gemini_service.model.generate_content(
-                    prompt,
-                    # Increased from 30s to 60s
-                    request_options={'timeout': 60}
-                )
+                response = self.gemini_service.model.generate_content(prompt)
                 response_text = response.text.strip()
                 print(
                     f"[GROUP RESTAURANT SEARCH] ✅ Gemini API responded successfully")
@@ -1339,10 +1346,7 @@ GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - 
 IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
 
             # Call LLM
-            response = self.gemini_service.model.generate_content(
-                prompt,
-                request_options={'timeout': 30}
-            )
+            response = self.gemini_service.model.generate_content(prompt)
             response_text = response.text.strip()
 
             print(f"[GROUP SEARCH STREAM] ✅ Step 3 complete: LLM ranking done")

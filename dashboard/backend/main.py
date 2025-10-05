@@ -1314,6 +1314,13 @@ async def discover_restaurants_ios(
         print(f"\n{'='*80}")
         print(f"[DISCOVER-iOS] ✅ COMPLETED in {elapsed:.2f}s")
         print(f"[DISCOVER-iOS] Returning {len(top_restaurants)} restaurants")
+
+        # Debug: Check reasoning in each restaurant before returning
+        for i, r in enumerate(top_restaurants, 1):
+            has_reasoning = 'reasoning' in r and r.get('reasoning')
+            status = "✅" if has_reasoning else "❌"
+            print(f"{status} [DISCOVER-iOS] Restaurant {i}: {r.get('name')} - {'HAS REASONING' if has_reasoning else 'NO REASONING'}")
+
         print(f"{'='*80}\n")
 
         return {
@@ -1425,6 +1432,13 @@ async def search_restaurants_ios(
             f"[SEARCH-iOS] Step 3/3: ✅ SEARCH COMPLETED in {elapsed:.2f}s")
         print(
             f"[SEARCH-iOS] Results: {len(results.get('top_restaurants', []))} top restaurants")
+
+        # Debug: Check reasoning in each restaurant before returning
+        for i, r in enumerate(results.get('top_restaurants', []), 1):
+            has_reasoning = 'reasoning' in r and r.get('reasoning')
+            status = "✅" if has_reasoning else "❌"
+            print(f"{status} [SEARCH-iOS] Restaurant {i}: {r.get('name')} - {'HAS REASONING' if has_reasoning else 'NO REASONING'}")
+
         print(f"{'='*80}\n")
         return results
 
