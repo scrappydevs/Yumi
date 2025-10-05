@@ -434,7 +434,7 @@ class RestaurantSearchService:
                 prefs_text) > 150 else f"[RESTAURANT SEARCH]   - Full preference text: {prefs_text}")
 
             # Create LLM prompt with quality-focused ranking
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3-4 that best match the user's query.
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 5-6 that best match the user's query.
 
 USER'S QUERY: "{query}"
 
@@ -478,7 +478,7 @@ TASK:
 1. Calculate match_score for each restaurant (0.0-1.0) using the formula:
    match_score = (query_match × 0.3) + (rating_score × 0.4) + (popularity_score × 0.3)
 
-2. Select TOP 3-4 restaurants with highest scores
+2. Select TOP 5-6 restaurants with highest scores
 3. Provide BRIEF reasoning (1-2 sentences max)
 
 Return ONLY valid JSON (no markdown, no code blocks):
@@ -726,8 +726,8 @@ IMPORTANT:
                     min_rating=4.0
                 )
 
-                # Return top 4 by quality score
-                top_restaurants = restaurants[:4]
+                # Return top 6 by quality score
+                top_restaurants = restaurants[:6]
 
                 return {
                     "status": "success",
@@ -793,14 +793,44 @@ IMPORTANT:
             print(
                 f"[GROUP RESTAURANT SEARCH] Merged preferences: {merged_preferences}")
 
+            # Step 1.5: Detect cuisine from query (same as single-user search)
+            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
+                                'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
+                                'sushi', 'ramen', 'tacos', 'burgers', 'seafood', 'mediterranean',
+                                'spanish', 'middle eastern', 'ethiopian', 'caribbean', 'brazilian']
+            detected_cuisine = None
+            query_lower = query.lower()
+            for cuisine in cuisine_keywords:
+                if cuisine in query_lower:
+                    detected_cuisine = cuisine
+                    print(
+                        f"[GROUP RESTAURANT SEARCH] Detected cuisine in query: {detected_cuisine}")
+                    break
+
             # Step 2: Get restaurants from entire database
             print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding restaurants...")
-            restaurants = self.get_nearby_restaurants_tool(
-                latitude=latitude,
-                longitude=longitude,
-                radius=40000000,
-                limit=10
-            )
+
+            # If cuisine detected, filter by it and get more candidates
+            if detected_cuisine:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Getting {detected_cuisine} restaurants with cuisine filter...")
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=50,  # Get more candidates when filtering by cuisine
+                    min_rating=4.0,
+                    cuisine_filter=detected_cuisine
+                )
+            else:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] No cuisine detected, getting top-rated restaurants...")
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=10
+                )
 
             print(
                 f"[GROUP RESTAURANT SEARCH] Got {len(restaurants) if restaurants else 0} restaurants from tool")
@@ -868,7 +898,7 @@ IMPORTANT:
 
             # Create LLM prompt with edge case handling for groups
             print(f"[GROUP RESTAURANT SEARCH] Building LLM prompt...")
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 for a GROUP of {len(user_ids)} people dining together.
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 5-6 for a GROUP of {len(user_ids)} people dining together.
 
 USER'S QUERY: "{query}"
 
@@ -918,7 +948,7 @@ GROUP CONTEXT:
 TASK:
 1. Identify if query has specific requirements
 2. Apply ranking rules above
-3. Select TOP 3 that work for the ENTIRE group
+3. Select TOP 5-6 that work for the ENTIRE group
 4. Explain your reasoning
 
 Return ONLY valid JSON (no markdown, no code blocks):
@@ -1039,13 +1069,13 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # Fallback: If LLM returned no restaurants, use top-rated nearby ones
             if not enriched_restaurants:
                 print(
-                    f"[GROUP SEARCH] ⚠️ LLM returned 0 restaurants, using top 3 nearby as fallback")
+                    f"[GROUP SEARCH] ⚠️ LLM returned 0 restaurants, using top 6 nearby as fallback")
                 fallback_restaurants = sorted(
                     restaurants,
                     key=lambda r: (r.get('rating', 0), r.get(
                         'user_ratings_total', 0)),
                     reverse=True
-                )[:3]
+                )[:6]
                 result['top_restaurants'] = fallback_restaurants
                 result['stage'] = "group - fallback (LLM returned empty)"
 
@@ -1102,11 +1132,11 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                     f"[GROUP RESTAURANT SEARCH] Fallback: Restaurant fetch failed: {rest_error}")
                 restaurants = []
 
-            # Return top 3 restaurants as fallback (frontend expects top_restaurants key)
-            top_3 = restaurants[:3] if restaurants else []
+            # Return top 6 restaurants as fallback (frontend expects top_restaurants key)
+            top_6 = restaurants[:6] if restaurants else []
 
             print(
-                f"[GROUP RESTAURANT SEARCH] ⚠️  Using fallback with {len(top_3)} restaurants")
+                f"[GROUP RESTAURANT SEARCH] ⚠️  Using fallback with {len(top_6)} restaurants")
             print(f"{'='*80}\n")
 
             return {
@@ -1116,7 +1146,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 "query": query,
                 "user_count": len(user_ids),
                 "merged_preferences": merged_preferences,
-                "top_restaurants": top_3,  # ✅ CRITICAL: Frontend expects this key
+                "top_restaurants": top_6,  # ✅ CRITICAL: Frontend expects this key
                 "all_nearby_restaurants": restaurants,
                 "location": {
                     "latitude": latitude,

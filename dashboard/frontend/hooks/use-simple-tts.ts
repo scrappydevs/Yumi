@@ -4,6 +4,10 @@ export function useSimpleTTS() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentVolume, setCurrentVolume] = useState(0.8);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Queue system for sequential TTS playback
+  const speechQueueRef = useRef<string[]>([]);
+  const isProcessingQueueRef = useRef(false);
 
   const setVolume = useCallback((vol: number) => {
     setCurrentVolume(vol);
@@ -13,26 +17,27 @@ export function useSimpleTTS() {
     }
   }, []);
 
-  const speak = useCallback(async (text: string): Promise<number> => {
-    const start = Date.now();
-    
-    // Stop any currently playing audio
-    if (currentAudioRef.current) {
-      try {
-        currentAudioRef.current.pause();
-      } catch (e) {
-        // Ignore pause errors
+  // Process the next item in the speech queue
+  const processNextInQueue = useCallback(async () => {
+    // If already processing or queue is empty, return
+    if (isProcessingQueueRef.current || speechQueueRef.current.length === 0) {
+      if (speechQueueRef.current.length === 0) {
+        isProcessingQueueRef.current = false;
+        setIsSpeaking(false);
       }
-      currentAudioRef.current = null;
+      return;
     }
-    
+
+    isProcessingQueueRef.current = true;
     setIsSpeaking(true);
+
+    // Get next text from queue
+    const text = speechQueueRef.current.shift()!;
+    console.log('[TTS Queue] Processing:', text, '| Queue remaining:', speechQueueRef.current.length);
 
     try {
       // Get API URL from environment
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
-      console.log('[TTS] Speaking:', text, 'at volume:', currentVolume);
       
       // Try streaming first, then fallback to non-streaming
       const audio = await createAudioWithFallback(apiUrl, text, currentVolume);
@@ -46,7 +51,6 @@ export function useSimpleTTS() {
         
         const cleanup = () => {
           if (timeoutId) clearTimeout(timeoutId);
-          setIsSpeaking(false);
           if (currentAudioRef.current === audio) {
             currentAudioRef.current = null;
           }
@@ -67,12 +71,6 @@ export function useSimpleTTS() {
         
         audio.onerror = (e) => {
           console.error('[TTS] Audio error:', e);
-          console.error('[TTS] Error details:', {
-            error: e,
-            networkState: audio.networkState,
-            readyState: audio.readyState,
-            src: audio.src
-          });
           cleanup();
           resolve();
         };
@@ -116,15 +114,33 @@ export function useSimpleTTS() {
         
         playAudio();
       });
-
-      return Date.now() - start;
     } catch (error) {
       console.error('[TTS] Exception:', error);
-      setIsSpeaking(false);
       currentAudioRef.current = null;
-      return 0;
     }
+
+    // Mark as done processing this item
+    isProcessingQueueRef.current = false;
+
+    // Process next item in queue (recursive)
+    processNextInQueue();
   }, [currentVolume]);
+
+  const speak = useCallback(async (text: string): Promise<number> => {
+    const start = Date.now();
+    
+    console.log('[TTS Queue] Adding to queue:', text);
+    
+    // Add to queue
+    speechQueueRef.current.push(text);
+    
+    // Start processing if not already processing
+    if (!isProcessingQueueRef.current) {
+      processNextInQueue();
+    }
+
+    return Date.now() - start;
+  }, [processNextInQueue]);
 
   // Helper function to create audio with fallback
   const createAudioWithFallback = async (apiUrl: string, text: string, volume: number): Promise<HTMLAudioElement> => {
@@ -201,7 +217,11 @@ export function useSimpleTTS() {
   };
 
   const stop = useCallback(() => {
-    // Actually stop the audio
+    // Clear the queue
+    speechQueueRef.current = [];
+    isProcessingQueueRef.current = false;
+    
+    // Stop current audio
     if (currentAudioRef.current) {
       try {
         currentAudioRef.current.pause();
@@ -211,6 +231,7 @@ export function useSimpleTTS() {
       currentAudioRef.current = null;
     }
     setIsSpeaking(false);
+    console.log('[TTS Queue] Stopped and cleared queue');
   }, []);
 
   return { speak, stop, isSpeaking, setVolume };
