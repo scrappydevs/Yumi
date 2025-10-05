@@ -1867,18 +1867,18 @@ export default function DiscoverPage() {
                 </div>
                 
                 {/* Match Score */}
-                {hoveredRestaurant.match_score && (
+                {(hoveredRestaurant.match_score !== undefined && hoveredRestaurant.match_score !== null) && (
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
                         initial={{ width: 0 }}
-                        animate={{ width: `${hoveredRestaurant.match_score * 100}%` }}
+                        animate={{ width: `${(hoveredRestaurant.match_score || 0.5) * 100}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut' }}
                       />
                     </div>
                     <span className="text-sm font-semibold text-gray-900">
-                      {Math.round(hoveredRestaurant.match_score * 100)}%
+                      {Math.round((hoveredRestaurant.match_score || 0.5) * 100)}%
                     </span>
                   </div>
                 )}
@@ -2248,13 +2248,13 @@ export default function DiscoverPage() {
                 <div className="mb-5">
                   <div className="flex items-center justify-between text-sm mb-2">
                     <span className="font-semibold">Match Score</span>
-                    <span className="text-purple-600 font-bold">{Math.round(selectedRestaurant.match_score * 100)}%</span>
+                    <span className="text-purple-600 font-bold">{Math.round((selectedRestaurant.match_score || 0.5) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                     <motion.div
                       className="h-full bg-purple-600"
                       initial={{ width: 0 }}
-                      animate={{ width: `${selectedRestaurant.match_score * 100}%` }}
+                      animate={{ width: `${(selectedRestaurant.match_score || 0.5) * 100}%` }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
                     />
                   </div>

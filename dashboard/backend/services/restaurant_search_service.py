@@ -19,14 +19,48 @@ from services.restaurant_db_service import get_restaurant_db_service
 class RestaurantSearchService:
     """Service for natural language restaurant search with LLM tool calls."""
 
+    # Map search keywords to database cuisine types
+    CUISINE_KEYWORD_MAPPING = {
+        'sushi': ['Japanese', 'Japanese/Sushi', 'Asian'],
+        'ramen': ['Japanese', 'Japanese/Sushi'],
+        'pizza': ['Italian', 'Italian/Pizza'],
+        'tacos': ['Mexican'],
+        'burgers': ['American', 'Fast Food'],
+        'seafood': ['Seafood'],
+        'italian': ['Italian', 'Italian/Pizza'],
+        'japanese': ['Japanese', 'Japanese/Sushi', 'Asian'],
+        'chinese': ['Chinese', 'Asian'],
+        'mexican': ['Mexican'],
+        'thai': ['Thai', 'Asian'],
+        'indian': ['Indian'],
+        'french': ['French'],
+        'korean': ['Korean', 'Asian'],
+        'vietnamese': ['Vietnamese', 'Asian'],
+        'greek': ['Greek', 'Mediterranean'],
+        'american': ['American'],
+        'mediterranean': ['Mediterranean', 'Greek'],
+        'spanish': ['Spanish'],
+        'middle eastern': ['Middle Eastern', 'Lebanese', 'Turkish'],
+        'ethiopian': ['Ethiopian'],
+        'caribbean': ['Caribbean', 'Jamaican', 'Cuban'],
+        'brazilian': ['Brazilian']
+    }
+
     def __init__(self):
         """Initialize with required services."""
-        self.gemini_service = get_gemini_service()
+        # Use full Flash model (not Lite) for complex restaurant search queries
+        # Reasoning: Restaurant search requires nuanced understanding of:
+        # - Complex user queries and preferences
+        # - Multi-factor ranking (rating, reviews, cuisine, atmosphere)
+        # - Accurate match score computation
+        # - Group preference blending
+        self.gemini_service = get_gemini_service('gemini-2.5-flash')
         self.supabase_service = get_supabase_service()
         self.taste_profile_service = get_taste_profile_service()
         self.restaurant_db_service = get_restaurant_db_service()
 
-        print(f"[RESTAURANT SEARCH] Service initialized (using database)")
+        print(
+            f"[RESTAURANT SEARCH] Service initialized (using Gemini Flash for complex queries)")
 
     def get_user_preferences_tool(self, user_id: str) -> Dict[str, Any]:
         """
@@ -125,9 +159,15 @@ class RestaurantSearchService:
             # Apply cuisine filter if specified
             if cuisine_filter and restaurants:
                 original_count = len(restaurants)
+                # Use keyword mapping if available
+                target_cuisines = self.CUISINE_KEYWORD_MAPPING.get(
+                    cuisine_filter.lower(), [cuisine_filter])
+                print(
+                    f"[TOOL] Mapping '{cuisine_filter}' to cuisines: {target_cuisines}")
+
                 restaurants = [
                     r for r in restaurants
-                    if cuisine_filter.lower() in (r.get('cuisine') or '').lower()
+                    if any(target.lower() in (r.get('cuisine') or '').lower() for target in target_cuisines)
                 ]
                 print(
                     f"[TOOL] Cuisine filter: {original_count} → {len(restaurants)} restaurants")
@@ -539,6 +579,24 @@ IMPORTANT:
                     f"[RESTAURANT SEARCH]    Response text preview: {response_text[:200]}...")
                 raise
 
+            # Validate and compute fallback match_scores
+            print(f"\n[RESTAURANT SEARCH] 🔍 Validating match scores...")
+            for rec in result.get('top_restaurants', []):
+                if 'match_score' not in rec or not isinstance(rec.get('match_score'), (int, float)) or rec.get('match_score') is None:
+                    # Compute fallback based on rating and popularity
+                    rating = rec.get('rating', 4.0)
+                    reviews = rec.get('user_ratings_total', 0)
+                    rating_score = rating / 5.0
+                    popularity_score = min(reviews / 500.0, 1.0)
+                    fallback_score = (rating_score * 0.6) + \
+                        (popularity_score * 0.4)
+                    rec['match_score'] = round(fallback_score, 2)
+                    print(
+                        f"[RESTAURANT SEARCH]    ⚠️ '{rec.get('name')}': Missing match_score, computed fallback = {fallback_score:.2f}")
+                else:
+                    print(
+                        f"[RESTAURANT SEARCH]    ✓ '{rec.get('name')}': match_score = {rec['match_score']:.2f}")
+
             # Log what LLM recommended
             print(f"\n[RESTAURANT SEARCH] 📋 LLM recommendations:")
             for i, rec in enumerate(result.get('top_restaurants', []), 1):
@@ -567,6 +625,18 @@ IMPORTANT:
                 if matching:
                     # Merge: LLM fields (reasoning, match_score) + original fields (place_id, photo_url, etc.)
                     enriched = {**matching, **llm_rec}
+
+                    # Ensure match_score is preserved and valid
+                    if 'match_score' not in enriched or not isinstance(enriched.get('match_score'), (int, float)) or enriched.get('match_score') is None:
+                        rating = enriched.get('rating', 4.0)
+                        reviews = enriched.get('user_ratings_total', 0)
+                        rating_score = rating / 5.0
+                        popularity_score = min(reviews / 500.0, 1.0)
+                        enriched['match_score'] = round(
+                            (rating_score * 0.6) + (popularity_score * 0.4), 2)
+                        print(
+                            f"[RESTAURANT SEARCH]       ⚠️ Recomputed match_score after enrichment: {enriched['match_score']:.2f}")
+
                     enriched_restaurants.append(enriched)
                     print(
                         f"[RESTAURANT SEARCH]    ✅ Matched to '{matching['name']}'")
@@ -574,9 +644,14 @@ IMPORTANT:
                         f"[RESTAURANT SEARCH]       - place_id: {matching.get('place_id', 'N/A')}")
                     print(
                         f"[RESTAURANT SEARCH]       - Distance: {matching.get('distance_meters', 'N/A')}m")
+                    print(
+                        f"[RESTAURANT SEARCH]       - Match score: {enriched.get('match_score', 'N/A')}")
                 else:
                     # Fallback: keep LLM result as-is (shouldn't happen, but safety)
                     print(f"[RESTAURANT SEARCH]    ⚠️ No match found in database!")
+                    # Ensure match_score exists even for unmatched results
+                    if 'match_score' not in llm_rec or not isinstance(llm_rec.get('match_score'), (int, float)):
+                        llm_rec['match_score'] = 0.5
                     enriched_restaurants.append(llm_rec)
 
             # Ensure we have 3-4 restaurants
