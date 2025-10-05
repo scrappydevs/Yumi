@@ -214,6 +214,9 @@ export default function DiscoverPage() {
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
   
+  // Ref to keep initial greeting audio alive (prevent garbage collection)
+  const initialGreetingAudioRef = useRef<HTMLAudioElement | null>(null);
+  
   // VAD Recording hook for auto-stop on silence with streaming transcription
   const {
     isRecording,
@@ -569,17 +572,15 @@ export default function DiscoverPage() {
       return;
     }
 
-    const interval = setInterval(() => {
-      phraseIndex = (phraseIndex + 1) % selectedPhrases.length;
-      const newPhrase = selectedPhrases[phraseIndex];
-      console.log('[Overview] Rotating to phrase:', newPhrase);
-      setCurrentPhrase(newPhrase);
-      
-      // Speak each new phrase if not muted (exact text match)
-      if (!isMuted && speak) {
-        speak(newPhrase).catch(err => console.error('Speak error:', err));
-      }
-    }, 8000); // Change phrase every 8 seconds (ensures minimum 6s+ display time)
+  const interval = setInterval(() => {
+    phraseIndex = (phraseIndex + 1) % selectedPhrases.length;
+    const newPhrase = selectedPhrases[phraseIndex];
+    console.log('[Overview] Rotating to phrase:', newPhrase);
+    setCurrentPhrase(newPhrase);
+    
+    // DON'T speak rotating phrases - only speak at start and end
+    // Visual feedback only during processing
+  }, 8000); // Change phrase every 8 seconds (visual only) (ensures minimum 6s+ display time)
 
     return () => clearInterval(interval);
   }, [isThinking, loadingPhrases, isMuted, speak]);
@@ -627,20 +628,313 @@ export default function DiscoverPage() {
 
   // VAD recording now handled by useVADRecording hook above
 
+  // Helper function to play TTS SYNCHRONOUSLY (no queue, no async delays)
+  // This is critical for browser autoplay policies - play() must be called
+  // synchronously within the user click handler
+  // 
+  // IMPORTANT: If audio doesn't start within 500ms, it will be cancelled to avoid
+  // both greeting and result TTS playing at the end (due to slow buffering)
+  const playImmediateTTS = (text: string) => {
+    console.log('\n═══════════════════════════════════════════════════════════════');
+    console.log('[Immediate TTS] 🎤 ========== STARTING IMMEDIATE PLAYBACK ==========');
+    console.log('═══════════════════════════════════════════════════════════════');
+    
+    if (isMuted) {
+      console.log('[Immediate TTS] 🔇 MUTED - Skipping audio playback');
+      console.log('[Immediate TTS]    isMuted value:', isMuted);
+      console.log('═══════════════════════════════════════════════════════════════\n');
+      return;
+    }
+    
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const streamingUrl = `${apiUrl}/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=Fahco4VZzobUeiPqni1S&stability=0.97&similarity_boost=0.65`;
+      
+      console.log('[Immediate TTS] 📝 Text to speak:', text);
+      console.log('[Immediate TTS] 🌐 API URL base:', apiUrl);
+      console.log('[Immediate TTS] 🔗 Full streaming URL:', streamingUrl);
+      console.log('[Immediate TTS] ⏰ Timestamp:', new Date().toISOString());
+      console.log('[Immediate TTS] 🔊 Volume setting:', volume);
+      
+      console.log('\n[Immediate TTS] 🎧 Creating Audio element...');
+      const audio = new Audio(streamingUrl);
+      console.log('[Immediate TTS] ✅ Audio element created successfully');
+      
+      audio.volume = volume * 0.9;
+      audio.playbackRate = 0.94;
+      audio.preload = 'auto';
+      
+      console.log('[Immediate TTS] ⚙️  Audio configuration:');
+      console.log('[Immediate TTS]    - Volume:', audio.volume);
+      console.log('[Immediate TTS]    - Playback rate:', audio.playbackRate);
+      console.log('[Immediate TTS]    - Preload:', audio.preload);
+      console.log('[Immediate TTS]    - Paused:', audio.paused);
+      console.log('[Immediate TTS]    - Network state:', audio.networkState, '(0=EMPTY, 1=IDLE, 2=LOADING, 3=NO_SOURCE)');
+      console.log('[Immediate TTS]    - Ready state:', audio.readyState, '(0=NOTHING, 1=METADATA, 2=CURRENT, 3=FUTURE, 4=ENOUGH)');
+      
+      // Store reference to prevent garbage collection
+      initialGreetingAudioRef.current = audio;
+      console.log('[Immediate TTS] 💾 Stored in initialGreetingAudioRef to prevent GC');
+      
+      // Set up COMPREHENSIVE event listeners for debugging
+      console.log('\n[Immediate TTS] 📡 Setting up event listeners...');
+      
+      // Track if audio actually starts playing (for timeout cancellation)
+      let playingFired = false;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let isCancelling = false; // Track if we're deliberately cancelling the audio
+      
+      audio.onloadstart = () => {
+        console.log('[Immediate TTS] 📥 [EVENT] loadstart - Browser started loading audio');
+        console.log('[Immediate TTS]    Network state:', audio.networkState);
+        console.log('[Immediate TTS]    Ready state:', audio.readyState);
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.onloadedmetadata = () => {
+        console.log('[Immediate TTS] 📊 [EVENT] loadedmetadata - Audio metadata loaded');
+        console.log('[Immediate TTS]    Duration:', audio.duration);
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.onloadeddata = () => {
+        console.log('[Immediate TTS] 📦 [EVENT] loadeddata - First frame of data loaded');
+        console.log('[Immediate TTS]    Ready state:', audio.readyState);
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.oncanplay = () => {
+        console.log('[Immediate TTS] ✅ [EVENT] canplay - Audio ready to play');
+        console.log('[Immediate TTS]    Current time:', audio.currentTime);
+        console.log('[Immediate TTS]    Duration:', audio.duration);
+        console.log('[Immediate TTS]    Paused:', audio.paused);
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+        
+        // Now that audio has buffered enough data, call play()
+        // This prevents the "waiting" event from firing
+        if (!playingFired && audio.paused) {
+          console.log('[Immediate TTS] 🎵 Calling play() now that audio is ready...');
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('[Immediate TTS] ✅ play() succeeded after canplay');
+              })
+              .catch(err => {
+                console.error('[Immediate TTS] ❌ play() failed after canplay:', err);
+              });
+          }
+        }
+      };
+      
+      audio.oncanplaythrough = () => {
+        console.log('[Immediate TTS] ✅✅ [EVENT] canplaythrough - Can play without buffering');
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.onplay = () => {
+        console.log('[Immediate TTS] ▶️  [EVENT] play - Play() was called');
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.onplaying = () => {
+        playingFired = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          console.log('[Immediate TTS] ⏰ Timeout cancelled - audio started playing in time!');
+        }
+        console.log('[Immediate TTS] 🔊 [EVENT] playing - AUDIO IS ACTUALLY PLAYING NOW!');
+        console.log('[Immediate TTS]    Current time:', audio.currentTime);
+        console.log('[Immediate TTS]    Duration:', audio.duration);
+        console.log('[Immediate TTS]    Paused:', audio.paused);
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.onpause = () => {
+        console.log('[Immediate TTS] ⏸️ [EVENT] pause - Audio paused');
+        console.log('[Immediate TTS]    Current time:', audio.currentTime);
+        console.log('[Immediate TTS]    Time:', new Date().toISOString());
+      };
+      
+      audio.ontimeupdate = () => {
+        // Only log at 0.5 second intervals to avoid spam
+        const time = audio.currentTime;
+        if (Math.abs(time - Math.round(time * 2) / 2) < 0.05) {
+          console.log('[Immediate TTS] ⏱️  [EVENT] timeupdate - Playing at', time.toFixed(2), 'seconds');
+        }
+      };
+      
+      audio.onended = () => {
+        console.log('[Immediate TTS] ✅ [EVENT] ended - Playback completed successfully');
+        console.log('[Immediate TTS]    Final time:', audio.currentTime);
+        console.log('[Immediate TTS]    Timestamp:', new Date().toISOString());
+        initialGreetingAudioRef.current = null;
+        console.log('[Immediate TTS] 💾 Cleared ref');
+      };
+      
+      audio.onerror = (e) => {
+        // Ignore errors from deliberate cancellation (when we clear the src)
+        if (isCancelling) {
+          console.log('[Immediate TTS] ℹ️ [EVENT] error (expected - from cancellation, ignoring)');
+          return;
+        }
+        
+        console.error('[Immediate TTS] ❌ [EVENT] error - Audio error occurred!');
+        console.error('[Immediate TTS]    Event:', e);
+        console.error('[Immediate TTS]    Error code:', audio.error?.code);
+        console.error('[Immediate TTS]    Error message:', audio.error?.message);
+        console.error('[Immediate TTS]    Error codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED');
+        console.error('[Immediate TTS]    Network state:', audio.networkState);
+        console.error('[Immediate TTS]    Ready state:', audio.readyState);
+        console.error('[Immediate TTS]    Timestamp:', new Date().toISOString());
+      };
+      
+      audio.onstalled = () => {
+        console.warn('[Immediate TTS] ⚠️  [EVENT] stalled - Data download stalled');
+        console.warn('[Immediate TTS]    Network state:', audio.networkState);
+        console.warn('[Immediate TTS]    Timestamp:', new Date().toISOString());
+      };
+      
+      audio.onwaiting = () => {
+        console.warn('[Immediate TTS] ⏳ [EVENT] waiting - Playback stopped, waiting for data');
+        console.warn('[Immediate TTS]    Current time:', audio.currentTime);
+        console.warn('[Immediate TTS]    Ready state:', audio.readyState);
+        console.warn('[Immediate TTS]    Timestamp:', new Date().toISOString());
+      };
+      
+      audio.onprogress = () => {
+        if (audio.buffered.length > 0) {
+          const bufferedEnd = audio.buffered.end(0);
+          console.log('[Immediate TTS] 📊 [EVENT] progress - Downloading... buffered', bufferedEnd.toFixed(2), 'seconds');
+        } else {
+          console.log('[Immediate TTS] 📊 [EVENT] progress - Downloading... (no buffer yet)');
+        }
+      };
+      
+      audio.onsuspend = () => {
+        console.log('[Immediate TTS] 🔵 [EVENT] suspend - Loading suspended');
+        console.log('[Immediate TTS]    Timestamp:', new Date().toISOString());
+      };
+      
+      audio.onabort = () => {
+        console.log('[Immediate TTS] 🛑 [EVENT] abort - Loading aborted');
+        console.log('[Immediate TTS]    Timestamp:', new Date().toISOString());
+      };
+      
+      console.log('[Immediate TTS] ✅ All event listeners set up');
+      
+      // Start loading audio immediately (synchronously within click handler to satisfy autoplay policy)
+      // We'll call play() when the 'canplay' event fires (audio has buffered enough data)
+      console.log('\n[Immediate TTS] 🎵 ========== STARTING AUDIO LOAD (SYNCHRONOUSLY) ==========');
+      console.log('[Immediate TTS]    State before load():');
+      console.log('[Immediate TTS]      - Paused:', audio.paused);
+      console.log('[Immediate TTS]      - Current time:', audio.currentTime);
+      console.log('[Immediate TTS]      - Ready state:', audio.readyState);
+      console.log('[Immediate TTS]      - Network state:', audio.networkState);
+      console.log('[Immediate TTS]    Calling load() to start buffering...');
+      
+      // Call load() to start loading the audio
+      // This is synchronous and maintains the user interaction context
+      audio.load();
+      
+      console.log('[Immediate TTS] ✅ load() called - audio will start buffering');
+      console.log('[Immediate TTS]    play() will be called automatically when "canplay" event fires');
+      console.log('[Immediate TTS]    This prevents the "waiting" event interruption');
+      
+      // Set up 500ms timeout - if audio doesn't start playing by then, cancel it
+      // This prevents both greeting and result TTS from playing at the end due to slow buffering
+      console.log('[Immediate TTS] ⏰ Setting up 500ms timeout...');
+      timeoutId = setTimeout(() => {
+        if (!playingFired) {
+          console.warn('[Immediate TTS] ⚠️⚠️⚠️ TIMEOUT: Audio didn\'t start within 500ms');
+          console.warn('[Immediate TTS] ⚠️  Cancelling audio to prevent double-playback issue');
+          console.warn('[Immediate TTS] ⚠️  User will only hear the final result TTS');
+          
+          try {
+            isCancelling = true; // Flag that we're deliberately cancelling (to suppress error event)
+            audio.pause();
+            audio.src = ''; // Clear source to stop loading (will trigger error event, but we'll ignore it)
+            initialGreetingAudioRef.current = null;
+          } catch (e) {
+            console.error('[Immediate TTS] ❌ Error cancelling audio:', e);
+          }
+          
+          console.warn('[Immediate TTS] ⚠️  Audio cancelled - proceeding with search silently');
+        }
+      }, 500);
+      
+      // Schedule state checks
+      console.log('[Immediate TTS] 📅 Scheduling state checks...');
+      
+      setTimeout(() => {
+        console.log('[Immediate TTS] 📊 State check after 100ms:');
+        console.log('[Immediate TTS]    - Paused:', audio.paused);
+        console.log('[Immediate TTS]    - Current time:', audio.currentTime);
+        console.log('[Immediate TTS]    - Duration:', audio.duration);
+        console.log('[Immediate TTS]    - Ready state:', audio.readyState);
+        console.log('[Immediate TTS]    - Network state:', audio.networkState);
+      }, 100);
+      
+      setTimeout(() => {
+        if (playingFired) {
+          console.log('[Immediate TTS] 📊 State check after 500ms:');
+          console.log('[Immediate TTS]    - Paused:', audio.paused);
+          console.log('[Immediate TTS]    - Current time:', audio.currentTime);
+          console.log('[Immediate TTS]    - Duration:', audio.duration);
+          console.log('[Immediate TTS]    - Ready state:', audio.readyState);
+          console.log('[Immediate TTS]    - Network state:', audio.networkState);
+        }
+      }, 500);
+      
+      setTimeout(() => {
+        if (playingFired) {
+          console.log('[Immediate TTS] 📊 State check after 1000ms (1s):');
+          console.log('[Immediate TTS]    - Paused:', audio.paused);
+          console.log('[Immediate TTS]    - Current time:', audio.currentTime);
+          console.log('[Immediate TTS]    - Duration:', audio.duration);
+          console.log('[Immediate TTS]    - Ready state:', audio.readyState);
+          console.log('[Immediate TTS]    - Network state:', audio.networkState);
+          if (audio.paused) {
+            console.warn('[Immediate TTS] ⚠️  WARNING: Audio still paused after 1 second!');
+          } else {
+            console.log('[Immediate TTS] ✅ Audio is playing after 1 second');
+          }
+        }
+      }, 1000);
+      
+      console.log('[Immediate TTS] ✅ playImmediateTTS setup complete');
+      console.log('═══════════════════════════════════════════════════════════════\n');
+      
+    } catch (error) {
+      console.error('\n[Immediate TTS] ❌❌❌ EXCEPTION CAUGHT IN playImmediateTTS!');
+      console.error('[Immediate TTS]    Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('[Immediate TTS]    Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[Immediate TTS]    Error stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('[Immediate TTS]    Timestamp:', new Date().toISOString());
+      console.error('═══════════════════════════════════════════════════════════════\n');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🚀🚀🚀 HANDLE SUBMIT CALLED 🚀🚀🚀');
+    console.log('\n\n\n');
+    console.log('╔═══════════════════════════════════════════════════════════════╗');
+    console.log('║  🚀🚀🚀 HANDLE SUBMIT CALLED 🚀🚀🚀                              ║');
+    console.log('╚═══════════════════════════════════════════════════════════════╝');
     console.log('🚀 Query:', prompt);
-    console.log('🚀 Mentions:', mentions);
+    console.log('🚀 Mentions:', mentions.length, mentions.map(m => m.username).join(', ') || 'none');
+    console.log('🚀 Timestamp:', new Date().toISOString());
+    console.log('🚀 User ID:', user?.id?.substring(0, 8) + '...');
+    console.log('🚀 Is muted:', isMuted);
+    console.log('🚀 Volume:', volume);
     
     // Check if prompt is empty
     if (!prompt.trim()) {
-      // If we have mentions but no text, show specific message
       if (mentions.length > 0) {
-        console.log('⚠️ Submission blocked: No query text. Please add what you want (e.g., "I want sushi")');
+        console.log('⚠️  Submission blocked: No query text. Please add what you want (e.g., "I want sushi")');
       } else {
-        console.log('⚠️ Submission blocked: Empty query');
+        console.log('⚠️  Submission blocked: Empty query');
       }
       return;
     }
@@ -648,8 +942,40 @@ export default function DiscoverPage() {
     const searchQuery = prompt;  // Save the query before clearing
     const searchMentions = [...mentions];  // Save mentions before clearing
     const searchMentionedFriends = [...mentionedFriendsData];  // Save mentioned friends to keep them visible
+    
+    // Check if this is a group search (has mentions)
+    const isGroupSearch = searchMentions.length > 0;
+    
+    console.log('\n╔═══════════════════════════════════════════════════════════════╗');
+    console.log('║  🎤🎤🎤 PHASE 1: INITIAL GREETING TTS 🎤🎤🎤                      ║');
+    console.log('╚═══════════════════════════════════════════════════════════════╝');
+    
+    // 🎤 CRITICAL: Play TTS IMMEDIATELY, BEFORE any async operations
+    // This must happen synchronously within the click handler for autoplay to work
+    const greetingMessage = isGroupSearch 
+      ? "Let me find something perfect for you all"
+      : "Let me find something perfect for you";
+    console.log('🎤 Greeting message:', greetingMessage);
+    console.log('🎤 Is group search:', isGroupSearch);
+    console.log('🎤 About to call playImmediateTTS()...');
+    console.log('🎤 Call timestamp:', new Date().toISOString());
+    
+    playImmediateTTS(greetingMessage);
+    
+    console.log('🎤 playImmediateTTS() returned (sync call completed)');
+    console.log('🎤 Return timestamp:', new Date().toISOString());
+    console.log('🎤 Now continuing with backend search...\n');
+    
+    console.log('╔═══════════════════════════════════════════════════════════════╗');
+    console.log('║  📡📡📡 PHASE 2: BACKEND SEARCH 📡📡📡                            ║');
+    console.log('╚═══════════════════════════════════════════════════════════════╝');
+    
+    // NOW proceed with async operations
     setPrompt('');  // Clear the input immediately
     setMentions([]);  // Clear mentions from input
+    
+    console.log('📡 State updates:');
+    console.log('   - Cleared prompt and mentions');
     
     // Keep mentioned friends visible during search - restore immediately after useEffect clears it
     // Use setTimeout to restore after the useEffect has run
@@ -664,18 +990,13 @@ export default function DiscoverPage() {
     setIsNarrowing(false);  // Reset narrowing state
     setSearchError(null);
     setSearchResults([]);
-    // DON'T clear images - keep them as placeholders during thinking phase
-    // This allows orbit animation to continue smoothly with existing/default images
-    // New images will replace them when API response arrives
-    // setAllNearbyImages([]); // ❌ REMOVED - was causing empty orbit during thinking
-    // setVisibleImageIds([]); // ❌ REMOVED - was causing empty orbit during thinking
     rotationCyclesRef.current = 0;  // Reset rotation cycles for next latent state
     
-    // Check if this is a group search (has mentions)
-    const isGroupSearch = searchMentions.length > 0;
-    
-    // Note: The rotating phrases with voice are handled by the useEffect hook
-    // No need to speak here to avoid voice overlap
+    console.log('   - Set isThinking = true');
+    console.log('   - Reset results state');
+    console.log('📡 Search query:', searchQuery);
+    console.log('📡 Is group search:', isGroupSearch);
+    console.log('📡 Number of mentions:', searchMentions.length);
     
     // Set up 60-second timeout (LLM can be slow)
     const timeoutId = setTimeout(() => {
@@ -696,6 +1017,8 @@ export default function DiscoverPage() {
       // Get coordinates - use actual user location if available, otherwise use selected city
       const coords = userCoords || CITY_COORDINATES[location] || CITY_COORDINATES['Boston'];
       
+      console.log('📡 Coordinates:', coords);
+      
       // Get auth session for JWT token
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -704,11 +1027,13 @@ export default function DiscoverPage() {
         throw new Error('Not authenticated. Please sign in.');
       }
       
-      // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
-      // Backend now handles ALL TTS for both single and group searches
+      console.log('📡 Session obtained, user authenticated');
+      
+      // PHASE 2.1: Fetch nearby restaurants immediately (no LLM, fast)
       setCurrentPhrase('Searching restaurants...');
       
-      console.log('📍 Fetching nearby restaurants...');
+      console.log('\n📍 Step 2.1: Fetching nearby restaurants...');
+      console.log('📍 Timestamp:', new Date().toISOString());
       const nearbyFormData = new FormData();
       nearbyFormData.append('latitude', coords.lat.toString());
       nearbyFormData.append('longitude', coords.lng.toString());
@@ -964,9 +1289,31 @@ export default function DiscoverPage() {
           // Keep mentioned friends visible after results are shown
           // setMentionedFriendsData([]); // REMOVED - keep friends visible
           
-          // Speak final result (backend can't play audio to browser)
+          console.log('\n╔═══════════════════════════════════════════════════════════════╗');
+          console.log('║  🎤🎤🎤 PHASE 3: FINAL RESULT TTS 🎤🎤🎤                         ║');
+          console.log('╚═══════════════════════════════════════════════════════════════╝');
+          
+          // 🎤 FINAL TTS: Speak result message from backend
           if (!isMuted && data.tts_message) {
+            console.log('🎤 Final TTS message from backend:', data.tts_message);
+            console.log('🎤 Using speak() hook (queued TTS)');
+            console.log('🎤 About to call speak()...');
+            console.log('🎤 Timestamp:', new Date().toISOString());
+            
             await speak(data.tts_message);
+            
+            console.log('🎤 speak() promise resolved - TTS completed');
+            console.log('🎤 Timestamp:', new Date().toISOString());
+            console.log('╚═══════════════════════════════════════════════════════════════╝\n');
+          } else {
+            if (isMuted) {
+              console.log('🔇 Skipping final TTS - user has muted audio');
+            }
+            if (!data.tts_message) {
+              console.warn('⚠️  No tts_message in backend response!');
+              console.warn('   Response keys:', Object.keys(data));
+            }
+            console.log('╚═══════════════════════════════════════════════════════════════╝\n');
           }
         } else {
           // No recommendations from LLM
