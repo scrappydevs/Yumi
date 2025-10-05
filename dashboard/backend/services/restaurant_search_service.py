@@ -54,7 +54,8 @@ class RestaurantSearchService:
         # - Multi-factor ranking (rating, reviews, cuisine, atmosphere)
         # - Accurate match score computation
         # - Group preference blending
-        self.gemini_service = get_gemini_service('gemini-2.5-flash')
+        # Use Flash Lite for faster responses (switched from gemini-2.5-flash)
+        self.gemini_service = get_gemini_service('gemini-2.5-flash-lite')
 
         # Use 2.5 Flash Lite for fast cuisine detection (lightweight)
         self.gemini_lite_service = get_gemini_service('gemini-2.5-flash-lite')
