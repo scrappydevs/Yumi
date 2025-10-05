@@ -22,14 +22,10 @@ from services.restaurant_db_service import get_restaurant_db_service
 class RestaurantSearchService:
     """Service for natural language restaurant search with LLM tool calls."""
 
-    # Map search keywords to database cuisine types
+    # Map detected cuisine names to database cuisine types
+    # Note: LLM handles dish-to-cuisine mapping (e.g., "burritos" → "mexican")
+    # This just maps the cuisine name to database column values
     CUISINE_KEYWORD_MAPPING = {
-        'sushi': ['Japanese', 'Japanese/Sushi', 'Asian'],
-        'ramen': ['Japanese', 'Japanese/Sushi'],
-        'pizza': ['Italian', 'Italian/Pizza'],
-        'tacos': ['Mexican'],
-        'burgers': ['American', 'Fast Food'],
-        'seafood': ['Seafood'],
         'italian': ['Italian', 'Italian/Pizza'],
         'japanese': ['Japanese', 'Japanese/Sushi', 'Asian'],
         'chinese': ['Chinese', 'Asian'],
@@ -46,7 +42,8 @@ class RestaurantSearchService:
         'middle eastern': ['Middle Eastern', 'Lebanese', 'Turkish'],
         'ethiopian': ['Ethiopian'],
         'caribbean': ['Caribbean', 'Jamaican', 'Cuban'],
-        'brazilian': ['Brazilian']
+        'brazilian': ['Brazilian'],
+        'seafood': ['Seafood']
     }
 
     def __init__(self):
@@ -58,6 +55,10 @@ class RestaurantSearchService:
         # - Accurate match score computation
         # - Group preference blending
         self.gemini_service = get_gemini_service('gemini-2.5-flash')
+
+        # Use Lite model for fast cuisine detection
+        self.gemini_lite_service = get_gemini_service('gemini-1.5-flash-8b')
+
         self.supabase_service = get_supabase_service()
         self.taste_profile_service = get_taste_profile_service()
         self.restaurant_db_service = get_restaurant_db_service()
@@ -99,6 +100,64 @@ class RestaurantSearchService:
         except Exception as e:
             # Non-critical failure - log and continue
             print(f"[TTS] ⚠️ Speech failed (non-critical): {e}")
+
+    async def _detect_cuisine_from_query(self, query: str) -> Optional[str]:
+        """
+        Use Gemini Lite to detect cuisine type from natural language query.
+
+        Args:
+            query: User's search query (e.g., "burritos", "find me good sushi", "italian near me")
+
+        Returns:
+            Cuisine type string (e.g., "mexican", "japanese", "italian") or None if no cuisine detected
+        """
+        try:
+            print(f"[CUISINE DETECTION] 🤖 Analyzing query: '{query}'")
+
+            prompt = f"""Analyze this restaurant search query and identify the cuisine type if present.
+
+Query: "{query}"
+
+If the query mentions a specific cuisine OR a dish strongly associated with one cuisine, return that cuisine.
+Otherwise, return null.
+
+Examples:
+- "burritos" → mexican
+- "find me good sushi" → japanese  
+- "italian near me" → italian
+- "pad thai" → thai
+- "best restaurants" → null
+- "something upscale" → null
+- "lunch" → null
+
+Return ONLY valid JSON (no markdown):
+{{"cuisine": "mexican"}}  or  {{"cuisine": null}}
+
+Supported cuisines: mexican, italian, japanese, chinese, thai, indian, french, korean, vietnamese, greek, american, seafood, mediterranean, spanish, middle eastern, ethiopian, caribbean, brazilian"""
+
+            response = await self.gemini_lite_service.generate_content_async(prompt)
+            response_text = response.text.strip()
+
+            # Remove markdown if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            result = json.loads(response_text)
+            detected_cuisine = result.get('cuisine')
+
+            if detected_cuisine:
+                print(f"[CUISINE DETECTION] ✅ Detected: {detected_cuisine}")
+            else:
+                print(f"[CUISINE DETECTION] ℹ️ No specific cuisine detected")
+
+            return detected_cuisine
+
+        except Exception as e:
+            print(f"[CUISINE DETECTION] ⚠️ Error (falling back to None): {e}")
+            return None
 
     def get_user_preferences_tool(self, user_id: str) -> Dict[str, Any]:
         """
@@ -334,12 +393,14 @@ class RestaurantSearchService:
         import time
         search_start = time.time()
 
-        print(f"\n{'='*80}")
-        print(f"[RESTAURANT SEARCH] 🍽️  STARTING SEARCH SERVICE")
-        print(f"{'='*80}")
-        print(f"[RESTAURANT SEARCH] Query: '{query}'")
-        print(f"[RESTAURANT SEARCH] User: {user_id[:8]}...")
-        print(f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
+        print(f"\n{'='*80}", flush=True)
+        print(f"[RESTAURANT SEARCH] 🍽️  STARTING SEARCH SERVICE", flush=True)
+        print(f"{'='*80}", flush=True)
+        print(f"[RESTAURANT SEARCH] Query: '{query}'", flush=True)
+        print(f"[RESTAURANT SEARCH] User: {user_id[:8]}...", flush=True)
+        print(
+            f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})", flush=True)
+
         try:
             # Step 1: Get user preferences
             step1_start = time.time()
@@ -350,19 +411,8 @@ class RestaurantSearchService:
             print(
                 f"[RESTAURANT SEARCH]    Found cuisines: {preferences.get('cuisines', [])[:3]}")
 
-            # Step 2: Detect cuisine from query
-            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
-                                'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
-                                'sushi', 'ramen', 'tacos', 'burgers', 'seafood', 'mediterranean',
-                                'spanish', 'middle eastern', 'ethiopian', 'caribbean', 'brazilian']
-            detected_cuisine = None
-            query_lower = query.lower()
-            for cuisine in cuisine_keywords:
-                if cuisine in query_lower:
-                    detected_cuisine = cuisine
-                    print(
-                        f"[RESTAURANT SEARCH] Detected cuisine in query: {detected_cuisine}")
-                    break
+            # Step 2: Detect cuisine from query using Gemini Lite
+            detected_cuisine = await self._detect_cuisine_from_query(query)
 
             restaurants = []
             step2_start = time.time()
@@ -579,14 +629,15 @@ IMPORTANT:
             # Step 4: Call Gemini LLM
             step4_start = time.time()
             print(
-                f"\n[RESTAURANT SEARCH] ⏱️  Step 4/4: Calling Gemini AI (timeout: 30s)...")
+                f"\n[RESTAURANT SEARCH] ⏱️  Step 4/4: Calling Gemini AI (timeout: 60s)...", flush=True)
             print(f"[RESTAURANT SEARCH]    🤖 Waiting for LLM response...")
 
             try:
                 model = self.gemini_service.model
                 response = model.generate_content(
                     prompt,
-                    request_options={'timeout': 30}
+                    # Increased from 30s to 60s
+                    request_options={'timeout': 60}
                 )
                 llm_elapsed = time.time() - step4_start
                 print(
@@ -727,6 +778,9 @@ IMPORTANT:
                 "latitude": latitude,
                 "longitude": longitude
             }
+            # TTS message for frontend to speak
+            restaurant_count = len(enriched_restaurants)
+            result["tts_message"] = f"Found {restaurant_count} great options"
 
             total_elapsed = time.time() - search_start
             print(f"\n{'='*80}")
@@ -813,15 +867,14 @@ IMPORTANT:
         Returns:
             Search results with top 5-6 restaurants matching merged group preferences
         """
-        print(f"\n{'='*80}")
-        print(f"[GROUP RESTAURANT SEARCH] 🔍 STARTING GROUP SEARCH")
-        print(f"[GROUP RESTAURANT SEARCH] Query: '{query}'")
-        print(f"[GROUP RESTAURANT SEARCH] Users: {len(user_ids)} people")
-        print(f"[GROUP RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
-        print(f"{'='*80}\n")
-
-        # 🎤 TTS: ONE PHRASE AT START (await to ensure it completes first)
-        await self._trigger_tts_and_stream("Hi, analyzing your results right now")
+        print(f"\n{'='*80}", flush=True)
+        print(f"[GROUP RESTAURANT SEARCH] 🔍 STARTING GROUP SEARCH", flush=True)
+        print(f"[GROUP RESTAURANT SEARCH] Query: '{query}'", flush=True)
+        print(
+            f"[GROUP RESTAURANT SEARCH] Users: {len(user_ids)} people", flush=True)
+        print(
+            f"[GROUP RESTAURANT SEARCH] Location: ({latitude}, {longitude})", flush=True)
+        print(f"{'='*80}\n", flush=True)
 
         try:
             print(f"[GROUP RESTAURANT SEARCH] ✅ Entered try block")
@@ -835,19 +888,8 @@ IMPORTANT:
             print(
                 f"[GROUP RESTAURANT SEARCH] Merged preferences: {merged_preferences}")
 
-            # Step 1.5: Detect cuisine from query (same as single-user search)
-            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
-                                'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
-                                'sushi', 'ramen', 'tacos', 'burgers', 'seafood', 'mediterranean',
-                                'spanish', 'middle eastern', 'ethiopian', 'caribbean', 'brazilian']
-            detected_cuisine = None
-            query_lower = query.lower()
-            for cuisine in cuisine_keywords:
-                if cuisine in query_lower:
-                    detected_cuisine = cuisine
-                    print(
-                        f"[GROUP RESTAURANT SEARCH] Detected cuisine in query: {detected_cuisine}")
-                    break
+            # Step 1.5: Detect cuisine from query using Gemini Lite
+            detected_cuisine = await self._detect_cuisine_from_query(query)
 
             # Step 2: Get restaurants from entire database
             print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding restaurants...")
@@ -1031,12 +1073,14 @@ GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - 
 
 IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
 
-            # Call Gemini with timeout configuration (30 seconds for complex group analysis)
-            print(f"[GROUP RESTAURANT SEARCH] 🤖 Calling Gemini API (timeout: 30s)...")
+            # Call Gemini with timeout configuration (60 seconds for complex group analysis)
+            print(
+                f"[GROUP RESTAURANT SEARCH] 🤖 Calling Gemini API (timeout: 60s)...", flush=True)
             try:
                 response = self.gemini_service.model.generate_content(
                     prompt,
-                    request_options={'timeout': 30}
+                    # Increased from 30s to 60s
+                    request_options={'timeout': 60}
                 )
                 response_text = response.text.strip()
                 print(
@@ -1135,9 +1179,6 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             print(
                 f"[GROUP RESTAURANT SEARCH] ✅ Returning {len(result.get('top_restaurants', []))} restaurants for group")
 
-            # 🎤 TTS: ONE PHRASE AT END (await to ensure it completes before returning)
-            await self._trigger_tts_and_stream("Found your restaurants")
-
             return result
 
         except Exception as e:
@@ -1232,17 +1273,8 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # STEP 2: Detect cuisine and get restaurants
             yield f"data: {json.dumps({'type': 'progress', 'message': 'Finding nearby restaurants', 'step': 2})}\n\n"
 
-            # Detect cuisine
-            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
-                                'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
-                                'sushi', 'ramen', 'tacos', 'burgers', 'seafood', 'mediterranean',
-                                'spanish', 'middle eastern', 'ethiopian', 'caribbean', 'brazilian']
-            detected_cuisine = None
-            query_lower = query.lower()
-            for cuisine in cuisine_keywords:
-                if cuisine in query_lower:
-                    detected_cuisine = cuisine
-                    break
+            # Detect cuisine using Gemini Lite
+            detected_cuisine = await self._detect_cuisine_from_query(query)
 
             # Get restaurants
             if detected_cuisine:

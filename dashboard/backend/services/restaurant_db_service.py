@@ -95,14 +95,10 @@ class RestaurantDatabaseService:
                 # Skip restaurants without food images
                 if not food_image_url:
                     skipped_no_photo += 1
-                    print(
-                        f"[RESTAURANT DB]   ⏭️  Skipping '{r['name']}' (no food image)")
                     continue
 
-                # Log the image URL being used
+                # Get dish name for the response
                 dish_name = r.get('dish_name', 'Unknown dish')
-                print(
-                    f"[RESTAURANT DB]   🍔 '{r['name']}' [{dish_name}] → {food_image_url}")
 
                 formatted_restaurants.append({
                     'place_id': r['place_id'],

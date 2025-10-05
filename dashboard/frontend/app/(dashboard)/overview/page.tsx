@@ -705,18 +705,8 @@ export default function DiscoverPage() {
       }
       
       // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
-      // For group searches, backend triggers TTS internally at each step
-      // For single searches, queue initial phrase
-      if (!isGroupSearch) {
-        const initialText = 'Let me find something perfect for you';
-        setCurrentPhrase(initialText);
-        if (!isMuted) {
-          speak(initialText); // No await - queue it
-        }
-      } else {
-        // Group search: Backend handles TTS, just set initial status
-        setCurrentPhrase('Searching restaurants...');
-      }
+      // Backend now handles ALL TTS for both single and group searches
+      setCurrentPhrase('Searching restaurants...');
       
       console.log('📍 Fetching nearby restaurants...');
       const nearbyFormData = new FormData();
@@ -762,22 +752,7 @@ export default function DiscoverPage() {
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
-        // For single user searches, queue progress phrases
-        // For group searches, these come from streaming backend
-        if (!isGroupSearch) {
-          const step2Text = 'Analyzing restaurant preferences';
-          setCurrentPhrase(step2Text);
-          if (!isMuted) {
-            speak(step2Text);  // No await - queue it
-          }
-          
-          const step3Text = 'Computing compatibility scores';
-          if (!isMuted) {
-            speak(step3Text);  // No await - queue it
-          }
-        }
-        
-        // Don't wait for TTS - proceed immediately to LLM call
+        // Backend now handles ALL TTS calls - no frontend TTS needed
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
         console.log(`   Query: "${searchQuery}"`);
@@ -989,9 +964,9 @@ export default function DiscoverPage() {
           // Keep mentioned friends visible after results are shown
           // setMentionedFriendsData([]); // REMOVED - keep friends visible
           
-          // Speak result if not muted - ensure TTS matches displayed text
-          if (!isMuted) {
-            await speak(step3Text);
+          // Speak final result (backend can't play audio to browser)
+          if (!isMuted && data.tts_message) {
+            await speak(data.tts_message);
           }
         } else {
           // No recommendations from LLM
