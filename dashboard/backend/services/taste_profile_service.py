@@ -58,12 +58,11 @@ class TasteProfileService:
             if isinstance(prefs, str):
                 try:
                     # Try to parse as JSON (old format)
-                    json.loads(prefs)
-                    # If successful, it's old format - return empty to trigger generation
-                    print(
-                        f"[TASTE PROFILE] ⚠️ Old JSON format detected, needs migration")
-                    print(f"{'='*80}\n")
-                    return ""
+                    parsed_json = json.loads(prefs)
+                    # Convert JSON to natural language
+                    natural_lang = self._json_to_natural_language(parsed_json)
+                    print(f"[TASTE PROFILE] Converted JSON to: {natural_lang}")
+                    return natural_lang
                 except (json.JSONDecodeError, TypeError):
                     # It's natural language format - return as is
                     print(f"[TASTE PROFILE] ✅ Natural language preferences found:")
@@ -81,6 +80,72 @@ class TasteProfileService:
                 f"[TASTE PROFILE ERROR] Failed to fetch preferences text: {str(e)}")
             print(f"{'='*80}\n")
             return ""
+    
+    def _json_to_natural_language(self, prefs_json: dict) -> str:
+        """
+        Convert JSON preferences to natural language text.
+        
+        Args:
+            prefs_json: Preferences as JSON dict
+            
+        Returns:
+            Natural language preference text
+        """
+        try:
+            parts = []
+            
+            # Cuisines
+            cuisines = prefs_json.get("cuisines", [])
+            if cuisines:
+                if len(cuisines) == 1:
+                    parts.append(f"Enjoys {cuisines[0]} cuisine")
+                elif len(cuisines) == 2:
+                    parts.append(f"Enjoys {cuisines[0]} and {cuisines[1]} cuisines")
+                else:
+                    cuisine_list = ", ".join(cuisines[:-1]) + f", and {cuisines[-1]}"
+                    parts.append(f"Enjoys {cuisine_list} cuisines")
+            
+            # Atmosphere
+            atmosphere = prefs_json.get("atmosphere", [])
+            if atmosphere:
+                if len(atmosphere) == 1:
+                    parts.append(f"prefers {atmosphere[0].lower()} atmosphere")
+                else:
+                    atm_list = " and ".join([a.lower() for a in atmosphere])
+                    parts.append(f"prefers {atm_list} atmospheres")
+            
+            # Price range
+            price_range = prefs_json.get("priceRange", "")
+            if price_range:
+                if price_range == "$$$$":
+                    parts.append("comfortable with upscale pricing")
+                elif price_range == "$$$":
+                    parts.append("comfortable with moderate-to-high pricing")
+                elif price_range == "$$":
+                    parts.append("prefers moderate pricing")
+                else:
+                    parts.append("prefers budget-friendly options")
+            
+            # Flavor notes
+            flavor_notes = prefs_json.get("flavorNotes", [])
+            if flavor_notes:
+                if len(flavor_notes) <= 2:
+                    flavors = " and ".join(flavor_notes)
+                    parts.append(f"likes {flavors} flavors")
+                else:
+                    flavors = ", ".join(flavor_notes)
+                    parts.append(f"enjoys {flavors} flavors")
+            
+            if not parts:
+                return "Has dining preferences to accommodate"
+            
+            # Join into natural sentence
+            text = ". ".join([p.capitalize() if i == 0 else p for i, p in enumerate(parts)])
+            return text + "."
+            
+        except Exception as e:
+            print(f"[TASTE PROFILE ERROR] Failed to convert JSON to text: {str(e)}")
+            return "Has specific dining preferences"
 
     def get_current_preferences(self, user_id: str) -> Dict[str, Any]:
         """
@@ -154,21 +219,35 @@ class TasteProfileService:
             
             # Merge multiple preferences using LLM
             print(f"[TASTE PROFILE] Merging {len(individual_prefs)} preference profiles...")
-            merge_prompt = f"""You are merging dining preferences for a group of {len(user_ids)} people.
+            
+            # Determine how to phrase the group
+            if len(individual_prefs) == 2:
+                group_phrase = "You and your friend"
+            else:
+                group_phrase = f"You and your {len(individual_prefs) - 1} friends"
+            
+            merge_prompt = f"""You are merging dining preferences for a group of friends.
 
 Here are the individual preferences:
 
 {chr(10).join([f"Person {i+1}: {pref}" for i, pref in enumerate(individual_prefs)])}
 
-Task: Create a single, concise group preference profile (2-3 sentences) that:
-1. Identifies common preferences across the group
-2. Notes any diverse tastes that need accommodation
-3. Suggests suitable restaurant types that would work for everyone
+Task: Create a single, concise group preference profile (MAXIMUM 2 sentences) that:
+1. Start with "{group_phrase}" (not "This group")
+2. Highlight common preferences and interesting contrasts
+3. Be conversational and friendly
 
-Example output:
-"This group has a shared love for Asian cuisines, particularly sushi and Korean BBQ. While most prefer vibrant, casual atmospheres, one member appreciates quieter settings. They're comfortable with mid to high price ranges and enjoy trying new restaurants together. A versatile Asian fusion restaurant or a popular ramen spot with varied options would satisfy the entire group."
+Example outputs:
+- "You and your friend both love Asian cuisines, with a mix of upscale sushi spots and casual ramen joints. You balance fine dining with cozy, trendy atmospheres."
+- "You and your 2 friends enjoy diverse cuisines from Italian to Thai, preferring casual, vibrant spots with moderate pricing and bold, savory flavors."
 
-Return ONLY the merged preference text (no markdown, no explanations).
+IMPORTANT: 
+- Maximum 2 sentences
+- Start with "{group_phrase}"
+- Be concise and conversational
+- No markdown, no explanations
+
+Return ONLY the merged preference text.
 """
             
             response = self.gemini_service.model.generate_content(merge_prompt)

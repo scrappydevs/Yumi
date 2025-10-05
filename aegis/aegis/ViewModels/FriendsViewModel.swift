@@ -16,10 +16,13 @@ class FriendsViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var myProfile: Profile?
+    @Published var blendedPreferences: BlendedPreferences?
+    @Published var isBlending: Bool = false
     
     private let networkService = NetworkService.shared
     private let authService = AuthService.shared
     private var searchTask: Task<Void, Never>?
+    private var loadTask: Task<Void, Never>?
     
     init() {
         // Set up search debouncing
@@ -36,34 +39,80 @@ class FriendsViewModel: ObservableObject {
         }
     }
     
+    func loadData() async {
+        print("🔄 [FRIENDS VM] loadData() called")
+
+        // Cancel any existing load task
+        loadTask?.cancel()
+
+        // Create new load task
+        loadTask = Task {
+            guard let authToken = authService.getAuthToken() else {
+                print("❌ [FRIENDS VM] No auth token")
+                errorMessage = "Not authenticated"
+                return
+            }
+
+            print("🔄 [FRIENDS VM] Starting data load...")
+            isLoading = true
+            errorMessage = nil
+
+            do {
+                // Load profile and friends concurrently
+                async let profileResult = networkService.fetchMyProfile(authToken: authToken)
+                async let friendsResult = networkService.fetchFriends(authToken: authToken)
+
+                let (profile, friendsList) = try await (profileResult, friendsResult)
+
+                if !Task.isCancelled {
+                    print("✅ [FRIENDS VM] Received profile: \(profile.username)")
+                    print("✅ [FRIENDS VM] Received \(friendsList.count) friends")
+                    myProfile = profile
+                    friends = friendsList
+                    print("✅ [FRIENDS VM] State updated - friends.count = \(friends.count)")
+                }
+            } catch {
+                if !Task.isCancelled {
+                    print("❌ [FRIENDS VM] Load error: \(error)")
+                    errorMessage = "Failed to load data: \(error.localizedDescription)"
+                }
+            }
+
+            isLoading = false
+            print("🔄 [FRIENDS VM] loadData() completed")
+        }
+
+        await loadTask?.value
+    }
+
     func loadMyProfile() async {
         guard let authToken = authService.getAuthToken() else {
             errorMessage = "Not authenticated"
             return
         }
-        
+
         do {
             myProfile = try await networkService.fetchMyProfile(authToken: authToken)
         } catch {
             errorMessage = "Failed to load profile: \(error.localizedDescription)"
         }
     }
-    
+
     func loadFriends() async {
         guard let authToken = authService.getAuthToken() else {
             errorMessage = "Not authenticated"
             return
         }
-        
+
         isLoading = true
         errorMessage = nil
-        
+
         do {
             friends = try await networkService.fetchFriends(authToken: authToken)
         } catch {
             errorMessage = "Failed to load friends: \(error.localizedDescription)"
         }
-        
+
         isLoading = false
     }
     
@@ -83,31 +132,43 @@ class FriendsViewModel: ObservableObject {
     }
     
     func addFriend(_ profile: Profile) async {
+        print("➕ [FRIENDS VM] Adding friend: \(profile.username)")
+        
         guard let authToken = authService.getAuthToken() else {
+            print("❌ [FRIENDS VM] No auth token for add friend")
             errorMessage = "Not authenticated"
             return
         }
-        
+
         do {
+            print("🔄 [FRIENDS VM] Calling addFriend API...")
             try await networkService.addFriend(friendId: profile.id, authToken: authToken)
-            await loadFriends() // Refresh friends list
-            await loadMyProfile() // Refresh profile
+            print("✅ [FRIENDS VM] Friend added successfully, refreshing data...")
+            await loadData() // Refresh both profile and friends
+            print("✅ [FRIENDS VM] Data refreshed after adding friend")
         } catch {
+            print("❌ [FRIENDS VM] Add friend error: \(error)")
             errorMessage = "Failed to add friend: \(error.localizedDescription)"
         }
     }
-    
+
     func removeFriend(_ profile: Profile) async {
+        print("➖ [FRIENDS VM] Removing friend: \(profile.username)")
+        
         guard let authToken = authService.getAuthToken() else {
+            print("❌ [FRIENDS VM] No auth token for remove friend")
             errorMessage = "Not authenticated"
             return
         }
-        
+
         do {
+            print("🔄 [FRIENDS VM] Calling removeFriend API...")
             try await networkService.removeFriend(friendId: profile.id, authToken: authToken)
-            await loadFriends() // Refresh friends list
-            await loadMyProfile() // Refresh profile
+            print("✅ [FRIENDS VM] Friend removed successfully, refreshing data...")
+            await loadData() // Refresh both profile and friends
+            print("✅ [FRIENDS VM] Data refreshed after removing friend")
         } catch {
+            print("❌ [FRIENDS VM] Remove friend error: \(error)")
             errorMessage = "Failed to remove friend: \(error.localizedDescription)"
         }
     }
@@ -115,5 +176,37 @@ class FriendsViewModel: ObservableObject {
     func isFriend(_ profile: Profile) -> Bool {
         guard let myProfile = myProfile else { return false }
         return myProfile.friends?.contains(profile.id) ?? false
+    }
+    
+    func blendPreferences(with selectedFriends: [Profile] = []) async {
+        guard let authToken = authService.getAuthToken() else {
+            errorMessage = "Not authenticated"
+            return
+        }
+        
+        // If no friends selected, use all friends
+        let friendIds = selectedFriends.isEmpty 
+            ? friends.map { $0.id }
+            : selectedFriends.map { $0.id }
+        
+        if friendIds.isEmpty {
+            errorMessage = "Add some friends first to blend preferences!"
+            return
+        }
+        
+        isBlending = true
+        errorMessage = nil
+        
+        do {
+            blendedPreferences = try await networkService.blendPreferences(
+                friendIds: friendIds,
+                authToken: authToken
+            )
+        } catch {
+            errorMessage = "Failed to blend preferences: \(error.localizedDescription)"
+            blendedPreferences = nil
+        }
+        
+        isBlending = false
     }
 }

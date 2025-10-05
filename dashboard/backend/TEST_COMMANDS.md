@@ -1,5 +1,38 @@
 # Restaurant Search - Testing Commands
 
+## 🌟 NEW: Test Discover Endpoint
+
+### Quick Test (FastAPI Docs - Easiest!)
+
+1. Start backend: `python main.py`
+2. Open browser: http://localhost:8000/docs
+3. Find `/api/restaurants/discover` endpoint
+4. Click "Try it out"
+5. Click the 🔒 lock icon and authorize with your JWT token
+6. Fill in:
+   - **latitude**: 40.4406 (CMU)
+   - **longitude**: -79.9959
+7. Click "Execute"
+8. Should return 2 personalized restaurant recommendations!
+
+### Test via curl
+```bash
+curl -X POST http://localhost:8000/api/restaurants/discover \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \
+  -F "latitude=40.4406" \
+  -F "longitude=-79.9959"
+```
+
+### Test via Python Script
+```bash
+cd dashboard/backend
+# First, set TEST_JWT_TOKEN in your environment
+export TEST_JWT_TOKEN="your_jwt_token_here"
+python test_discover.py
+```
+
+---
+
 ## Stage 1: Test Tool Functions
 
 ### Option A: Run Python Test Script

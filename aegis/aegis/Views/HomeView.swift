@@ -19,11 +19,6 @@ struct HomeView: View {
 
     @State private var reviews: [Review] = []
     @State private var isLoading = false
-    @State private var showCamera = false
-    @State private var capturedImage: UIImage?
-    @State private var uploadedImageId: Int?
-    @State private var showAIAnalyzing = false
-    @State private var showReviewForm = false
 
     var body: some View {
         NavigationView {
@@ -77,32 +72,6 @@ struct HomeView: View {
                         await loadReviews()
                     }
                 }
-
-                // Floating Camera Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            showCamera = true
-                        }) {
-                            Image(systemName: "camera.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(width: 64, height: 64)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.blue, .blue.opacity(0.8)]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .clipShape(Circle())
-                                .shadow(color: .blue.opacity(0.4), radius: 20, x: 0, y: 10)
-                        }
-                        .padding(24)
-                    }
-                }
             }
             .navigationTitle("My Reviews")
             .navigationBarTitleDisplayMode(.large)
@@ -123,49 +92,6 @@ struct HomeView: View {
                 locationService.requestPermission()
                 await loadReviews()
             }
-        }
-        .fullScreenCover(isPresented: $showCamera, onDismiss: {
-            // After camera dismisses, show AI analyzing screen if we have an image
-            print("📸 [DEBUG] fullScreenCover dismissed, capturedImage exists: \(capturedImage != nil)")
-            if capturedImage != nil {
-                print("📸 [DEBUG] Showing AI analyzing screen")
-                // Small delay for smooth transition
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showAIAnalyzing = true
-                }
-            } else {
-                print("⚠️ [DEBUG] No image captured, not showing form")
-            }
-        }) {
-            CustomCameraView { image in
-                print("📸 [DEBUG] Camera callback: Received image of size \(image.size)")
-                capturedImage = image
-                print("📸 [DEBUG] Camera callback: Stored image, capturedImage is now: \(capturedImage != nil)")
-            }
-        }
-        .fullScreenCover(isPresented: $showAIAnalyzing) {
-            AIAnalyzingLoadingView(
-                capturedImage: $capturedImage,
-                uploadedImageId: $uploadedImageId,
-                onComplete: {
-                    print("✨ [DEBUG] AI analysis complete, showing form with imageId: \(uploadedImageId ?? -1)")
-                    showAIAnalyzing = false
-                    // Small delay for smooth transition
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        showReviewForm = true
-                    }
-                }
-            )
-        }
-        .sheet(isPresented: $showReviewForm, onDismiss: {
-            print("📝 [DEBUG] Sheet dismissed, clearing image and reloading")
-            capturedImage = nil
-            uploadedImageId = nil
-            Task {
-                await loadReviews()
-            }
-        }) {
-            SheetContentView(capturedImage: $capturedImage, imageId: $uploadedImageId)
         }
     }
 
