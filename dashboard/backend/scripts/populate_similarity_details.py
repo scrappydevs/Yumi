@@ -373,12 +373,12 @@ async def populate_similarity_details():
                     user2_prefs
                 )
                 
-                # Update the record
+                # Update the record (Supabase handles JSONB serialization automatically)
                 supabase.table('friend_similarities')\
                     .update({
-                        'shared_restaurants': json.dumps(shared_data['shared_restaurants']),
-                        'shared_cuisines': json.dumps(shared_data['shared_cuisines']),
-                        'taste_profile_overlap': json.dumps(shared_data['taste_profile_overlap'])
+                        'shared_restaurants': shared_data['shared_restaurants'],
+                        'shared_cuisines': shared_data['shared_cuisines'],
+                        'taste_profile_overlap': shared_data['taste_profile_overlap']
                     })\
                     .eq('id', sim_id)\
                     .execute()

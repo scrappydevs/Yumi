@@ -19,26 +19,11 @@ from supabase_client import get_supabase
 from routers.friends_graph import compute_friend_similarities
 
 
-async def clear_friend_similarities_table():
-    """Clear the friend_similarities table before recomputation."""
-    supabase = get_supabase()
-    try:
-        print("🗑️  Clearing friend_similarities table for fresh recomputation...")
-        # Delete all rows by using a condition that's always true
-        supabase.table('friend_similarities').delete().neq('user_id_1', '00000000-0000-0000-0000-000000000000').execute()
-        print("✅ Table cleared successfully\n")
-    except Exception as e:
-        print(f"⚠️  Could not clear friend_similarities table: {e}\n")
-
-
 async def recompute_all_user_similarities():
     """
     Fetch all users and recompute their friend similarities.
     """
     supabase = get_supabase()
-    
-    # Clear existing similarities first
-    await clear_friend_similarities_table()
     
     try:
         print("🔄 Starting similarity recomputation for all users...")

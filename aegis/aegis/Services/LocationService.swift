@@ -28,15 +28,30 @@ class LocationService: NSObject, ObservableObject {
     }
 
     func getCurrentLocation() async throws -> String {
-        // Check if we have a recent cached location (within last 2 minutes)
+        // Check if we have a recent cached location (within last 10 minutes)
         if let location = lastLocation {
             let age = Date().timeIntervalSince(location.timestamp)
-            if age < 120 { // 2 minutes
+            if age < 600 { // 10 minutes - use longer cache for faster loading
                 print("✅ [DEBUG] Using cached location (age: \(Int(age))s)")
                 return "\(location.coordinate.latitude),\(location.coordinate.longitude)"
             } else {
                 print("📍 [DEBUG] Cached location too old (\(Int(age))s), requesting fresh location")
             }
+        }
+        
+        // If we have ANY cached location, use it immediately and update in background
+        if let location = lastLocation {
+            print("⚡ [DEBUG] Using stale cached location, will update in background")
+            let cachedCoords = "\(location.coordinate.latitude),\(location.coordinate.longitude)"
+            
+            // Request fresh location in background
+            Task {
+                await MainActor.run {
+                    locationManager.requestLocation()
+                }
+            }
+            
+            return cachedCoords
         }
 
         // Must access locationManager on main thread
@@ -60,18 +75,18 @@ class LocationService: NSObject, ObservableObject {
             }
         }
 
-        // Wait for location with multiple checks (12 attempts = 6 seconds)
-        for i in 1...12 {
+        // Wait for location with multiple checks (6 attempts = 3 seconds)
+        for i in 1...6 {
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             if let location = lastLocation {
                 print("✅ [DEBUG] Got fresh location after \(Double(i) * 0.5)s")
                 return "\(location.coordinate.latitude),\(location.coordinate.longitude)"
             }
-            print("⏳ [DEBUG] Waiting for location... attempt \(i)/12")
+            print("⏳ [DEBUG] Waiting for location... attempt \(i)/6")
         }
 
         // Fallback to mock location
-        print("⚠️ Using mock location (real location unavailable after 6s)")
+        print("⚠️ Using mock location (real location unavailable after 3s)")
         return "40.4406,-79.9959"  // CMU coordinates
     }
 }

@@ -367,16 +367,11 @@ struct BlendLoadingView: View {
                         .frame(width: 120, height: 120)
                         .rotationEffect(.degrees(rotationAngle))
                     
-                    // Pulsing sparkles (blend theme)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 50))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.purple, .blue],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                    // Yummy Logo
+                    Image("yummylogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 70, height: 70)
                         .scaleEffect(pulseScale)
                 }
                 

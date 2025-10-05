@@ -213,9 +213,6 @@ export function useSimpleTTS() {
     setIsSpeaking(false);
   }, []);
 
-  // speakAsync is just an alias - speak already returns a Promise
-  const speakAsync = speak;
-
-  return { speak, speakAsync, stop, isSpeaking, setVolume };
+  return { speak, stop, isSpeaking, setVolume };
 }
 
