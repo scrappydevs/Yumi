@@ -23,7 +23,7 @@ class GeminiService:
         "Austrian", "Swiss", "Belgian", "Dutch", "Danish", "Norwegian", "Finnish", "Icelandic"
     }
 
-    def __init__(self, model_name: str = 'gemini-2.5-flash'):
+    def __init__(self, model_name: str = 'gemini-2.5-flash-lite'):
         """Initialize Gemini with API key from environment.
 
         Args:
@@ -57,27 +57,17 @@ class GeminiService:
             # Convert bytes to PIL Image
             image = Image.open(io.BytesIO(image_bytes))
 
-            # Create prompt for structured food analysis
-            prompt = """Analyze the ACTUAL FOOD visible in this image and provide:
+            # Create prompt for structured food analysis (simplified for speed)
+            prompt = """Identify this food:
 
-IMPORTANT: Only label the actual, visible food in the photo - ignore any text, menus, or names.
+DISH: Name of the dish (e.g., "Spaghetti Carbonara", "California Roll")
+CUISINE: ONE from: American, Italian, French, Chinese, Japanese, Mexican, Indian, Thai, Korean, Vietnamese, Greek, Spanish, Turkish, Brazilian, Lebanese, Others
+DESCRIPTION: 1 sentence about the food
 
-1. DISH: The specific name of the dish or food item you SEE (e.g., "Spaghetti Carbonara", "California Roll", "Chocolate Cake")
-   - Base this on what the food LOOKS like, not on any text in the image
-   
-2. CUISINE: The type of cuisine - MUST be EXACTLY ONE from this list:
-   American, Italian, French, Chinese, Japanese, Mexican, Indian, Thai, Greek, Spanish, Korean, Vietnamese, Lebanese, Turkish, Moroccan, Ethiopian, Brazilian, Peruvian, Jamaican, Cuban, German, Polish, Russian, Swedish, Portuguese, Filipino, Malaysian, Indonesian, Singaporean, Egyptian, Iranian, Afghan, Nepalese, Burmese, Cambodian, Georgian, Armenian, Argentinian, Colombian, Venezuelan, Chilean, Ecuadorian, Bolivian, Uruguayan, Paraguayan, Hungarian, Austrian, Swiss, Belgian, Dutch, Danish, Norwegian, Finnish, Icelandic
-   
-3. DESCRIPTION: A brief 1-2 sentence description of the VISIBLE food including key ingredients and presentation
-
-Format your response EXACTLY as:
-DISH: [dish name]
-CUISINE: [one cuisine from the list above]
-DESCRIPTION: [description]
-
-IMPORTANT: 
-- For CUISINE, you MUST select EXACTLY ONE word from the cuisine list provided
-- Label what you SEE in the photo, not what any text says"""
+Format:
+DISH: [name]
+CUISINE: [one type]
+DESCRIPTION: [brief description]"""
 
             # Call Gemini API with vision
             response = self.model.generate_content([prompt, image])
@@ -244,11 +234,12 @@ Be specific. If unsure about restaurant, say "Unknown"."""
 _gemini_services: dict[str, GeminiService] = {}
 
 
-def get_gemini_service(model_name: str = 'gemini-2.5-flash') -> GeminiService:
+def get_gemini_service(model_name: str = 'gemini-2.5-flash-lite') -> GeminiService:
     """Get or create Gemini service instance.
 
     Args:
         model_name: Gemini model to use. Cached per model.
+                   Default: gemini-2.5-flash-lite (fast and efficient)
 
     Returns:
         GeminiService instance for the specified model

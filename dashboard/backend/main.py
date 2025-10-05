@@ -221,41 +221,16 @@ async def analyze_and_update_description(image_id: int, image_bytes: bytes, lati
         supabase_service = get_supabase_service()
         places_service = get_places_service()
 
-        # Find nearby restaurants if we have coordinates
-        nearby_restaurants = []
-        if latitude is not None and longitude is not None:
-            print(
-                f"[BACKGROUND AI] Finding restaurants near ({latitude}, {longitude})...")
-            try:
-                nearby_restaurants = places_service.find_nearby_restaurants(
-                    latitude=latitude,
-                    longitude=longitude,
-                    radius=1000,  # 1km radius
-                    limit=25
-                )
-                print(
-                    f"[BACKGROUND AI] Found {len(nearby_restaurants)} nearby restaurants")
-            except Exception as e:
-                print(
-                    f"[BACKGROUND AI] Warning: Could not fetch nearby restaurants: {str(e)}")
-                # Continue without restaurants - AI can still analyze the food
-        else:
-            print(
-                f"[BACKGROUND AI] No coordinates provided, skipping restaurant search")
+        # Skip restaurant search for faster AI analysis
+        # User manually enters restaurant name anyway, so auto-suggestion isn't critical
+        print(
+            f"[BACKGROUND AI] Skipping restaurant search for speed - analyzing food only")
 
-        # Analyze with Gemini AI
-        if nearby_restaurants:
-            analysis = gemini_service.analyze_food_with_restaurant_matching(
-                image_bytes, nearby_restaurants)
-            print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
-            print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
-            print(f"[BACKGROUND AI] Restaurant: {analysis['restaurant']}")
-        else:
-            # Fallback to basic analysis if no restaurants
-            analysis = gemini_service.analyze_food_image(image_bytes)
-            analysis['restaurant'] = 'Unknown'
-            print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
-            print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
+        # Analyze with Gemini AI (basic analysis only)
+        analysis = gemini_service.analyze_food_image(image_bytes)
+        analysis['restaurant'] = 'Unknown'
+        print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
+        print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
 
         # Cache the AI-suggested restaurant (temporary, for auto-fill)
         if analysis.get('restaurant') and analysis['restaurant'] != 'Unknown':
@@ -1151,15 +1126,15 @@ async def discover_restaurants_ios(
         query = "restaurants that match my taste profile perfectly"
 
         print(f"[DISCOVER-iOS] Using query: '{query}'")
-        print(f"[DISCOVER-iOS] Limiting to 10 candidates for speed")
+        print(f"[DISCOVER-iOS] Limiting to 8 candidates for speed")
 
-        # Execute search with iOS optimization (10 candidates only)
+        # Execute search with iOS optimization (8 candidates for faster LLM response)
         results = await search_service.search_restaurants(
             query=query,
             user_id=user_id,
             latitude=latitude,
             longitude=longitude,
-            max_candidates=10
+            max_candidates=8
         )
 
         # Return only top 2 restaurants for discover
@@ -1238,16 +1213,16 @@ async def search_restaurants_ios(
         print(f"[SEARCH-iOS] Step 1/3: Getting search service...")
         search_service = get_restaurant_search_service()
         print(f"[SEARCH-iOS] ✅ Search service ready")
-        print(f"[SEARCH-iOS] Limiting to 10 candidates for speed")
+        print(f"[SEARCH-iOS] Limiting to 8 candidates for speed")
 
-        # Execute search with iOS optimization (10 candidates only)
+        # Execute search with iOS optimization (8 candidates for faster LLM response)
         print(f"[SEARCH-iOS] Step 2/3: Calling search_restaurants method...")
         results = await search_service.search_restaurants(
             query=query,
             user_id=user_id,
             latitude=latitude,
             longitude=longitude,
-            max_candidates=10
+            max_candidates=8
         )
 
         # Track the search for implicit signals learning
