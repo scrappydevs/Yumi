@@ -263,16 +263,25 @@ export default function DiscoverPage() {
       } else if (showingResults) {
         speed = 0.6;  // Slower when showing results
       } else {
-        // Latent state: SUPER fast for first 2 cycles, then slow down
-        speed = rotationCyclesRef.current < 1 ? 5.0 : 0.8;
+        // Latent state: SUPER fast for first 0.7 cycles, then gradually slow down
+        if (rotationCyclesRef.current < 0.7) {
+          speed = 5.0;  // Fast speed
+        } else {
+          // Gradually slow down over the next 0.3 cycles
+          const slowdownProgress = Math.min((rotationCyclesRef.current - 0.7) / 0.3, 1);
+          speed = 5.0 - (4.2 * slowdownProgress);  // Interpolate from 5.0 to 0.8
+        }
       }
       
       setRotation((prev) => {
         const newRotation = (prev + speed) % 360;
-        // Track complete cycles (when we pass 360/0 degrees)
-        if (prev > newRotation && !isThinking && !showingResults) {
-          rotationCyclesRef.current += 1;
-          console.log(`🔄 Rotation cycle complete! Count: ${rotationCyclesRef.current}, Speed will be: ${rotationCyclesRef.current < 1 ? 5.0 : 0.8}`);
+        // Track fractional cycle progress in latent mode
+        if (!isThinking && !showingResults) {
+          rotationCyclesRef.current += speed / 360;
+          // Log on whole number crossings
+          if (Math.floor(prev / 360) < Math.floor((prev + speed) / 360)) {
+            console.log(`🔄 Rotation cycle milestone! Count: ${rotationCyclesRef.current.toFixed(2)}, Current speed: ${speed.toFixed(2)}`);
+          }
         }
         return newRotation;
       });
@@ -340,11 +349,11 @@ export default function DiscoverPage() {
           .single();
 
         if (profile?.friends && profile.friends.length > 0) {
-          // Fetch friend profiles (limit to 6 for cleaner orbit)
+          // Fetch all friend profiles
           const { data: friends } = await supabase
             .from('profiles')
             .select('id, username, display_name, avatar_url')
-            .in('id', profile.friends.slice(0, 6));
+            .in('id', profile.friends);
 
           if (friends) {
             // Sort by ID to maintain consistent positioning (prevent random swaps)
@@ -598,8 +607,8 @@ export default function DiscoverPage() {
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
-        // Show only ~10-15 images initially (so animation has images to swap in/out)
-        const initialCount = Math.min(15, allImages.length);
+        // Show only ~3 images initially (so animation has images to swap in/out)
+        const initialCount = Math.min(3, allImages.length);
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
@@ -1317,9 +1326,9 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    // Instant movement during fast rotation (< 2 cycles), smooth during slow rotation
-                    left: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
-                    top: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    // Instant movement during fast rotation (< 0.7 cycles), smooth during slow rotation
+                    left: { duration: rotationCyclesRef.current < 0.7 ? 0 : 0, ease: 'linear' },
+                    top: { duration: rotationCyclesRef.current < 0.7 ? 0 : 0, ease: 'linear' },
                     opacity: { duration: 0.4, ease: 'easeInOut' },
                     scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
                     // No delay - all images appear at once to prevent repositioning
@@ -1475,7 +1484,7 @@ export default function DiscoverPage() {
                   marginLeft: `${marginOffset}px`,
                   marginTop: `${marginOffset}px`,
                   zIndex: isMentioned ? 10 : 5,
-                  cursor: 'pointer',
+                  cursor: (isThinking || showingResults) ? 'default' : 'pointer',
                 }}
                 onMouseEnter={async () => {
                   // Fetch friend's recent activity
@@ -1503,6 +1512,12 @@ export default function DiscoverPage() {
                 }}
                 onMouseLeave={() => setHoveredFriend(null)}
                 onClick={() => {
+                  // Don't allow toggling mentions during thinking or results
+                  if (isThinking || showingResults) {
+                    console.log('⚠️ Cannot toggle mentions while AI is thinking or showing results');
+                    return;
+                  }
+                  
                   // Toggle mention when clicking on friend avatar
                   if (isMentioned) {
                     // Remove mention
@@ -1564,7 +1579,7 @@ export default function DiscoverPage() {
                       boxShadow: isMentioned ? '0 2px 8px rgba(155, 135, 245, 0.4)' : '0 2px 6px rgba(0, 0, 0, 0.2)',
                     }}
                   >
-                    {isMentioned ? 'Included' : 'Click to add'}
+                    {isMentioned ? 'Included' : (isThinking || showingResults) ? '' : 'Click to add'}
                   </motion.div>
 
                   {/* Small name label on hover */}
