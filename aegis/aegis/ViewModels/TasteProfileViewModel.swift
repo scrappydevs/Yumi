@@ -28,7 +28,7 @@ class TasteProfileViewModel: ObservableObject {
     private let damping: CGFloat = 0.85
     private let centeringForce: CGFloat = 0.01
     
-    func loadGraph() async {
+    func loadGraph(bypassCache: Bool = false) async {
         guard let authToken = authService.getAuthToken() else {
             error = "Not authenticated"
             return
@@ -40,7 +40,8 @@ class TasteProfileViewModel: ObservableObject {
         do {
             let data = try await networkService.fetchFoodGraph(
                 authToken: authToken,
-                minSimilarity: minSimilarity
+                minSimilarity: minSimilarity,
+                useCache: !bypassCache
             )
             self.graphData = data
             
@@ -50,7 +51,7 @@ class TasteProfileViewModel: ObservableObject {
             // Start physics simulation
             startPhysicsSimulation()
             
-            print("✅ Loaded graph: \(data.nodes.count) nodes, \(data.edges.count) edges")
+            print("✅ Loaded graph: \(data.nodes.count) nodes, \(data.edges.count) edges \(bypassCache ? "(fresh)" : "(cached or fresh)")")
         } catch {
             self.error = "Failed to load graph: \(error.localizedDescription)"
             print("❌ Graph load error: \(error)")
@@ -60,7 +61,7 @@ class TasteProfileViewModel: ObservableObject {
     }
     
     func refreshGraph() async {
-        await loadGraph()
+        await loadGraph(bypassCache: true) // Always fetch fresh data when explicitly refreshing
     }
     
     private func initializeNodePositions(for nodes: [FoodNode]) {

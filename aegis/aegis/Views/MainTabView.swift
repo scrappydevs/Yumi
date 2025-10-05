@@ -8,10 +8,32 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @StateObject private var loadingVM = AppLoadingViewModel()
     @State private var selectedTab = 0
+    @State private var hasPreloaded = false
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        ZStack {
+            // Background preload views - always present but hidden
+            // This prevents cancellation when loading screen disappears
+            ZStack {
+                DiscoverView(onLoaded: {
+                    loadingVM.markDiscoverLoaded()
+                })
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                
+                HomeView(onLoaded: {
+                    loadingVM.markReviewsLoaded()
+                })
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+            }
+            .zIndex(-1) // Keep behind everything
+            
+            TabView(selection: $selectedTab) {
             // Tab 0: Discover (Bottom Left)
             DiscoverView()
                 .tabItem {
@@ -48,8 +70,16 @@ struct MainTabView: View {
                 Label("Profile", systemImage: "chart.pie")
             }
             .tag(4)
+            }
+            .accentColor(.blue)
+            
+            // Loading screen overlay
+            if loadingVM.isLoading {
+                LoadingView()
+                    .transition(.opacity)
+                    .zIndex(999)
+            }
         }
-        .accentColor(.blue)
     }
 }
 

@@ -9,8 +9,8 @@ export function useVoiceOutput() {
       setIsSpeaking(true);
       console.log('🔊 Speaking:', text);
       
-      // Use streaming endpoint with Bella voice (soft, gentle female)
-      const audioUrl = `http://localhost:8000/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=EXAVITQu4vr4xnSDxMaL&stability=0.6&similarity_boost=0.7`;
+      // Use streaming endpoint with Fahco4VZzobUeiPqni1S voice
+      const audioUrl = `http://localhost:8000/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=Fahco4VZzobUeiPqni1S&stability=0.97&similarity_boost=0.65`;
       
       // Create and play audio
       const audio = new Audio(audioUrl);

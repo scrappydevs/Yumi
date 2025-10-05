@@ -2,10 +2,12 @@
 Aegis Backend API
 FastAPI application for handling infrastructure issue submissions.
 """
+from routers import profiles, friends, users, preferences
 from routers import invites
 from routers import voice
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import os
@@ -20,7 +22,7 @@ from services.restaurant_search_service import get_restaurant_search_service
 from services.restaurant_db_service import get_restaurant_db_service
 from utils.auth import get_user_id_from_token
 from supabase_client import SupabaseClient
-from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph
+from routers import issues, ai, audio, config, reservations, twilio_webhooks, friends_graph, nlp
 import asyncio
 
 # Lazy import for embedding service (heavy memory usage)
@@ -162,8 +164,10 @@ app.include_router(invites.router, prefix="/api")
 # Import and include friends graph router
 app.include_router(friends_graph.router, prefix="/api")
 
+# Import and include NLP router
+app.include_router(nlp.router)
+
 # Import and include iOS friends management routers
-from routers import profiles, friends, users, preferences
 app.include_router(profiles.router, prefix="/api")
 app.include_router(friends.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
@@ -217,41 +221,16 @@ async def analyze_and_update_description(image_id: int, image_bytes: bytes, lati
         supabase_service = get_supabase_service()
         places_service = get_places_service()
 
-        # Find nearby restaurants if we have coordinates
-        nearby_restaurants = []
-        if latitude is not None and longitude is not None:
-            print(
-                f"[BACKGROUND AI] Finding restaurants near ({latitude}, {longitude})...")
-            try:
-                nearby_restaurants = places_service.find_nearby_restaurants(
-                    latitude=latitude,
-                    longitude=longitude,
-                    radius=1000,  # 1km radius
-                    limit=25
-                )
-                print(
-                    f"[BACKGROUND AI] Found {len(nearby_restaurants)} nearby restaurants")
-            except Exception as e:
-                print(
-                    f"[BACKGROUND AI] Warning: Could not fetch nearby restaurants: {str(e)}")
-                # Continue without restaurants - AI can still analyze the food
-        else:
-            print(
-                f"[BACKGROUND AI] No coordinates provided, skipping restaurant search")
+        # Skip restaurant search for faster AI analysis
+        # User manually enters restaurant name anyway, so auto-suggestion isn't critical
+        print(
+            f"[BACKGROUND AI] Skipping restaurant search for speed - analyzing food only")
 
-        # Analyze with Gemini AI
-        if nearby_restaurants:
-            analysis = gemini_service.analyze_food_with_restaurant_matching(
-                image_bytes, nearby_restaurants)
-            print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
-            print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
-            print(f"[BACKGROUND AI] Restaurant: {analysis['restaurant']}")
-        else:
-            # Fallback to basic analysis if no restaurants
-            analysis = gemini_service.analyze_food_image(image_bytes)
-            analysis['restaurant'] = 'Unknown'
-            print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
-            print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
+        # Analyze with Gemini AI (basic analysis only)
+        analysis = gemini_service.analyze_food_image(image_bytes)
+        analysis['restaurant'] = 'Unknown'
+        print(f"[BACKGROUND AI] Dish: {analysis['dish']}")
+        print(f"[BACKGROUND AI] Cuisine: {analysis['cuisine']}")
 
         # Cache the AI-suggested restaurant (temporary, for auto-fill)
         if analysis.get('restaurant') and analysis['restaurant'] != 'Unknown':
@@ -1030,15 +1009,15 @@ async def discover_restaurants(
     """
     Discover personalized restaurant recommendations.
     Returns 2 restaurants based on user's preferences and location.
-    
+
     Args:
         user_id: Extracted from JWT token (automatic)
         latitude: User's current latitude
         longitude: User's current longitude
-        
+
     Returns:
         { "status": "success", "restaurants": [...], "reasoning": "..." }
-    
+
     Example:
         POST /api/restaurants/discover
         Form data:
@@ -1048,7 +1027,7 @@ async def discover_restaurants(
     try:
         import time
         start_time = time.time()
-        
+
         print(f"\n{'='*80}")
         print(f"[DISCOVER] 🌟 NEW DISCOVER REQUEST")
         print(f"{'='*80}")
@@ -1059,12 +1038,12 @@ async def discover_restaurants(
 
         # Get restaurant search service
         search_service = get_restaurant_search_service()
-        
+
         # Use a neutral discovery query to get personalized recommendations
         query = "restaurants that match my taste profile perfectly"
-        
+
         print(f"[DISCOVER] Using query: '{query}'")
-        
+
         # Execute search
         results = await search_service.search_restaurants(
             query=query,
@@ -1072,16 +1051,16 @@ async def discover_restaurants(
             latitude=latitude,
             longitude=longitude
         )
-        
+
         # Return only top 2 restaurants for discover
         top_restaurants = results.get('top_restaurants', [])[:2]
-        
+
         elapsed = time.time() - start_time
         print(f"\n{'='*80}")
         print(f"[DISCOVER] ✅ COMPLETED in {elapsed:.2f}s")
         print(f"[DISCOVER] Returning {len(top_restaurants)} restaurants")
         print(f"{'='*80}\n")
-        
+
         return {
             "status": "success",
             "restaurants": top_restaurants,
@@ -1091,7 +1070,7 @@ async def discover_restaurants(
                 "longitude": longitude
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1099,9 +1078,194 @@ async def discover_restaurants(
         import traceback
         traceback.print_exc()
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Failed to generate recommendations: {str(e)}"
         )
+
+
+@app.post("/api/restaurants/discover-ios")
+async def discover_restaurants_ios(
+    user_id: str = Depends(get_user_id_from_token),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    iOS-optimized discover endpoint - faster version with 10 restaurant candidates.
+    Returns 2 restaurants based on user's preferences and location.
+
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        latitude: User's current latitude
+        longitude: User's current longitude
+
+    Returns:
+        { "status": "success", "restaurants": [...], "reasoning": "..." }
+
+    Example:
+        POST /api/restaurants/discover-ios
+        Form data:
+            latitude=40.4406
+            longitude=-79.9959
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        print(f"\n{'='*80}")
+        print(f"[DISCOVER-iOS] 🌟 NEW iOS DISCOVER REQUEST")
+        print(f"{'='*80}")
+        print(f"[DISCOVER-iOS] User: {user_id[:8]}...")
+        print(f"[DISCOVER-iOS] Location: ({latitude}, {longitude})")
+        print(f"[DISCOVER-iOS] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
+
+        # Get restaurant search service
+        search_service = get_restaurant_search_service()
+
+        # Use a neutral discovery query to get personalized recommendations
+        query = "restaurants that match my taste profile perfectly"
+
+        print(f"[DISCOVER-iOS] Using query: '{query}'")
+        print(f"[DISCOVER-iOS] Limiting to 8 candidates for speed")
+
+        # Execute search with iOS optimization (8 candidates for faster LLM response)
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude,
+            max_candidates=8
+        )
+
+        # Return only top 2 restaurants for discover
+        top_restaurants = results.get('top_restaurants', [])[:2]
+
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(f"[DISCOVER-iOS] ✅ COMPLETED in {elapsed:.2f}s")
+        print(f"[DISCOVER-iOS] Returning {len(top_restaurants)} restaurants")
+        print(f"{'='*80}\n")
+
+        return {
+            "status": "success",
+            "restaurants": top_restaurants,
+            "reasoning": results.get('reasoning', ''),
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[DISCOVER-iOS ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate recommendations: {str(e)}"
+        )
+
+
+@app.post("/api/restaurants/search-ios")
+async def search_restaurants_ios(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    iOS-optimized search endpoint - faster version with 10 restaurant candidates.
+    Natural language restaurant search using LLM with tool calls.
+
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        query: User's natural language query (e.g., "Quiet Italian spot with outdoor seating")
+        latitude: User's current latitude
+        longitude: User's current longitude
+
+    Returns:
+        Search results with top restaurants matching query and user preferences
+
+    Example query:
+        POST /api/restaurants/search-ios
+        {
+            "query": "Italian restaurant near me",
+            "latitude": 40.7580,
+            "longitude": -73.9855
+        }
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        print(f"\n{'='*80}")
+        print(f"[SEARCH-iOS] 🔍 NEW iOS SEARCH REQUEST")
+        print(f"{'='*80}")
+        print(f"[SEARCH-iOS] User: {user_id[:8]}...")
+        print(f"[SEARCH-iOS] Query: '{query}'")
+        print(f"[SEARCH-iOS] Location: ({latitude}, {longitude})")
+        print(f"[SEARCH-iOS] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
+
+        # Get restaurant search service
+        print(f"[SEARCH-iOS] Step 1/3: Getting search service...")
+        search_service = get_restaurant_search_service()
+        print(f"[SEARCH-iOS] ✅ Search service ready")
+        print(f"[SEARCH-iOS] Limiting to 8 candidates for speed")
+
+        # Execute search with iOS optimization (8 candidates for faster LLM response)
+        print(f"[SEARCH-iOS] Step 2/3: Calling search_restaurants method...")
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude,
+            max_candidates=8
+        )
+
+        # Track the search for implicit signals learning
+        try:
+            print(f"\n[SEARCH TRACKING] 🔍 Tracking iOS search query...")
+            print(f"[SEARCH TRACKING] Query: '{query}'")
+            print(f"[SEARCH TRACKING] User: {user_id[:8]}...")
+            print(
+                f"[SEARCH TRACKING] Results: {len(results.get('top_restaurants', []))} restaurants")
+
+            from services.implicit_signals_service import get_implicit_signals_service
+            signals_service = get_implicit_signals_service()
+            signals_service.track_search(
+                user_id=user_id,
+                query=query,
+                latitude=latitude,
+                longitude=longitude,
+                metadata={'result_count': len(
+                    results.get('top_restaurants', [])), 'source': 'ios'}
+            )
+            print(f"[SEARCH TRACKING] ✅ Search tracked successfully\n")
+        except Exception as track_error:
+            print(
+                f"[SEARCH TRACKING] ❌ Warning: Failed to track search: {track_error}")
+            # Don't fail the search if tracking fails
+
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(
+            f"[SEARCH-iOS] Step 3/3: ✅ SEARCH COMPLETED in {elapsed:.2f}s")
+        print(
+            f"[SEARCH-iOS] Results: {len(results.get('top_restaurants', []))} top restaurants")
+        print(f"{'='*80}\n")
+        return results
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SEARCH-iOS ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Restaurant search failed: {str(e)}")
 
 
 @app.post("/api/restaurants/search-group")
@@ -1200,6 +1364,73 @@ async def search_restaurants_group(
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Group restaurant search failed: {str(e)}")
+
+
+@app.post("/api/restaurants/search-group-stream")
+async def search_restaurants_group_stream(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = Form(...),
+    friend_ids: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    Streaming version of group restaurant search with real-time progress updates.
+
+    Yields Server-Sent Events (SSE) with progress updates as the search proceeds.
+
+    Progress messages:
+    - Step 1: Analyzing group taste profiles
+    - Step 2: Finding nearby restaurants
+    - Step 3: Computing compatibility scores
+    - Final: Complete results
+
+    Returns:
+        StreamingResponse with SSE-formatted progress updates
+    """
+    try:
+        print(f"[GROUP SEARCH STREAM API] Request from user: {user_id}")
+        print(f"[GROUP SEARCH STREAM API] Query: '{query}'")
+        print(f"[GROUP SEARCH STREAM API] Friend IDs: '{friend_ids}'")
+
+        # Parse friend IDs
+        friend_id_list = [fid.strip()
+                          for fid in friend_ids.split(",") if fid.strip()]
+        all_user_ids = [user_id] + friend_id_list
+
+        print(f"[GROUP SEARCH STREAM API] Total users: {len(all_user_ids)}")
+
+        # Get search service
+        search_service = get_restaurant_search_service()
+
+        # Create streaming generator
+        async def generate():
+            async for sse_message in search_service.search_restaurants_for_group_stream(
+                query=query,
+                user_ids=all_user_ids,
+                latitude=latitude,
+                longitude=longitude
+            ):
+                yield sse_message
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Disable nginx buffering
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[GROUP SEARCH STREAM API ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Streaming group search failed: {str(e)}")
 
 
 # ============================================================================

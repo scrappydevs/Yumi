@@ -4,6 +4,8 @@ Audio Service for TTS (Text-to-Speech) and STT (Speech-to-Text)
 This module provides modular functions for:
 - ElevenLabs: Text-to-Speech with streaming and conversion
 - Whisper: Speech-to-Text transcription (optional)
+
+ALL ElevenLabs calls now go through the orchestrator to prevent concurrent requests.
 """
 import os
 import base64
@@ -11,6 +13,7 @@ import tempfile
 import requests
 from typing import Optional, Dict, Any, Iterator
 from elevenlabs import ElevenLabs
+from services.elevenlabs_orchestrator import get_elevenlabs_orchestrator
 
 # Minimal silent MP3 file (~0.026 seconds of silence at 44.1kHz)
 # This is used as a fallback when TTS fails, to provide valid audio data
@@ -49,9 +52,9 @@ class AudioService:
             base_url="https://api.elevenlabs.io"
         )
 
-        # Default voice ID
+        # Default voice ID - Fahco4VZzobUeiPqni1S (ElevenLabs voice library)
         self.default_voice_id = os.getenv(
-            "ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
+            "ELEVENLABS_VOICE_ID", "Fahco4VZzobUeiPqni1S")
 
         # Whisper model (lazy loading)
         self._whisper_model = None
@@ -131,9 +134,13 @@ class AudioService:
         similarity_boost: float = 0.75
     ) -> Iterator[bytes]:
         """
-        Stream text to speech audio using HTTP chunked transfer (yields chunks)
+        Stream text to speech audio using TRUE streaming via orchestrator.
 
-        This uses direct HTTP streaming for optimal performance and low latency.
+        ALL calls now go through the ElevenLabs orchestrator to ensure:
+        - No concurrent API calls
+        - Sequential request processing
+        - True streaming (not buffered)
+        - Proper error handling and fallbacks
 
         Args:
             text: Text to convert to speech
@@ -142,84 +149,22 @@ class AudioService:
             similarity_boost: Voice similarity boost (0.0-1.0)
 
         Yields:
-            Audio chunks as bytes (MP3 format)
+            Audio chunks as bytes (MP3 format) - streamed in real-time!
 
         Example:
             for chunk in service.text_to_speech_stream_http("Hello world"):
                 yield chunk
         """
-        vid = voice_id or self.default_voice_id
-
-        # Use NON-STREAMING endpoint for complete audio (no /stream suffix)
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{vid}"
-        headers = {
-            "xi-api-key": self.elevenlabs_api_key,
-            "Accept": "audio/mpeg",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "text": text,
-            "model_id": "eleven_multilingual_v2",  # Best quality for natural pacing
-            "voice_settings": {
-                "stability": stability,
-                "similarity_boost": similarity_boost,
-            },
-            "output_format": "mp3_44100_128"
-        }
-
-        try:
-            # Get COMPLETE audio buffer first, then stream it
-            r = requests.post(url, headers=headers, json=payload)
-            r.raise_for_status()
-
-            # Yield the complete audio in chunks
-            audio_data = r.content
-            chunk_size = 4096
-            for i in range(0, len(audio_data), chunk_size):
-                yield audio_data[i:i+chunk_size]
-
-        except requests.exceptions.HTTPError as e:
-            # Log detailed error information for debugging
-            status_code = e.response.status_code if e.response else "unknown"
-            error_body = ""
-            try:
-                error_body = e.response.text if e.response else ""
-            except:
-                pass
-
-            print(f"[AUDIO] ❌ ElevenLabs TTS Error {status_code}: {str(e)}")
-            print(f"[AUDIO]    Text: '{text[:50]}...'")
-            print(f"[AUDIO]    Voice ID: {vid}")
-            if error_body:
-                print(f"[AUDIO]    Response: {error_body[:200]}")
-
-            # Handle specific error cases
-            if status_code == 401:
-                print("[AUDIO]    ⚠️  Authentication failed - check API key or quota")
-            elif status_code == 429:
-                print(
-                    "[AUDIO]    ⚠️  Rate limit exceeded - please wait before retrying")
-            elif status_code in [402, 403]:
-                print("[AUDIO]    ⚠️  Quota exceeded or permission denied")
-
-            # Yield silent MP3 to prevent stream failure (graceful degradation)
-            # This provides valid audio data that browsers can decode without errors
-            print("[AUDIO]    🔇 Returning silent audio as fallback")
-            yield SILENT_MP3
-
-        except requests.exceptions.RequestException as e:
-            # Handle network errors
-            print(f"[AUDIO] ❌ Network error during TTS: {str(e)}")
-            print(f"[AUDIO]    Text: '{text[:50]}...'")
-            print("[AUDIO]    🔇 Returning silent audio as fallback")
-            yield SILENT_MP3
-
-        except Exception as e:
-            # Catch any other unexpected errors
-            print(f"[AUDIO] ❌ Unexpected error during TTS: {str(e)}")
-            print(f"[AUDIO]    Text: '{text[:50]}...'")
-            print("[AUDIO]    🔇 Returning silent audio as fallback")
-            yield SILENT_MP3
+        # Get orchestrator singleton
+        orchestrator = get_elevenlabs_orchestrator()
+        
+        # Use orchestrator's streaming method (handles queue, rate limits, errors)
+        yield from orchestrator.stream_request(
+            text=text,
+            voice_id=voice_id or self.default_voice_id,
+            stability=stability,
+            similarity_boost=similarity_boost
+        )
 
     # ==================== Voice Management ====================
 
