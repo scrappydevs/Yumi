@@ -27,7 +27,6 @@ import { useVADRecording } from '@/hooks/use-vad-recording';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase/client';
 import { trackClick } from '@/lib/track-interaction';
-import { useAudio } from '@/lib/audio-context';
 
 // Cuisine-based fallback images for restaurants without photos
 const CUISINE_FALLBACK_IMAGES: { [key: string]: string } = {
@@ -186,8 +185,8 @@ export default function DiscoverPage() {
   const [userCoords, setUserCoords] = useState<{lat: number, lng: number} | null>(null);
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
-  const { isMuted } = useAudio(); // Use shared audio context
-  const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentPhrase, setCurrentPhrase] = useState('Searching nearby restaurants');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [glowingIndices, setGlowingIndices] = useState<Set<number>>(new Set());
 
@@ -608,8 +607,8 @@ export default function DiscoverPage() {
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
-        // Show only 1 image initially (so animation has images to swap in/out)
-        const initialCount = Math.min(1, allImages.length);
+        // Show up to 20 images initially (or all if fewer)
+        const initialCount = Math.min(20, allImages.length);
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
@@ -993,6 +992,47 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-white">
       
+      {/* Sound Controls - Top Left */}
+      <div className="absolute top-6 left-6 z-10 flex items-center gap-2">
+        <motion.button
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (!isMuted && isSpeaking) stop();
+          }}
+          className="glass-layer-1 w-11 h-11 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
+          {isMuted ? (
+            <VolumeX className="w-5 h-5 text-red-500" />
+          ) : (
+            <Volume2 className={`w-5 h-5 ${isSpeaking ? 'text-purple-500 animate-pulse' : 'text-gray-600'}`} />
+          )}
+        </motion.button>
+
+        {!isMuted && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 100, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="glass-layer-1 px-3 py-2.5 rounded-full shadow-soft flex items-center"
+          >
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume * 100}
+              onChange={(e) => setVolume(parseFloat(e.target.value) / 100)}
+              className="w-20 h-1 bg-gradient-to-r from-purple-300 to-blue-300 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #9B87F5 0%, #9B87F5 ${volume * 100}%, #e5e7eb ${volume * 100}%, #e5e7eb 100%)`
+              }}
+            />
+          </motion.div>
+        )}
+      </div>
+
       {/* Test AI Button - Bottom Left */}
       <div className="absolute bottom-6 left-6 z-10">
         <motion.button

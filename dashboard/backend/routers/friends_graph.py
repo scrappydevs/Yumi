@@ -198,41 +198,16 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
                         score = sim.get('similarity_score', 0.5)
                         explanation = sim.get('similarity_explanation') or sim.get('explanation', 'Similar food preferences')
                         
-                        # Parse JSON fields from database
-                        shared_restaurants = sim.get('shared_restaurants', [])
-                        if isinstance(shared_restaurants, str):
-                            try:
-                                shared_restaurants = json.loads(shared_restaurants)
-                            except (json.JSONDecodeError, TypeError):
-                                shared_restaurants = []
-                        
-                        shared_cuisines = sim.get('shared_cuisines', [])
-                        if isinstance(shared_cuisines, str):
-                            try:
-                                shared_cuisines = json.loads(shared_cuisines)
-                            except (json.JSONDecodeError, TypeError):
-                                shared_cuisines = []
-                        
-                        taste_profile_overlap = sim.get('taste_profile_overlap', {})
-                        if isinstance(taste_profile_overlap, str):
-                            try:
-                                taste_profile_overlap = json.loads(taste_profile_overlap)
-                            except (json.JSONDecodeError, TypeError):
-                                taste_profile_overlap = {}
-                        
                         similarities.append({
                             'source': source,
                             'target': target,
                             'similarity_score': score,
                             'explanation': explanation,
-                            'shared_restaurants': shared_restaurants,
-                            'shared_cuisines': shared_cuisines,
-                            'taste_profile_overlap': taste_profile_overlap,
+                            'shared_restaurants': sim.get('shared_restaurants', []),
+                            'shared_cuisines': sim.get('shared_cuisines', []),
+                            'taste_profile_overlap': sim.get('taste_profile_overlap', {}),
                         })
-                        # Debug: Show shared data
-                        cuisines_str = f", {len(shared_cuisines)} cuisines" if shared_cuisines else ""
-                        restaurants_str = f", {len(shared_restaurants)} restaurants" if shared_restaurants else ""
-                        print(f"  ↔️  {source[:8]}... <-> {target[:8]}...: {score:.2f}{cuisines_str}{restaurants_str}")
+                        print(f"  ↔️  {source[:8]}... <-> {target[:8]}...: {score:.2f}")
         except Exception as e:
             print(f"Note: similarity data not available: {e}")
         
@@ -245,9 +220,6 @@ async def get_friend_graph(user_id: str, force_refresh: bool = False):
                     'target': friend['id'],
                     'similarity_score': 0.5,
                     'explanation': 'Friends on Yumi',
-                    'shared_restaurants': [],
-                    'shared_cuisines': [],
-                    'taste_profile_overlap': {},
                 })
         
         graph_data = {
