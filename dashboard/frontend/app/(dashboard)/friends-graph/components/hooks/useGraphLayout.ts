@@ -85,60 +85,50 @@ export function useGraphLayout() {
   return { layoutNodes, layoutEdges };
 }
 
-// Helper: Calculate force-directed position with spring physics (like auctor-1)
-// Uses ideal distance based on similarity - more similar = closer together
+// Helper: Calculate position based on similarity to current user
+// Higher similarity to current user = closer to center
 function calculateForceDirectedPosition(
   friend: GraphData['friends'][0],
   allFriends: GraphData['friends'],
   similarities: GraphData['similarities'],
   index: number
 ) {
-  // Start with circular layout (MUCH LARGER radius to prevent overlap)
-  const radius = 500; // Increased from 300 to 500 for more spacing
-  const angle = (index / allFriends.length) * 2 * Math.PI;
+  const centerX = 600;
+  const centerY = 500;
   
-  let x = Math.cos(angle) * radius + 600;
-  let y = Math.sin(angle) * radius + 500;
-
-  // Spring-based physics: distance = similarity (STRONGER force for visibility)
-  // High similarity (0.8+) → ideal distance = 250px (close but not overlapping)
-  // Medium similarity (0.5-0.7) → ideal distance = 400px (medium)
-  // Low similarity (0.3) → ideal distance = 550px (far apart)
-  similarities.forEach((sim) => {
-    if (sim.source === friend.id || sim.target === friend.id) {
-      const otherUserId = sim.source === friend.id ? sim.target : sim.source;
-      const otherIndex = allFriends.findIndex((f) => f.id === otherUserId);
-      
-      if (otherIndex !== -1) {
-        // Calculate ideal distance: Higher similarity = SMALLER distance (closer nodes)
-        // Formula: as similarity goes from 0→1, distance goes from 550px→250px
-        const idealDistance = 550 - (sim.similarity_score * 300);
-        
-        // Get other node's position (use same radius and center as above)
-        const otherAngle = (otherIndex / allFriends.length) * 2 * Math.PI;
-        const otherX = Math.cos(otherAngle) * radius + 600;
-        const otherY = Math.sin(otherAngle) * radius + 500;
-        
-        // Calculate current distance
-        const dx = otherX - x;
-        const dy = otherY - y;
-        const currentDistance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Spring force: pulls nodes to ideal distance
-        if (currentDistance > 0) {
-          const displacement = currentDistance - idealDistance;
-          // Apply force to move toward ideal distance (no similarity weighting to avoid oscillation)
-          const force = displacement * 0.5; // Balanced force for all pairs
-          
-          const forceX = (dx / currentDistance) * force;
-          const forceY = (dy / currentDistance) * force;
-          
-          x += forceX;
-          y += forceY;
-        }
-      }
+  // If this is the current user, place at center
+  if (friend.is_current_user) {
+    return { x: centerX, y: centerY };
+  }
+  
+  // Find similarity score to current user
+  let similarityToCurrentUser = 0.5; // default
+  const currentUser = allFriends.find(f => f.is_current_user);
+  
+  if (currentUser) {
+    const simRecord = similarities.find(
+      sim => 
+        (sim.source === currentUser.id && sim.target === friend.id) ||
+        (sim.target === currentUser.id && sim.source === friend.id)
+    );
+    
+    if (simRecord) {
+      similarityToCurrentUser = simRecord.similarity_score;
     }
-  });
+  }
+  
+  // Calculate distance from current user based on similarity
+  // Higher similarity (0.8+) → distance = 200px (very close to center)
+  // Medium similarity (0.5-0.7) → distance = 350px (medium distance)
+  // Low similarity (0.3) → distance = 500px (far from center)
+  // Formula: Higher similarity = CLOSER to current user
+  const distanceFromCenter = 500 - (similarityToCurrentUser * 300);
+  
+  // Distribute friends in circular pattern around center
+  const angle = (index / (allFriends.length - 1)) * 2 * Math.PI; // Exclude current user from count
+  
+  const x = centerX + Math.cos(angle) * distanceFromCenter;
+  const y = centerY + Math.sin(angle) * distanceFromCenter;
 
   return { x, y };
 }
