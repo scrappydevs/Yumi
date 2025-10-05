@@ -1104,6 +1104,191 @@ async def discover_restaurants(
         )
 
 
+@app.post("/api/restaurants/discover-ios")
+async def discover_restaurants_ios(
+    user_id: str = Depends(get_user_id_from_token),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    iOS-optimized discover endpoint - faster version with 10 restaurant candidates.
+    Returns 2 restaurants based on user's preferences and location.
+    
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        latitude: User's current latitude
+        longitude: User's current longitude
+        
+    Returns:
+        { "status": "success", "restaurants": [...], "reasoning": "..." }
+    
+    Example:
+        POST /api/restaurants/discover-ios
+        Form data:
+            latitude=40.4406
+            longitude=-79.9959
+    """
+    try:
+        import time
+        start_time = time.time()
+        
+        print(f"\n{'='*80}")
+        print(f"[DISCOVER-iOS] 🌟 NEW iOS DISCOVER REQUEST")
+        print(f"{'='*80}")
+        print(f"[DISCOVER-iOS] User: {user_id[:8]}...")
+        print(f"[DISCOVER-iOS] Location: ({latitude}, {longitude})")
+        print(f"[DISCOVER-iOS] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
+
+        # Get restaurant search service
+        search_service = get_restaurant_search_service()
+        
+        # Use a neutral discovery query to get personalized recommendations
+        query = "restaurants that match my taste profile perfectly"
+        
+        print(f"[DISCOVER-iOS] Using query: '{query}'")
+        print(f"[DISCOVER-iOS] Limiting to 10 candidates for speed")
+        
+        # Execute search with iOS optimization (10 candidates only)
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude,
+            max_candidates=10
+        )
+        
+        # Return only top 2 restaurants for discover
+        top_restaurants = results.get('top_restaurants', [])[:2]
+        
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(f"[DISCOVER-iOS] ✅ COMPLETED in {elapsed:.2f}s")
+        print(f"[DISCOVER-iOS] Returning {len(top_restaurants)} restaurants")
+        print(f"{'='*80}\n")
+        
+        return {
+            "status": "success",
+            "restaurants": top_restaurants,
+            "reasoning": results.get('reasoning', ''),
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[DISCOVER-iOS ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to generate recommendations: {str(e)}"
+        )
+
+
+@app.post("/api/restaurants/search-ios")
+async def search_restaurants_ios(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    iOS-optimized search endpoint - faster version with 10 restaurant candidates.
+    Natural language restaurant search using LLM with tool calls.
+
+    Args:
+        user_id: Extracted from JWT token (automatic)
+        query: User's natural language query (e.g., "Quiet Italian spot with outdoor seating")
+        latitude: User's current latitude
+        longitude: User's current longitude
+
+    Returns:
+        Search results with top restaurants matching query and user preferences
+
+    Example query:
+        POST /api/restaurants/search-ios
+        {
+            "query": "Italian restaurant near me",
+            "latitude": 40.7580,
+            "longitude": -73.9855
+        }
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        print(f"\n{'='*80}")
+        print(f"[SEARCH-iOS] 🔍 NEW iOS SEARCH REQUEST")
+        print(f"{'='*80}")
+        print(f"[SEARCH-iOS] User: {user_id[:8]}...")
+        print(f"[SEARCH-iOS] Query: '{query}'")
+        print(f"[SEARCH-iOS] Location: ({latitude}, {longitude})")
+        print(f"[SEARCH-iOS] Timestamp: {time.strftime('%H:%M:%S')}")
+        print(f"{'='*80}\n")
+
+        # Get restaurant search service
+        print(f"[SEARCH-iOS] Step 1/3: Getting search service...")
+        search_service = get_restaurant_search_service()
+        print(f"[SEARCH-iOS] ✅ Search service ready")
+        print(f"[SEARCH-iOS] Limiting to 10 candidates for speed")
+
+        # Execute search with iOS optimization (10 candidates only)
+        print(f"[SEARCH-iOS] Step 2/3: Calling search_restaurants method...")
+        results = await search_service.search_restaurants(
+            query=query,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude,
+            max_candidates=10
+        )
+
+        # Track the search for implicit signals learning
+        try:
+            print(f"\n[SEARCH TRACKING] 🔍 Tracking iOS search query...")
+            print(f"[SEARCH TRACKING] Query: '{query}'")
+            print(f"[SEARCH TRACKING] User: {user_id[:8]}...")
+            print(
+                f"[SEARCH TRACKING] Results: {len(results.get('top_restaurants', []))} restaurants")
+
+            from services.implicit_signals_service import get_implicit_signals_service
+            signals_service = get_implicit_signals_service()
+            signals_service.track_search(
+                user_id=user_id,
+                query=query,
+                latitude=latitude,
+                longitude=longitude,
+                metadata={'result_count': len(
+                    results.get('top_restaurants', [])), 'source': 'ios'}
+            )
+            print(f"[SEARCH TRACKING] ✅ Search tracked successfully\n")
+        except Exception as track_error:
+            print(
+                f"[SEARCH TRACKING] ❌ Warning: Failed to track search: {track_error}")
+            # Don't fail the search if tracking fails
+
+        elapsed = time.time() - start_time
+        print(f"\n{'='*80}")
+        print(
+            f"[SEARCH-iOS] Step 3/3: ✅ SEARCH COMPLETED in {elapsed:.2f}s")
+        print(
+            f"[SEARCH-iOS] Results: {len(results.get('top_restaurants', []))} top restaurants")
+        print(f"{'='*80}\n")
+        return results
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SEARCH-iOS ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Restaurant search failed: {str(e)}")
+
+
 @app.post("/api/restaurants/search-group")
 async def search_restaurants_group(
     user_id: str = Depends(get_user_id_from_token),
