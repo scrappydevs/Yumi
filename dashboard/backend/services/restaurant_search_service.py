@@ -739,16 +739,20 @@ IMPORTANT:
             ])
 
             # Build merged preferences text
-            prefs_text = f"""
+            # Handle case where merged_preferences is a string (fallback message) vs dict
+            if isinstance(merged_preferences, str):
+                prefs_text = f"\n- {merged_preferences}"
+                has_group_preferences = False
+            else:
+                prefs_text = f"""
 - Favorite Cuisines: {', '.join(merged_preferences.get('cuisines', [])) or 'None specified'}
 - Price Range: {merged_preferences.get('priceRange') or 'No preference'}
 - Atmosphere: {', '.join(merged_preferences.get('atmosphere', [])) or 'No preference'}
 - Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
 """
-
-            # Check if merged preferences are substantial
-            has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or
-                                         merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+                # Check if merged preferences are substantial
+                has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or
+                                             merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
 
             # Create LLM prompt with edge case handling for groups
             prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 for a GROUP of {len(user_ids)} people dining together.
@@ -835,6 +839,10 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # Call Gemini
             response = self.gemini_service.model.generate_content(prompt)
             response_text = response.text.strip()
+            
+            print(f"\n[GROUP SEARCH LLM] Raw response received:")
+            print(f"[GROUP SEARCH LLM] {response_text[:500]}...")  # First 500 chars
+            print()
 
             # Clean up markdown if present
             if response_text.startswith("```json"):
@@ -848,6 +856,14 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             # Parse JSON
             import json
             result = json.loads(response_text)
+            
+            print(f"[GROUP SEARCH LLM] Parsed result: {len(result.get('top_restaurants', []))} restaurants")
+            if result.get('top_restaurants'):
+                for i, r in enumerate(result['top_restaurants']):
+                    print(f"  {i+1}. {r.get('name')} - {r.get('cuisine')} ({r.get('rating')}⭐)")
+            else:
+                print(f"  ⚠️ NO RESTAURANTS in LLM response!")
+                print(f"  Result keys: {list(result.keys())}")
 
             # CRITICAL: Enrich LLM results with full restaurant data (place_id, photo_url, etc.)
             enriched_restaurants = []
@@ -856,20 +872,37 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                     (r for r in restaurants if r['name'] == llm_rec['name']), None)
                 if matching:
                     enriched = {**matching, **llm_rec}
+                    # Map 'reason' to 'reasoning' for frontend compatibility
+                    if 'reason' in enriched and 'reasoning' not in enriched:
+                        enriched['reasoning'] = enriched['reason']
                     enriched_restaurants.append(enriched)
                     print(
                         f"  ✓ Enriched {llm_rec['name']} with place_id: {matching.get('place_id', 'N/A')}")
                 else:
                     print(
                         f"  ⚠️ No match found for {llm_rec['name']}, keeping LLM data only")
+                    # Map 'reason' to 'reasoning' for frontend compatibility
+                    if 'reason' in llm_rec and 'reasoning' not in llm_rec:
+                        llm_rec['reasoning'] = llm_rec['reason']
                     enriched_restaurants.append(llm_rec)
 
             result['top_restaurants'] = enriched_restaurants
             result['all_nearby_restaurants'] = restaurants
 
+            # Fallback: If LLM returned no restaurants, use top-rated nearby ones
+            if not enriched_restaurants:
+                print(f"[GROUP SEARCH] ⚠️ LLM returned 0 restaurants, using top 3 nearby as fallback")
+                fallback_restaurants = sorted(
+                    restaurants, 
+                    key=lambda r: (r.get('rating', 0), r.get('user_ratings_total', 0)), 
+                    reverse=True
+                )[:3]
+                result['top_restaurants'] = fallback_restaurants
+                result['stage'] = "group - fallback (LLM returned empty)"
+
             # Add metadata
             result["status"] = "success"
-            result["stage"] = "group - LLM analysis"
+            result["stage"] = result.get("stage", "group - LLM analysis")
             result["query"] = query
             result["user_count"] = len(user_ids)
             result["merged_preferences"] = merged_preferences
@@ -879,7 +912,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
             }
 
             print(
-                f"[GROUP RESTAURANT SEARCH] ✅ LLM ranked top {len(result.get('top_restaurants', []))} restaurants for group")
+                f"[GROUP RESTAURANT SEARCH] ✅ Returning {len(result.get('top_restaurants', []))} restaurants for group")
             return result
 
         except Exception as e:

@@ -71,6 +71,36 @@ const demoUsers = [
     avatar: '/assets/davidchung.jpeg',
     color: 'from-red-400 to-pink-500' 
   },
+  { 
+    id: '9', 
+    name: 'Benton', 
+    avatar: '/assets/benton.jpeg',
+    color: 'from-indigo-400 to-purple-500' 
+  },
+  { 
+    id: '10', 
+    name: 'Kabir', 
+    avatar: '/assets/kabir.jpeg',
+    color: 'from-cyan-400 to-blue-500' 
+  },
+  { 
+    id: '11', 
+    name: 'Spandan', 
+    avatar: '/assets/spandan.jpeg',
+    color: 'from-emerald-400 to-green-500' 
+  },
+  { 
+    id: '12', 
+    name: 'Matthew', 
+    avatar: '/assets/matthew chen.jpeg',
+    color: 'from-rose-400 to-red-500' 
+  },
+  { 
+    id: '13', 
+    name: 'Vedanth', 
+    avatar: '/assets/vedanth.jpeg',
+    color: 'from-amber-400 to-yellow-500' 
+  },
 ];
 
 // Detailed sample similarities with food preferences
@@ -164,6 +194,72 @@ const demoSimilarities = [
     reason: 'Pizza and burger enthusiasts with craft beer',
     cuisines: ['American', 'Italian', 'Comfort Food'],
     restaurants: 3
+  },
+  { 
+    source: '1', target: '9', similarity: 0.74, 
+    reason: 'Both enjoy exploring new fusion restaurants',
+    cuisines: ['Fusion', 'Contemporary', 'Asian Fusion'],
+    restaurants: 3
+  },
+  { 
+    source: '9', target: '10', similarity: 0.82, 
+    reason: 'Love Indian street food and spicy curries',
+    cuisines: ['Indian', 'Street Food', 'Spicy'],
+    restaurants: 4
+  },
+  { 
+    source: '2', target: '10', similarity: 0.71, 
+    reason: 'Both appreciate authentic regional Indian cuisine',
+    cuisines: ['Indian', 'South Asian'],
+    restaurants: 2
+  },
+  { 
+    source: '10', target: '11', similarity: 0.88, 
+    reason: 'Chai and samosa lovers with passion for Indian food',
+    cuisines: ['Indian', 'Tea', 'Snacks'],
+    restaurants: 5
+  },
+  { 
+    source: '3', target: '11', similarity: 0.75, 
+    reason: 'Both love vegetarian options and healthy eating',
+    cuisines: ['Vegetarian', 'Health Food', 'Plant-Based'],
+    restaurants: 3
+  },
+  { 
+    source: '11', target: '12', similarity: 0.79, 
+    reason: 'Dim sum and dumpling enthusiasts',
+    cuisines: ['Chinese', 'Dim Sum', 'Asian'],
+    restaurants: 4
+  },
+  { 
+    source: '5', target: '12', similarity: 0.67, 
+    reason: 'Love exploring Asian restaurants and noodles',
+    cuisines: ['Asian', 'Noodles', 'Ramen'],
+    restaurants: 2
+  },
+  { 
+    source: '12', target: '13', similarity: 0.84, 
+    reason: 'Both love South Indian food and dosas',
+    cuisines: ['South Indian', 'Indian', 'Dosa'],
+    restaurants: 4
+  },
+  { 
+    source: '4', target: '13', similarity: 0.70, 
+    reason: 'Health-conscious with love for fresh ingredients',
+    cuisines: ['Health Food', 'Fresh', 'Organic'],
+    restaurants: 3
+  },
+  { 
+    source: '8', target: '9', similarity: 0.76, 
+    reason: 'Both enjoy trying new restaurants every week',
+    cuisines: ['Contemporary', 'Fusion', 'Experimental'],
+    restaurants: 3
+  },
+  { 
+    source: '7', target: '13', similarity: 0.68, 
+    reason: 'Love street tacos and casual dining',
+    cuisines: ['Mexican', 'Street Food', 'Casual'],
+    restaurants: 2
   },
 ];
 

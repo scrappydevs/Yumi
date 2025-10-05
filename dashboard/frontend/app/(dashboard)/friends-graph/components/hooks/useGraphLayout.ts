@@ -85,58 +85,50 @@ export function useGraphLayout() {
   return { layoutNodes, layoutEdges };
 }
 
-// Helper: Calculate force-directed position with spring physics (like auctor-1)
-// Uses ideal distance based on similarity - more similar = closer together
+// Helper: Calculate position based on similarity to current user
+// Higher similarity to current user = closer to center
 function calculateForceDirectedPosition(
   friend: GraphData['friends'][0],
   allFriends: GraphData['friends'],
   similarities: GraphData['similarities'],
   index: number
 ) {
-  // Start with circular layout
-  const radius = 300;
-  const angle = (index / allFriends.length) * 2 * Math.PI;
+  const centerX = 600;
+  const centerY = 500;
   
-  let x = Math.cos(angle) * radius + 500;
-  let y = Math.sin(angle) * radius + 400;
-
-  // Spring-based physics: distance = similarity
-  // High similarity (0.9) → ideal distance = 110px (close)
-  // Medium similarity (0.6) → ideal distance = 200px (medium)
-  // Low similarity (0.3) → ideal distance = 290px (far)
-  similarities.forEach((sim) => {
-    if (sim.source === friend.id || sim.target === friend.id) {
-      const otherUserId = sim.source === friend.id ? sim.target : sim.source;
-      const otherIndex = allFriends.findIndex((f) => f.id === otherUserId);
-      
-      if (otherIndex !== -1) {
-        // Calculate ideal distance based on similarity
-        const idealDistance = 100 + (1.0 - sim.similarity_score) * 200;
-        
-        // Get other node's position
-        const otherAngle = (otherIndex / allFriends.length) * 2 * Math.PI;
-        const otherX = Math.cos(otherAngle) * radius + 500;
-        const otherY = Math.sin(otherAngle) * radius + 400;
-        
-        // Calculate current distance
-        const dx = otherX - x;
-        const dy = otherY - y;
-        const currentDistance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Spring force: pulls nodes to ideal distance
-        if (currentDistance > 0) {
-          const displacement = currentDistance - idealDistance;
-          const force = displacement * sim.similarity_score * 0.3;
-          
-          const forceX = (dx / currentDistance) * force;
-          const forceY = (dy / currentDistance) * force;
-          
-          x += forceX;
-          y += forceY;
-        }
-      }
+  // If this is the current user, place at center
+  if (friend.is_current_user) {
+    return { x: centerX, y: centerY };
+  }
+  
+  // Find similarity score to current user
+  let similarityToCurrentUser = 0.5; // default
+  const currentUser = allFriends.find(f => f.is_current_user);
+  
+  if (currentUser) {
+    const simRecord = similarities.find(
+      sim => 
+        (sim.source === currentUser.id && sim.target === friend.id) ||
+        (sim.target === currentUser.id && sim.source === friend.id)
+    );
+    
+    if (simRecord) {
+      similarityToCurrentUser = simRecord.similarity_score;
     }
-  });
+  }
+  
+  // Calculate distance from current user based on similarity
+  // Higher similarity (0.8+) → distance = 200px (very close to center)
+  // Medium similarity (0.5-0.7) → distance = 350px (medium distance)
+  // Low similarity (0.3) → distance = 500px (far from center)
+  // Formula: Higher similarity = CLOSER to current user
+  const distanceFromCenter = 500 - (similarityToCurrentUser * 300);
+  
+  // Distribute friends in circular pattern around center
+  const angle = (index / (allFriends.length - 1)) * 2 * Math.PI; // Exclude current user from count
+  
+  const x = centerX + Math.cos(angle) * distanceFromCenter;
+  const y = centerY + Math.sin(angle) * distanceFromCenter;
 
   return { x, y };
 }

@@ -186,20 +186,20 @@ export default function DiscoverPage() {
   const [expandedOnce, setExpandedOnce] = useState(false);
   const [absorbedIndices, setAbsorbedIndices] = useState<number[]>([]);
   const [isMuted, setIsMuted] = useState(false);
-  const [currentPhrase, setCurrentPhrase] = useState('Finding the perfect spot for you');
+  const [currentPhrase, setCurrentPhrase] = useState('Searching nearby restaurants');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [glowingIndices, setGlowingIndices] = useState<Set<number>>(new Set());
 
   // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
   const loadingPhrases = useMemo(() => [
-    'Finding the perfect spot for you',
-    'Reading the culinary landscape',
-    'Consulting the food gods',
-    'Matching your vibe',
-    'Uncovering hidden gems',
-    'Decoding your taste DNA',
-    'Scanning the flavor matrix',
-    'Channeling your cravings',
+    'Searching nearby restaurants',
+    'Analyzing your taste profile',
+    'Computing compatibility scores',
+    'Ranking recommendations',
+    'Evaluating cuisine matches',
+    'Processing restaurant data',
+    'Matching atmosphere preferences',
+    'Reviewing dining patterns',
   ], []);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [allNearbyImages, setAllNearbyImages] = useState<Array<{url: string, name: string, id: string, index?: number}>>([]);
@@ -263,16 +263,25 @@ export default function DiscoverPage() {
       } else if (showingResults) {
         speed = 0.6;  // Slower when showing results
       } else {
-        // Latent state: SUPER fast for first 2 cycles, then slow down
-        speed = rotationCyclesRef.current < 1 ? 5.0 : 0.8;
+        // Latent state: SUPER fast for first 0.7 cycles, then gradually slow down
+        if (rotationCyclesRef.current < 0.7) {
+          speed = 5.0;  // Fast speed
+        } else {
+          // Gradually slow down over the next 0.3 cycles
+          const slowdownProgress = Math.min((rotationCyclesRef.current - 0.7) / 0.3, 1);
+          speed = 5.0 - (4.2 * slowdownProgress);  // Interpolate from 5.0 to 0.8
+        }
       }
       
       setRotation((prev) => {
         const newRotation = (prev + speed) % 360;
-        // Track complete cycles (when we pass 360/0 degrees)
-        if (prev > newRotation && !isThinking && !showingResults) {
-          rotationCyclesRef.current += 1;
-          console.log(`🔄 Rotation cycle complete! Count: ${rotationCyclesRef.current}, Speed will be: ${rotationCyclesRef.current < 1 ? 5.0 : 0.8}`);
+        // Track fractional cycle progress in latent mode
+        if (!isThinking && !showingResults) {
+          rotationCyclesRef.current += speed / 360;
+          // Log on whole number crossings
+          if (Math.floor(prev / 360) < Math.floor((prev + speed) / 360)) {
+            console.log(`🔄 Rotation cycle milestone! Count: ${rotationCyclesRef.current.toFixed(2)}, Current speed: ${speed.toFixed(2)}`);
+          }
         }
         return newRotation;
       });
@@ -340,11 +349,11 @@ export default function DiscoverPage() {
           .single();
 
         if (profile?.friends && profile.friends.length > 0) {
-          // Fetch friend profiles (limit to 6 for cleaner orbit)
+          // Fetch all friend profiles
           const { data: friends } = await supabase
             .from('profiles')
             .select('id, username, display_name, avatar_url')
-            .in('id', profile.friends.slice(0, 6));
+            .in('id', profile.friends);
 
           if (friends) {
             // Sort by ID to maintain consistent positioning (prevent random swaps)
@@ -498,8 +507,18 @@ export default function DiscoverPage() {
     
     const searchQuery = prompt;  // Save the query before clearing
     const searchMentions = [...mentions];  // Save mentions before clearing
+    const searchMentionedFriends = [...mentionedFriendsData];  // Save mentioned friends to keep them visible
     setPrompt('');  // Clear the input immediately
-    setMentions([]);  // Clear mentions (but keep mentionedFriendsData to show in orbit)
+    setMentions([]);  // Clear mentions from input
+    
+    // Keep mentioned friends visible during search - restore immediately after useEffect clears it
+    // Use setTimeout to restore after the useEffect has run
+    setTimeout(() => {
+      if (searchMentionedFriends.length > 0) {
+        setMentionedFriendsData(searchMentionedFriends);
+      }
+    }, 0);
+    
     setIsThinking(true);
     setShowingResults(false);  // Reset results state
     setIsNarrowing(false);  // Reset narrowing state
@@ -544,7 +563,7 @@ export default function DiscoverPage() {
       
       // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
       // Step 1: Finding restaurants
-      const step1Text = 'Finding restaurants nearby';
+      const step1Text = 'Searching nearby restaurants';
       setCurrentPhrase(step1Text);
       if (!isMuted) {
         await speak(step1Text);
@@ -554,7 +573,7 @@ export default function DiscoverPage() {
       nearbyFormData.append('latitude', coords.lat.toString());
       nearbyFormData.append('longitude', coords.lng.toString());
       nearbyFormData.append('radius', '2000');
-      nearbyFormData.append('limit', '20');
+      nearbyFormData.append('limit', '25');
       
       const nearbyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -588,18 +607,18 @@ export default function DiscoverPage() {
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
-        // Show only ~10-15 images initially (so animation has images to swap in/out)
-        const initialCount = Math.min(15, allImages.length);
+        // Show up to 20 images initially (or all if fewer)
+        const initialCount = Math.min(20, allImages.length);
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
-        // Wait for "Finding restaurants nearby" speech to complete
+        // Wait for "Searching nearby restaurants" speech to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Step 2: Analyzing food preferences (don't await - let it happen in parallel)
         const step2Text = isGroupSearch 
-          ? "Analyzing everyone's food preferences"
-          : 'Analyzing your food preferences';
+          ? "Analyzing group taste profiles"
+          : 'Analyzing your taste profile';
         setCurrentPhrase(step2Text);
         if (!isMuted) {
           speak(step2Text);  // No await - don't block LLM call!
@@ -687,7 +706,7 @@ export default function DiscoverPage() {
             setCurrentPhrase(noResultsText);
             setIsThinking(false);
             setShowingResults(false);
-            setMentionedFriendsData([]);  // Clear mentioned friends
+            // Keep mentioned friends visible even when no results
             if (!isMuted) {
               await speak(noResultsText);
             }
@@ -711,8 +730,8 @@ export default function DiscoverPage() {
           
           console.log(`🎯 Found top ${finalCount}: ${topIds.join(', ')}`);
           
-          // Update status to "Narrowing down"
-          setCurrentPhrase('Narrowing down');
+          // Update status to "Finalizing recommendations"
+          setCurrentPhrase('Finalizing recommendations');
           setIsNarrowing(true);  // Enable narrowing mode for different exit animation
           
           // Build current pool of images
@@ -813,8 +832,8 @@ export default function DiscoverPage() {
           // Use the processed restaurants (with fallback images)
           setSearchResults(restaurantsWithIds.slice(0, finalCount));
           
-          // Clear mentioned friends data after results are shown
-          setMentionedFriendsData([]);
+          // Keep mentioned friends visible after results are shown
+          // setMentionedFriendsData([]); // REMOVED - keep friends visible
           
           // Speak result if not muted - ensure TTS matches displayed text
           if (!isMuted) {
@@ -832,7 +851,7 @@ export default function DiscoverPage() {
           setCurrentPhrase(noResultsText);
           setIsThinking(false);
           setShowingResults(false);
-          setMentionedFriendsData([]);  // Clear mentioned friends
+          // Keep mentioned friends visible even when no results
           if (!isMuted) {
             await speak(noResultsText);
           }
@@ -848,7 +867,7 @@ export default function DiscoverPage() {
         setCurrentPhrase(noImagesText);
         setIsThinking(false);
         setShowingResults(false);
-        setMentionedFriendsData([]);
+        // Keep mentioned friends visible even when no images
         if (!isMuted) {
           await speak(noImagesText);
         }
@@ -869,7 +888,7 @@ export default function DiscoverPage() {
       setSearchError(errorText);
       setCurrentPhrase('Sorry, something went wrong');
       setIsThinking(false);
-      setMentionedFriendsData([]);  // Clear mentioned friends on error
+      // Keep mentioned friends visible even on error
       
       // Clear timeout on error
       clearTimeout(timeoutId);
@@ -910,7 +929,7 @@ export default function DiscoverPage() {
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
-      formData.append('limit', '25');  // Fetch 25 since we filter for cuisine/description
+      formData.append('limit', '15');  // Fetch 25 since we filter for cuisine/description
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -1220,11 +1239,11 @@ export default function DiscoverPage() {
               zIndex: 5,
             }}
           >
-            {/* Subtle glow */}
+            {/* Subtle purple glow */}
             <motion.div
               className="absolute inset-0 rounded-full"
               animate={{
-                opacity: [0.15, 0.25, 0.15],
+                opacity: [0.5, 0.25, 0.5],
                 scale: [1, 1.1, 1],
               }}
               transition={{
@@ -1233,7 +1252,7 @@ export default function DiscoverPage() {
                 ease: "easeInOut"
               }}
               style={{
-                background: 'radial-gradient(circle at center, rgba(200, 200, 220, 0.2), transparent 70%)',
+                background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0.3), rgba(168, 85, 247, 0.2), transparent 0%)',
                 filter: 'blur(20px)',
               }}
             />
@@ -1276,8 +1295,8 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              // Different radius for each state: thinking (420), results (200), latent (300)
-              const baseRadius = isThinking ? 380 : showingResults ? 300 : 300;
+              // Different radius for each state: thinking (larger), results (medium), latent (medium)
+              const baseRadius = isThinking ? 440 : showingResults ? 360 : 320;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1307,9 +1326,9 @@ export default function DiscoverPage() {
                     transition: { duration: 0.4, ease: 'easeOut' }
                   }}
                   transition={{
-                    // Instant movement during fast rotation (< 2 cycles), smooth during slow rotation
-                    left: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
-                    top: { duration: rotationCyclesRef.current < 1 ? 0 : 0, ease: 'linear' },
+                    // Instant movement during fast rotation (< 0.7 cycles), smooth during slow rotation
+                    left: { duration: rotationCyclesRef.current < 0.7 ? 0 : 0, ease: 'linear' },
+                    top: { duration: rotationCyclesRef.current < 0.7 ? 0 : 0, ease: 'linear' },
                     opacity: { duration: 0.4, ease: 'easeInOut' },
                     scale: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] },
                     // No delay - all images appear at once to prevent repositioning
@@ -1321,7 +1340,7 @@ export default function DiscoverPage() {
                   }}
                 >
                   <motion.div
-                    className="rounded-2xl p-2.5 shadow-medium cursor-pointer relative overflow-hidden"
+                    className="rounded-2xl p-2 shadow-medium cursor-pointer relative overflow-hidden"
                     style={{
                       background: 'rgba(255, 255, 255, 0.35)',
                       backdropFilter: 'blur(30px) saturate(180%)',
@@ -1379,12 +1398,12 @@ export default function DiscoverPage() {
                         alt={item.name}
                         className="object-cover rounded-xl"
                         style={{
-                          width: '112px',
-                          height: '112px',
-                          minWidth: '112px',
-                          minHeight: '112px',
-                          maxWidth: '112px',
-                          maxHeight: '112px',
+                          width: '100px',
+                          height: '100px',
+                          minWidth: '100px',
+                          minHeight: '100px',
+                          maxWidth: '100px',
+                          maxHeight: '100px',
                           boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.08)',
                         }}
                       />
@@ -1429,9 +1448,11 @@ export default function DiscoverPage() {
             // Hide non-mentioned friends during thinking/results
             if (!isMentioned && (isThinking || showingResults)) return null;
             
-            // Calculate position on inner circle (radius 150)
-            const angle = ((index / friendsData.length) * 360 + rotation * 0.7) * (Math.PI / 180); // Slower rotation
-            const friendRadius = 150;
+            // Calculate position - mentioned friends go to middle orbit and rotate with images when thinking
+            // When thinking: rotate with food images (same speed), otherwise: slower independent rotation
+            const rotationSpeed = (isThinking || showingResults) && isMentioned ? rotation : rotation * 0.7;
+            const angle = ((index / friendsData.length) * 360 + rotationSpeed) * (Math.PI / 180);
+            const friendRadius = isMentioned ? 230 : 150; // Middle orbit for mentioned, inner for others
             const x = 350 + Math.cos(angle) * friendRadius;
             const y = 350 + Math.sin(angle) * friendRadius;
             
@@ -1463,7 +1484,7 @@ export default function DiscoverPage() {
                   marginLeft: `${marginOffset}px`,
                   marginTop: `${marginOffset}px`,
                   zIndex: isMentioned ? 10 : 5,
-                  cursor: 'pointer',
+                  cursor: (isThinking || showingResults) ? 'default' : 'pointer',
                 }}
                 onMouseEnter={async () => {
                   // Fetch friend's recent activity
@@ -1490,11 +1511,39 @@ export default function DiscoverPage() {
                   }
                 }}
                 onMouseLeave={() => setHoveredFriend(null)}
+                onClick={() => {
+                  // Don't allow toggling mentions during thinking or results
+                  if (isThinking || showingResults) {
+                    console.log('⚠️ Cannot toggle mentions while AI is thinking or showing results');
+                    return;
+                  }
+                  
+                  // Toggle mention when clicking on friend avatar
+                  if (isMentioned) {
+                    // Remove mention
+                    setMentions(mentions.filter(m => m.id !== friend.id));
+                    // Remove from prompt text
+                    const mentionText = `@${friend.username}`;
+                    setPrompt(prompt.replace(mentionText, '').trim());
+                    console.log(`❌ Removed mention: ${friend.username}`);
+                  } else {
+                    // Add mention
+                    const newMention: Mention = {
+                      id: friend.id,
+                      username: friend.username,
+                      display_name: friend.display_name || null
+                    };
+                    setMentions([...mentions, newMention]);
+                    // Add to prompt text
+                    setPrompt(prompt ? `${prompt} @${friend.username}` : `@${friend.username}`);
+                    console.log(`✅ Added mention: ${friend.username}`);
+                  }
+                }}
               >
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full transition-transform hover:scale-105">
                   {/* Liquid glass container with gradient border - enhanced for mentioned friends */}
                   <div 
-                    className="absolute inset-0 rounded-full"
+                    className="absolute inset-0 rounded-full transition-all"
                     style={{
                       background: isMentioned 
                         ? 'linear-gradient(135deg, rgba(155, 135, 245, 0.9), rgba(99, 102, 241, 0.9))'
@@ -1519,21 +1568,19 @@ export default function DiscoverPage() {
                     </div>
                   </div>
                   
-                  {/* "Searching for" indicator for mentioned friends */}
-                  {isMentioned && (
-                    <motion.div
-                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap"
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      style={{
-                        background: 'rgba(155, 135, 245, 0.95)',
-                        color: 'white',
-                        boxShadow: '0 2px 8px rgba(155, 135, 245, 0.4)',
-                      }}
-                    >
-                      Included
-                    </motion.div>
-                  )}
+                  {/* Click indicator badge */}
+                  <motion.div
+                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap pointer-events-none"
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      background: isMentioned ? 'rgba(155, 135, 245, 0.95)' : 'rgba(100, 100, 120, 0.8)',
+                      color: 'white',
+                      boxShadow: isMentioned ? '0 2px 8px rgba(155, 135, 245, 0.4)' : '0 2px 6px rgba(0, 0, 0, 0.2)',
+                    }}
+                  >
+                    {isMentioned ? 'Included' : (isThinking || showingResults) ? '' : 'Click to add'}
+                  </motion.div>
 
                   {/* Small name label on hover */}
                   {hoveredFriend?.id === friend.id && (
