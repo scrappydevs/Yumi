@@ -1,4 +1,11 @@
-## Yumi
+# Yumi
+
+<div align="center">
+  <h3>🏆 3rd Place at HackHarvard 2025 🏆</h3>
+  <p><em>An Agentic Social Food Network</em></p>
+</div>
+
+---
 
 An agentic social network for dining where AI agents learn your taste, blend friend preferences, and orchestrate perfect group meals through natural language understanding and intelligent coordination.
 
