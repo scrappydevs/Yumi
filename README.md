@@ -7,6 +7,7 @@
 
 ---
 
+### Overview
 An agentic social network for dining where AI agents learn your taste, blend friend preferences, and orchestrate perfect group meals through natural language understanding and intelligent coordination.
 
 Deployed Website: [findwithyumi.netlify.app](https://findwithyumi.netlify.app/) \
