@@ -12,8 +12,8 @@ class NetworkService {
     static let shared = NetworkService()
 
     // Backend URL - Using ngrok tunnel to local backend
-    //private let baseURL = "https://unsliding-deena-unsportful.ngrok-free.dev"
-    private let baseURL = "https://yummy-wehd.onrender.com"
+    private let baseURL = "https://unsliding-deena-unsportful.ngrok-free.dev"
+    //private let baseURL = "https://yummy-wehd.onrender.com"
     private init() {}
 
     // MARK: - Flexible Date Decoding Strategy
@@ -281,6 +281,45 @@ class NetworkService {
         return graphData
     }
     
+    // MARK: - Taste Profile Text
+    func fetchTasteProfileText(authToken: String, useCache: Bool = true) async throws -> TasteProfileTextResponse {
+        // Try loading from cache first
+        if useCache, let cachedText = CacheService.shared.loadCachedTasteProfileText() {
+            print("✅ [TASTE PROFILE TEXT] Loaded from cache")
+            return cachedText
+        }
+        
+        print("🌐 [TASTE PROFILE TEXT] Fetching from API...")
+        let url = URL(string: "\(baseURL)/api/profile/taste-profile-text")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            print("❌ [TASTE PROFILE TEXT] Server error: \(httpResponse.statusCode)")
+            if let responseText = String(data: data, encoding: .utf8) {
+                print("❌ [TASTE PROFILE TEXT] Response: \(responseText)")
+            }
+            throw NetworkError.serverError(statusCode: httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        let profileResponse = try decoder.decode(TasteProfileTextResponse.self, from: data)
+        print("✅ [TASTE PROFILE TEXT] Received profile text (\(profileResponse.profileText.count) chars)")
+        
+        // Cache the results
+        CacheService.shared.cacheTasteProfileText(profileResponse)
+        
+        return profileResponse
+    }
+    
     // MARK: - Friends Management
     
     // Fetch current user's profile
@@ -502,13 +541,22 @@ class NetworkService {
         }
         
         let decoder = JSONDecoder()
-        let discoverResponse = try decoder.decode(DiscoverResponse.self, from: data)
-        print("✅ [DISCOVER-iOS] Received \(discoverResponse.restaurants.count) restaurants")
-        
-        // Cache the results
-        CacheService.shared.cacheDiscoverRestaurants(discoverResponse)
-        
-        return discoverResponse
+            let discoverResponse = try decoder.decode(DiscoverResponse.self, from: data)
+            print("✅ [DISCOVER-iOS] Received \(discoverResponse.restaurants.count) restaurants")
+            
+            // Debug: Log reasoning data
+            for (index, restaurant) in discoverResponse.restaurants.enumerated() {
+                if let reasoning = restaurant.reasoning {
+                    print("✅ [DISCOVER-iOS] Restaurant \(index + 1): \(restaurant.name) - Reasoning: \(reasoning)")
+                } else {
+                    print("❌ [DISCOVER-iOS] Restaurant \(index + 1): \(restaurant.name) - NO REASONING")
+                }
+            }
+            
+            // Cache the results
+            CacheService.shared.cacheDiscoverRestaurants(discoverResponse)
+            
+            return discoverResponse
     }
     
     // MARK: - Haversine Distance Helper
@@ -605,6 +653,16 @@ class NetworkService {
         do {
             let searchResponse = try decoder.decode(SearchResponse.self, from: data)
             print("✅ [SEARCH-iOS] Successfully decoded response")
+            
+            // Debug: Log reasoning data
+            for (index, restaurant) in searchResponse.topRestaurants.enumerated() {
+                if let reasoning = restaurant.reasoning {
+                    print("✅ [SEARCH-iOS] Restaurant \(index + 1): \(restaurant.name) - Reasoning: \(reasoning)")
+                } else {
+                    print("❌ [SEARCH-iOS] Restaurant \(index + 1): \(restaurant.name) - NO REASONING")
+                }
+            }
+            
             return DiscoverResponse(
                 status: searchResponse.status,
                 restaurants: searchResponse.topRestaurants,

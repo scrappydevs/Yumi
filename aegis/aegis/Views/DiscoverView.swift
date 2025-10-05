@@ -331,6 +331,37 @@ struct RestaurantCard: View {
                     .lineLimit(3)
             }
             
+            // Recommendation Reasoning
+            if let reasoning = restaurant.reasoning, !reasoning.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(.blue)
+                            .font(.caption)
+                        Text("Why we recommend this:")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+                    }
+                    Text(reasoning)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                }
+                .padding(.vertical, 4)
+                .onAppear {
+                    print("✅ [DISCOVER] Showing reasoning for \(restaurant.name): \(reasoning)")
+                }
+            } else {
+                // Debug: Show when reasoning is missing
+                Text("No reasoning available")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .onAppear {
+                        print("❌ [DISCOVER] No reasoning for \(restaurant.name)")
+                    }
+            }
+            
             // Address
             if let address = restaurant.address {
                 Text(address)

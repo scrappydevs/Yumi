@@ -18,6 +18,7 @@ class CacheService {
     private enum CacheKey: String {
         case reviews = "cached_reviews"
         case tasteProfile = "cached_taste_profile"
+        case tasteProfileText = "cached_taste_profile_text"
         case discoverRestaurants = "cached_discover_restaurants"
         case lastCacheUpdate = "last_cache_update"
     }
@@ -25,6 +26,7 @@ class CacheService {
     // Cache expiry durations (in seconds)
     private let reviewsCacheExpiry: TimeInterval = 300 // 5 minutes
     private let tasteProfileCacheExpiry: TimeInterval = 600 // 10 minutes
+    private let tasteProfileTextCacheExpiry: TimeInterval = 600 // 10 minutes
     private let discoverCacheExpiry: TimeInterval = 1800 // 30 minutes
     
     // MARK: - File Manager Helper
@@ -161,6 +163,19 @@ class CacheService {
     
     func clearTasteProfileCache() {
         clearCache(for: .tasteProfile)
+    }
+    
+    // MARK: - Taste Profile Text Caching
+    func cacheTasteProfileText(_ profileText: TasteProfileTextResponse) {
+        saveToCache(profileText, key: .tasteProfileText)
+    }
+    
+    func loadCachedTasteProfileText() -> TasteProfileTextResponse? {
+        return loadFromCache(TasteProfileTextResponse.self, key: .tasteProfileText, expiryDuration: tasteProfileTextCacheExpiry)
+    }
+    
+    func clearTasteProfileTextCache() {
+        clearCache(for: .tasteProfileText)
     }
     
     // MARK: - Public API - Discover Restaurants

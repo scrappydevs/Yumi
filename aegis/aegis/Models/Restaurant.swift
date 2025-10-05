@@ -87,3 +87,16 @@ struct LocationCoordinates: Codable {
     let latitude: Double
     let longitude: Double
 }
+
+// MARK: - Taste Profile Text Response
+struct TasteProfileTextResponse: Codable {
+    let status: String
+    let profileText: String
+    let hasProfile: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case status
+        case profileText = "profile_text"
+        case hasProfile = "has_profile"
+    }
+}

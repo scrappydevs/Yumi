@@ -72,6 +72,11 @@ struct TasteProfileView: View {
     private func graphView(graphData: FoodGraphData) -> some View {
         ScrollView {
             VStack(spacing: 20) {
+                // AI Taste Profile Section
+                if let profileText = viewModel.tasteProfileText {
+                    tasteProfileCard(profileText: profileText)
+                }
+                
                 // Stats header card
                 statsCard(stats: graphData.stats)
                 
@@ -204,6 +209,36 @@ struct TasteProfileView: View {
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 2)
         }
+    }
+    
+    // MARK: - Taste Profile Card
+    @ViewBuilder
+    private func tasteProfileCard(profileText: String) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.blue)
+                    .font(.title2)
+                
+                Text("AI Taste Profile")
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+            }
+            
+            Text(profileText)
+                .font(.system(.body, design: .rounded))
+                .foregroundColor(.secondary)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 2)
     }
     
     // MARK: - Loading State

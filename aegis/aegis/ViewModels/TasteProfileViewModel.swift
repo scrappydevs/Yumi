@@ -11,6 +11,7 @@ import SwiftUI
 @MainActor
 class TasteProfileViewModel: ObservableObject {
     @Published var graphData: FoodGraphData?
+    @Published var tasteProfileText: String?
     @Published var nodePositions: [Int: NodePosition] = [:]
     @Published var isLoading: Bool = false
     @Published var error: String?
@@ -38,12 +39,23 @@ class TasteProfileViewModel: ObservableObject {
         error = nil
         
         do {
-            let data = try await networkService.fetchFoodGraph(
+            // Load both graph data and taste profile text in parallel
+            async let graphData = networkService.fetchFoodGraph(
                 authToken: authToken,
                 minSimilarity: minSimilarity,
                 useCache: !bypassCache
             )
+            
+            async let profileTextResponse = networkService.fetchTasteProfileText(
+                authToken: authToken,
+                useCache: !bypassCache
+            )
+            
+            // Wait for both to complete
+            let (data, textResponse) = try await (graphData, profileTextResponse)
+            
             self.graphData = data
+            self.tasteProfileText = textResponse.hasProfile ? textResponse.profileText : nil
             
             // Initialize node positions
             initializeNodePositions(for: data.nodes)
@@ -52,6 +64,7 @@ class TasteProfileViewModel: ObservableObject {
             startPhysicsSimulation()
             
             print("✅ Loaded graph: \(data.nodes.count) nodes, \(data.edges.count) edges \(bypassCache ? "(fresh)" : "(cached or fresh)")")
+            print("✅ Loaded taste profile text: \(textResponse.profileText.count) chars")
         } catch {
             self.error = "Failed to load graph: \(error.localizedDescription)"
             print("❌ Graph load error: \(error)")

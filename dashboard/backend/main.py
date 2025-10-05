@@ -703,6 +703,176 @@ async def get_food_graph(
             status_code=500, detail=f"Failed to generate food graph: {str(e)}")
 
 
+def create_taste_profile_summary(profile_text: str) -> str:
+    """
+    Create a concise summary of the taste profile for iOS display.
+    Extracts key preferences and creates a short, readable summary.
+    
+    Args:
+        profile_text: Full taste profile text from database
+        
+    Returns:
+        Shortened, summarized version for mobile display
+    """
+    if not profile_text or len(profile_text.strip()) < 50:
+        return ""
+    
+    # Extract key elements using simple text processing
+    text = profile_text.lower()
+    
+    # Find cuisine preferences
+    cuisines = []
+    cuisine_keywords = {
+        'thai': 'Thai', 'japanese': 'Japanese', 'italian': 'Italian', 
+        'chinese': 'Chinese', 'mexican': 'Mexican', 'indian': 'Indian',
+        'american': 'American', 'french': 'French', 'korean': 'Korean',
+        'vietnamese': 'Vietnamese', 'greek': 'Greek', 'spanish': 'Spanish'
+    }
+    
+    for keyword, display_name in cuisine_keywords.items():
+        if keyword in text and display_name not in cuisines:
+            cuisines.append(display_name)
+    
+    # Find atmosphere preferences
+    atmospheres = []
+    atmosphere_keywords = {
+        'casual': 'casual', 'upscale': 'upscale', 'romantic': 'romantic',
+        'cozy': 'cozy', 'modern': 'modern', 'traditional': 'traditional',
+        'outdoor': 'outdoor seating', 'intimate': 'intimate'
+    }
+    
+    for keyword, display_name in atmosphere_keywords.items():
+        if keyword in text and display_name not in atmospheres:
+            atmospheres.append(display_name)
+    
+    # Find price preferences
+    price_preference = ""
+    if '$$' in profile_text or 'mid-range' in text:
+        price_preference = "mid-range"
+    elif '$$$' in profile_text or 'upscale' in text:
+        price_preference = "upscale"
+    elif '$' in profile_text or 'budget' in text:
+        price_preference = "budget-friendly"
+    
+    # Build summary
+    summary_parts = []
+    
+    # Cuisine summary
+    if cuisines:
+        if len(cuisines) == 1:
+            summary_parts.append(f"love {cuisines[0]} cuisine")
+        elif len(cuisines) == 2:
+            summary_parts.append(f"enjoy {cuisines[0]} and {cuisines[1]} cuisine")
+        else:
+            # For 3+ cuisines, be more specific
+            cuisine_list = ", ".join(cuisines[:3])  # Show up to 3
+            if len(cuisines) > 3:
+                cuisine_list += f" and {len(cuisines) - 3} other cuisines"
+            summary_parts.append(f"enjoy {cuisine_list}")
+    
+    # Atmosphere summary
+    if atmospheres:
+        if len(atmospheres) == 1:
+            summary_parts.append(f"prefer {atmospheres[0]} dining atmospheres")
+        elif len(atmospheres) == 2:
+            summary_parts.append(f"prefer {atmospheres[0]} and {atmospheres[1]} dining")
+        else:
+            # For 3+ atmospheres, be more descriptive
+            atm_list = ", ".join(atmospheres[:2])
+            summary_parts.append(f"prefer {atm_list} and other comfortable dining settings")
+    
+    # Price summary
+    if price_preference:
+        summary_parts.append(f"likes {price_preference} restaurants")
+    
+    # Combine into readable summary
+    if summary_parts:
+        summary = "You " + ", ".join(summary_parts) + "."
+        # Target length for 2 lines on mobile (around 150-200 characters)
+        if len(summary) > 200:
+            # Take first two parts for more detail
+            if len(summary_parts) >= 2:
+                summary = f"You {summary_parts[0]} and {summary_parts[1]}."
+            else:
+                # If only one part, truncate it to fit 2 lines
+                summary = f"You {summary_parts[0]}."
+                if len(summary) > 200:
+                    summary = summary[:197] + "..."
+        return summary
+    
+    # Fallback: create a 2-line summary from first two sentences
+    sentences = [s.strip() for s in profile_text.split('.') if s.strip()]
+    if sentences:
+        if len(sentences) >= 2:
+            # Combine first two sentences for 2-line summary
+            summary = f"{sentences[0]}. {sentences[1]}."
+            if len(summary) > 200:
+                summary = summary[:197] + "..."
+            return summary
+        else:
+            # Single sentence - make it more descriptive if too short
+            first_sentence = sentences[0]
+            if len(first_sentence) > 200:
+                return first_sentence[:197] + "..."
+            elif len(first_sentence) < 80:
+                # If too short, try to add more context
+                return f"You have diverse taste preferences. {first_sentence}"
+            return first_sentence
+    
+    return ""
+
+
+@app.get("/api/profile/taste-profile-text")
+async def get_taste_profile_text(
+    user_id: str = Depends(get_user_id_from_token)
+):
+    """
+    Get user's taste profile as natural language text.
+    
+    Returns:
+        Natural language description of user's food preferences
+    """
+    try:
+        print(f"\n{'='*60}")
+        print(f"[TASTE PROFILE TEXT API] 📝 Getting taste profile text for user: {user_id[:8]}...")
+        print(f"{'='*60}")
+        
+        # Get taste profile service
+        taste_profile_service = get_taste_profile_service()
+        
+        # Get user's taste profile text
+        profile_text = taste_profile_service.get_current_preferences_text(user_id)
+        
+        # Create a summarized version for iOS display (keep original in DB)
+        summarized_text = ""
+        if profile_text:
+            # Extract key preferences and create a concise summary
+            summarized_text = create_taste_profile_summary(profile_text)
+        
+        print(f"[TASTE PROFILE TEXT API] ✅ Profile text retrieved ({len(profile_text)} chars)")
+        print(f"[TASTE PROFILE TEXT API] Summarized to ({len(summarized_text)} chars)")
+        if summarized_text:
+            print(f"[TASTE PROFILE TEXT API] Summary: {summarized_text}")
+        else:
+            print(f"[TASTE PROFILE TEXT API] No profile text found")
+        print(f"{'='*60}\n")
+        
+        return {
+            "status": "success",
+            "profile_text": summarized_text,  # Return summarized version
+            "has_profile": bool(profile_text.strip())
+        }
+        
+    except Exception as e:
+        print(f"[TASTE PROFILE TEXT API ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get taste profile text: {str(e)}"
+        )
+
+
 @app.post("/api/restaurants/search/test")
 async def search_restaurants_test(
     query: str = Form(...),
