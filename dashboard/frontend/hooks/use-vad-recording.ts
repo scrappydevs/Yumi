@@ -156,11 +156,8 @@ export function useVADRecording({
           console.warn('⚠️ No onPartialTranscription callback set!');
         }
       } else {
-        console.warn('⚠️ Transcription response invalid:', {
-          success: data.success,
-          hasText: !!data.text,
-          textTrimmed: data.text?.trim()
-        });
+        // Silence or no speech in this chunk is normal - don't spam warnings
+        console.log('🔇 No speech in this chunk (silence is normal during pauses)');
       }
     } catch (error) {
       console.error('❌❌ Chunk transcription error:', error);
@@ -344,7 +341,19 @@ export function useVADRecording({
           onTranscriptionComplete(data.text);
         }
       } else {
-        throw new Error(data.error || 'Transcription failed');
+        // If no transcription but also no error, it's likely just silence/empty audio
+        if (!data.error || data.error.includes('No audio') || data.error.includes('silence')) {
+          console.log('ℹ️ No speech detected in recording');
+          setState((prev) => ({
+            ...prev,
+            isTranscribing: false,
+          }));
+          if (onTranscriptionComplete) {
+            onTranscriptionComplete(''); // Return empty string instead of throwing
+          }
+        } else {
+          throw new Error(data.error || 'Transcription failed');
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
