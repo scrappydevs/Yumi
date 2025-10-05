@@ -678,8 +678,11 @@ export default function DiscoverPage() {
     setIsNarrowing(false);  // Reset narrowing state
     setSearchError(null);
     setSearchResults([]);
-    setAllNearbyImages([]); // Reset images for new search
-    setVisibleImageIds([]);
+    // DON'T clear images - keep them as placeholders during thinking phase
+    // This allows orbit animation to continue smoothly with existing/default images
+    // New images will replace them when API response arrives
+    // setAllNearbyImages([]); // ❌ REMOVED - was causing empty orbit during thinking
+    // setVisibleImageIds([]); // ❌ REMOVED - was causing empty orbit during thinking
     rotationCyclesRef.current = 0;  // Reset rotation cycles for next latent state
     
     // Check if this is a group search (has mentions)
