@@ -193,14 +193,14 @@ export default function DiscoverPage() {
 
   // Rotating loading phrases - more varied and engaging (useMemo to prevent recreating)
   const loadingPhrases = useMemo(() => [
-    'Finding the perfect spot for you',
-    'Reading the culinary landscape',
-    'Consulting the food gods',
-    'Matching your vibe',
-    'Uncovering hidden gems',
-    'Decoding your taste DNA',
-    'Scanning the flavor matrix',
-    'Channeling your cravings',
+    'Searching nearby restaurants',
+    'Analyzing your taste profile',
+    'Computing compatibility scores',
+    'Ranking recommendations',
+    'Evaluating cuisine matches',
+    'Processing restaurant data',
+    'Matching atmosphere preferences',
+    'Reviewing dining patterns',
   ], []);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [allNearbyImages, setAllNearbyImages] = useState<Array<{url: string, name: string, id: string, index?: number}>>([]);
@@ -564,7 +564,7 @@ export default function DiscoverPage() {
       
       // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
       // Step 1: Finding restaurants
-      const step1Text = 'Finding restaurants nearby';
+      const step1Text = 'Searching nearby restaurants';
       setCurrentPhrase(step1Text);
       if (!isMuted) {
         await speak(step1Text);
@@ -574,7 +574,7 @@ export default function DiscoverPage() {
       nearbyFormData.append('latitude', coords.lat.toString());
       nearbyFormData.append('longitude', coords.lng.toString());
       nearbyFormData.append('radius', '2000');
-      nearbyFormData.append('limit', '20');
+      nearbyFormData.append('limit', '25');
       
       const nearbyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -608,18 +608,18 @@ export default function DiscoverPage() {
         // Just update images - let existing useEffect handle swapping animation
         setAllNearbyImages(allImages);
         
-        // Show only ~3 images initially (so animation has images to swap in/out)
-        const initialCount = Math.min(3, allImages.length);
+        // Show only 1 image initially (so animation has images to swap in/out)
+        const initialCount = Math.min(1, allImages.length);
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
-        // Wait for "Finding restaurants nearby" speech to complete
+        // Wait for "Searching nearby restaurants" speech to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         // Step 2: Analyzing food preferences (don't await - let it happen in parallel)
         const step2Text = isGroupSearch 
-          ? "Analyzing everyone's food preferences"
-          : 'Analyzing your food preferences';
+          ? "Analyzing group taste profiles"
+          : 'Analyzing your taste profile';
         setCurrentPhrase(step2Text);
         if (!isMuted) {
           speak(step2Text);  // No await - don't block LLM call!
@@ -731,8 +731,8 @@ export default function DiscoverPage() {
           
           console.log(`🎯 Found top ${finalCount}: ${topIds.join(', ')}`);
           
-          // Update status to "Narrowing down"
-          setCurrentPhrase('Narrowing down');
+          // Update status to "Finalizing recommendations"
+          setCurrentPhrase('Finalizing recommendations');
           setIsNarrowing(true);  // Enable narrowing mode for different exit animation
           
           // Build current pool of images
@@ -930,7 +930,7 @@ export default function DiscoverPage() {
       formData.append('latitude', coords.lat.toString());
       formData.append('longitude', coords.lng.toString());
       formData.append('radius', '2000');
-      formData.append('limit', '25');  // Fetch 25 since we filter for cuisine/description
+      formData.append('limit', '15');  // Fetch 25 since we filter for cuisine/description
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/restaurants/nearby`, {
         method: 'POST',
@@ -1256,7 +1256,7 @@ export default function DiscoverPage() {
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
               // Different radius for each state: thinking (larger), results (medium), latent (medium)
-              const baseRadius = isThinking ? 440 : showingResults ? 360 : 360;
+              const baseRadius = isThinking ? 440 : showingResults ? 360 : 320;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1300,7 +1300,7 @@ export default function DiscoverPage() {
                   }}
                 >
                   <motion.div
-                    className="rounded-2xl p-2.5 shadow-medium cursor-pointer relative overflow-hidden"
+                    className="rounded-2xl p-2 shadow-medium cursor-pointer relative overflow-hidden"
                     style={{
                       background: 'rgba(255, 255, 255, 0.35)',
                       backdropFilter: 'blur(30px) saturate(180%)',
@@ -1358,12 +1358,12 @@ export default function DiscoverPage() {
                         alt={item.name}
                         className="object-cover rounded-xl"
                         style={{
-                          width: '112px',
-                          height: '112px',
-                          minWidth: '112px',
-                          minHeight: '112px',
-                          maxWidth: '112px',
-                          maxHeight: '112px',
+                          width: '100px',
+                          height: '100px',
+                          minWidth: '100px',
+                          minHeight: '100px',
+                          maxWidth: '100px',
+                          maxHeight: '100px',
                           boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.08)',
                         }}
                       />

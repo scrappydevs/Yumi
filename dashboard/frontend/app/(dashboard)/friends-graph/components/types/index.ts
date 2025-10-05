@@ -20,15 +20,16 @@ export type SimilarityEdgeData = {
   similarityScore: number;
   explanation: string;
   sharedRestaurants: Array<{
-    id: string;
+    place_id: string;
     name: string;
+    cuisine?: string;
   }>;
   sharedCuisines: string[];
   tasteOverlap: {
-    sweet?: number;
-    spicy?: number;
-    savory?: number;
-    sour?: number;
+    shared_atmosphere?: string[];
+    shared_flavors?: string[];
+    price_compatible?: boolean | null;
+    overlap_score?: number;
   };
 };
 

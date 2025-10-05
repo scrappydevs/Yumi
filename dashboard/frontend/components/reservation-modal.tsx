@@ -247,6 +247,13 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const loadReservation = async () => {
     setLoading(true)
     try {
+      // Get current user first
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setCurrentUser(user.id)
+        console.log('👤 Current user set:', user.id)
+      }
+      
       console.log('📥 Loading reservation:', reservationId)
       const data = await apiRequest<ReservationData>(
         API_CONFIG.endpoints.reservations.getById(reservationId!)
@@ -254,8 +261,8 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
       console.log('📊 Reservation loaded:', {
         id: data.id,
         organizer_id: data.organizer_id,
-        currentUser,
-        isOrganizer: data.organizer_id === currentUser
+        currentUser: user?.id,
+        isOrganizer: data.organizer_id === user?.id
       })
       setReservation(data)
     } catch (err) {
