@@ -244,6 +244,12 @@ export default function DiscoverPage() {
         console.log('[Overview] ✨ Auto-tagged friends:', detectedMentions.map(m => m.username).join(', '));
         setMentions(detectedMentions);
         
+        // Add detected friends to wheel
+        console.log('[Overview] 🎡 Adding detected friends to wheel...');
+        for (const mention of detectedMentions) {
+          await addFriendToWheel(mention);
+        }
+        
         // Optional: Speak confirmation if not muted
         if (!isMuted && detectedMentions.length > 0) {
           const friendNames = detectedMentions.map(m => m.display_name || m.username).join(' and ');
@@ -261,6 +267,43 @@ export default function DiscoverPage() {
   const isGroupSearch = mentions.length > 0;
 
   /**
+   * Add manually tagged friend to the orbit wheel if not already present
+   * @param mention - The manually tagged friend mention
+   */
+  const addFriendToWheel = async (mention: Mention) => {
+    try {
+      // Check if friend is already in wheel
+      const alreadyInWheel = friendsData.some(f => f.id === mention.id);
+      if (alreadyInWheel) {
+        console.log(`[Overview] ✓ ${mention.username} already in wheel`);
+        return;
+      }
+
+      console.log(`[Overview] ➕ Adding ${mention.username} to wheel`);
+
+      // Fetch full friend profile
+      const supabase = createClient();
+      const { data: friendProfile } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .eq('id', mention.id)
+        .single();
+
+      if (friendProfile) {
+        // Add to wheel (prepend so they're visible)
+        setFriendsData(prev => {
+          // Limit to 8 total friends in wheel (don't make it too crowded)
+          const newFriends = [friendProfile, ...prev].slice(0, 8);
+          console.log(`[Overview] ✅ Wheel now has ${newFriends.length} friends`);
+          return newFriends;
+        });
+      }
+    } catch (error) {
+      console.error('[Overview] ❌ Error adding friend to wheel:', error);
+    }
+  };
+
+  /**
    * Detect friend mentions in transcribed text using NLP API
    * @param text - The transcribed text to analyze
    * @returns Array of detected mentions
@@ -268,6 +311,11 @@ export default function DiscoverPage() {
   const detectFriendMentions = async (text: string): Promise<Mention[]> => {
     try {
       if (!text.trim() || friendsData.length === 0) {
+        console.warn('[Overview] ⚠️  Cannot detect mentions:', {
+          hasText: !!text.trim(),
+          friendsLoaded: friendsData.length,
+          friendsList: friendsData.map(f => f.username).join(', ')
+        });
         return [];
       }
 
@@ -1924,7 +1972,18 @@ export default function DiscoverPage() {
               <MentionInput
                 value={prompt}
                 onChange={setPrompt}
-                onMentionsChange={(newMentions) => setMentions(newMentions)}
+                onMentionsChange={(newMentions) => {
+                  // Update mentions state
+                  setMentions(newMentions);
+                  
+                  // Add any newly tagged friends to the wheel
+                  const newlyAdded = newMentions.filter(
+                    newMention => !mentions.some(m => m.id === newMention.id)
+                  );
+                  newlyAdded.forEach(mention => {
+                    addFriendToWheel(mention);
+                  });
+                }}
                 mentions={mentions}
                 placeholder={isThinking ? "AI is thinking..." : isRecording ? "Listening..." : "Where should we eat? (Type @ to mention friends)"}
                 disabled={isThinking}

@@ -101,7 +101,10 @@ async def detect_friend_mentions(
 
         friends_text = "\n".join(friends_list)
 
-        # Create LLM prompt for friend detection
+        print(f"[NLP] 📋 Friends available for matching:")
+        print(friends_text)
+
+        # Create LLM prompt for friend detection - IMPROVED with strict matching
         prompt = f"""You are analyzing text to detect friend mentions in a dining/restaurant context.
 
 USER'S TEXT:
@@ -111,15 +114,37 @@ AVAILABLE FRIENDS:
 {friends_text}
 
 TASK:
-Identify which friends (if any) are mentioned in the text in a dining context (eating out, restaurant plans, meals together, etc.).
+Identify ALL friends mentioned in the text in a dining context (eating out, restaurant plans, meals together, etc.).
 
-RULES:
-1. Only match if there's clear dining/restaurant context (e.g., "lunch with", "dinner date with", "sushi with")
-2. Match both usernames and display names (case-insensitive, partial matches OK)
-3. Be lenient with name variations (e.g., "Julian" matches "jul", "julian", "Julian")
-4. Return confidence: "high" (exact match), "medium" (partial match), "low" (uncertain)
-5. DO NOT match if it's just mentioning a person without dining context
-6. DO NOT match if the person is not in the friends list
+CRITICAL MATCHING RULES:
+1. Only match if there's clear dining/restaurant context (e.g., "lunch with", "dinner date with", "sushi with", "eating with")
+2. Match MUST be based on actual name similarity - DON'T match completely different names
+3. **Be lenient with typos and variations of THE SAME NAME**:
+   ✓ "David" matches "david", "Dave", "dave", "dav", "DAVID" (same name, different case/length)
+   ✓ "Julian" matches "julian", "Jul", "jules" (same name, partial)
+   ✓ "data" could be typo for "date" in "date night"
+   ✗ "David" does NOT match "Dheeraj" (completely different names)
+   ✗ "Sarah" does NOT match "Sam" (different names)
+4. Return confidence:
+   - "high": Exact name match (case-insensitive)
+   - "medium": Partial match or typo of THE SAME NAME
+   - "low": Uncertain match
+5. **IMPORTANT**: If there are MULTIPLE friends mentioned (e.g., "lunch with Sarah and Mike"), return ALL of them
+6. Common patterns: "with X", "and X", "X and Y", "with X and Y"
+7. DO NOT match if it's just mentioning a person without dining context
+8. DO NOT match if the person is not in the friends list
+9. **VERIFY**: Check that the name mentioned actually sounds similar to the friend's name or username
+
+GOOD MATCHES:
+- "sushi with Julian" + Friend: Julian Ng-Thow-Hing → ✓ Match Julian (exact)
+- "lunch with Sarah and Mike" + Friends: Sarah, Mike → ✓ Match BOTH (exact)
+- "dinner with dave" + Friend: David Smith → ✓ Match David (variation: Dave/David)
+- "hanging with jul" + Friend: Julian → ✓ Match Julian (partial: jul/Julian)
+
+BAD MATCHES (DON'T DO THESE):
+- "lobster with David" + Friend: Dheeraj → ✗ DON'T match (David ≠ Dheeraj)
+- "sushi with John" + Friend: Julian → ✗ DON'T match (John ≠ Julian)
+- "dinner with Sam" + Friend: Sarah → ✗ DON'T match (Sam ≠ Sarah)
 
 Return ONLY valid JSON (no markdown, no explanations):
 {{
@@ -137,14 +162,16 @@ Return ONLY valid JSON (no markdown, no explanations):
 If no friends are mentioned in a dining context, return: {{"matches": []}}"""
 
         print(f"[NLP] 🤖 Sending to Gemini for analysis...")
+        print(f"[NLP] Using model: gemini-2.5-flash (better reasoning)")
 
-        # Call Gemini service
-        gemini_service = get_gemini_service()
+        # Call Gemini service with BETTER model for accurate name matching (gemini-2.5-flash)
+        gemini_service = get_gemini_service(model_name='gemini-2.5-flash')
         response = gemini_service.model.generate_content(prompt)
         response_text = response.text.strip()
 
         print(f"[NLP] ✅ Gemini response received")
         print(f"[NLP] Response length: {len(response_text)} chars")
+        print(f"[NLP] Raw response: {response_text}")
 
         # Clean markdown formatting if present
         if response_text.startswith("```json"):
