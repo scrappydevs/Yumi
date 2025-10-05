@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { AegisSidebar } from '@/components/aegis-sidebar';
+import { AudioProvider, useAudio } from '@/lib/audio-context';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { isMuted, setIsMuted } = useAudio();
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -29,7 +27,10 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <AegisSidebar 
         isCollapsed={sidebarCollapsed} 
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        isMuted={isMuted}
+        onToggleMute={() => setIsMuted(!isMuted)}
+        isSpeaking={false}
       />
 
       {/* Main Content */}
@@ -37,6 +38,14 @@ export default function DashboardLayout({
         {children}
       </main>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AudioProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </AudioProvider>
   );
 }
 

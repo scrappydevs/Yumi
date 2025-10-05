@@ -20,6 +20,8 @@ import {
   LogOut,
   Calendar,
   Network,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 const SIDEBAR_WIDTH_EXPANDED = '240px';
@@ -28,6 +30,9 @@ const SIDEBAR_WIDTH_COLLAPSED = '60px';
 interface AegisSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  isSpeaking?: boolean;
 }
 
 type NavigationItem = {
@@ -49,7 +54,7 @@ const secondaryNav: NavigationItem[] = [
   { name: 'Profile', icon: User, href: '/profile' },
 ];
 
-export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
+export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleMute, isSpeaking = false }: AegisSidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = React.useState(false);
   const supabase = createClient();
@@ -200,15 +205,37 @@ export function AegisSidebar({ isCollapsed, onToggle }: AegisSidebarProps) {
         })}
       </nav>
 
-      {/* Footer - Logout Button */}
+      {/* Footer - Mute and Logout */}
       <div 
-        className="relative z-50 p-2.5"
+        className="relative z-50 p-2.5 space-y-2"
         style={{
           borderTop: '0.5px solid rgba(148, 163, 184, 0.15)',
           background: 'rgba(248, 250, 252, 0.15)',
           backdropFilter: 'blur(30px) saturate(180%)',
         }}
       >
+        {/* Mute Button */}
+        {onToggleMute && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleMute}
+            className={cn(
+              'w-full rounded-xl transition-all',
+              isCollapsed ? 'justify-center px-0' : 'justify-start gap-2',
+              isMuted ? 'text-red-600 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
+            )}
+          >
+            {isMuted ? (
+              <VolumeX className="h-4 w-4 flex-shrink-0" />
+            ) : (
+              <Volume2 className={cn("h-4 w-4 flex-shrink-0", isSpeaking && "animate-pulse text-purple-600")} />
+            )}
+            {!isCollapsed && <span className="text-sm font-medium">{isMuted ? 'Unmute' : 'Mute'}</span>}
+          </Button>
+        )}
+        
+        {/* Logout Button */}
         <Button
           variant="ghost"
           size="sm"
