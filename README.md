@@ -8,7 +8,7 @@ Figma Deck: [Slides](https://www.figma.com/slides/Ow9o0zbgZ2FhKydvVrlrPD/Untitle
 
 ### Tech Stack
 <div align="center">
-  <img src="Yumi Tech Stack.png" alt="Tech Stack" />
+  <img src="Yumi_Tech_Stack.png" alt="Tech Stack" />
 </div>
 
 **Tech Stack:** Swift, SwiftUI, Python, FastAPI, TypeScript, React, Next.js, Supabase, Google Gemini, Google Places API, ElevenLabs, HuggingFace, Render, Netlify
