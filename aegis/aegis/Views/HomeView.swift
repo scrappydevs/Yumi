@@ -72,7 +72,7 @@ struct HomeView: View {
                         .padding()
                     }
                     .refreshable {
-                        await loadReviews()
+                        await loadReviews(bypassCache: true)
                     }
                 }
             }
@@ -98,7 +98,7 @@ struct HomeView: View {
         }
     }
 
-    private func loadReviews() async {
+    private func loadReviews(bypassCache: Bool = false) async {
         guard let authToken = authService.getAuthToken() else {
             // No auth token, still call callback
             if !hasCalledOnLoaded {
@@ -111,8 +111,8 @@ struct HomeView: View {
 
         isLoading = true
         do {
-            reviews = try await NetworkService.shared.fetchUserReviews(authToken: authToken)
-            print("✅ [HOME] Loaded \(reviews.count) reviews")
+            reviews = try await NetworkService.shared.fetchUserReviews(authToken: authToken, useCache: !bypassCache)
+            print("✅ [HOME] Loaded \(reviews.count) reviews \(bypassCache ? "(fresh)" : "(cached or fresh)")")
         } catch {
             // Don't call onLoaded on cancellation (view was dismissed)
             if (error as NSError).code == NSURLErrorCancelled {

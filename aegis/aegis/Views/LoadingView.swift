@@ -27,7 +27,7 @@ struct LoadingView: View {
             Color.white
                 .ignoresSafeArea()
             
-            // Gemini-style animated orbs in background
+            // AI-style animated orbs in background
             ZStack {
                 // Purple orb
                 Circle()
@@ -89,7 +89,7 @@ struct LoadingView: View {
                 
                 // Yummy Logo with gradient ring
                 ZStack {
-                    // Rotating gradient ring (Gemini-style)
+                    // Rotating gradient ring (AI-style)
                     Circle()
                         .trim(from: 0, to: 0.7)
                         .stroke(
@@ -103,7 +103,7 @@ struct LoadingView: View {
                         .frame(width: 140, height: 140)
                         .rotationEffect(.degrees(rotationAngle))
                     
-                    // Logo
+                    // Yummy Logo
                     Image("yummylogo")
                         .resizable()
                         .scaledToFit()
@@ -127,7 +127,7 @@ struct LoadingView: View {
                     .transition(.opacity)
                     .id("message-\(messageIndex)")
                 
-                // Progress dots (Gemini-style)
+                // Progress dots (AI-style)
                 HStack(spacing: 8) {
                     ForEach(0..<3) { index in
                         Circle()

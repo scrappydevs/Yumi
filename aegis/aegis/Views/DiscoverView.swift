@@ -140,8 +140,8 @@ struct DiscoverView: View {
                     }
                 }
                 .refreshable {
-                    // Pull-to-refresh action
-                    await loadRecommendations()
+                    // Pull-to-refresh action - bypass cache for fresh data
+                    await loadRecommendations(bypassCache: true)
                 }
                 
                 // Search overlay
@@ -172,41 +172,42 @@ struct DiscoverView: View {
         }
     }
     
-    private func loadRecommendations() async {
+    private func loadRecommendations(bypassCache: Bool = false) async {
         isLoading = true
         errorMessage = nil
         
         do {
-            print("🌟 [DISCOVER] Starting to load recommendations...")
+            print("🌟 [DISCOVER-iOS] Starting to load recommendations (iOS-optimized)...")
             
             // Get user's location
             let locationString = try await LocationService.shared.getCurrentLocation()
-            print("📍 [DISCOVER] Location: \(locationString)")
+            print("📍 [DISCOVER-iOS] Location: \(locationString)")
             
             let coords = locationString.split(separator: ",")
             guard coords.count == 2,
                   let latitude = Double(coords[0]),
                   let longitude = Double(coords[1]) else {
-                print("❌ [DISCOVER] Invalid location format")
+                print("❌ [DISCOVER-iOS] Invalid location format")
                 throw NSError(domain: "Invalid location", code: -1)
             }
             
             // Get auth token
             guard let token = await AuthService.shared.getAuthToken() else {
-                print("❌ [DISCOVER] No auth token")
+                print("❌ [DISCOVER-iOS] No auth token")
                 throw NSError(domain: "Not authenticated", code: 401)
             }
             
-            print("🔑 [DISCOVER] Got auth token, calling API...")
+            print("🔑 [DISCOVER-iOS] Got auth token, calling iOS-optimized API...")
             
-            // Fetch recommendations
+            // Fetch recommendations (using iOS-optimized endpoint with 10 candidates)
             let response = try await NetworkService.shared.discoverRestaurants(
                 latitude: latitude,
                 longitude: longitude,
-                authToken: token
+                authToken: token,
+                useCache: !bypassCache
             )
             
-            print("✅ [DISCOVER] Got \(response.restaurants.count) restaurants")
+            print("✅ [DISCOVER-iOS] Got \(response.restaurants.count) restaurants \(bypassCache ? "(fresh)" : "(cached or fresh)")")
             
             restaurants = response.restaurants
             reasoning = response.reasoning ?? ""
@@ -215,12 +216,12 @@ struct DiscoverView: View {
             // Don't call onLoaded on cancellation (view was dismissed)
             if (error as NSError).code == NSURLErrorCancelled || 
                String(describing: error).contains("CancellationError") {
-                print("⚠️ [DISCOVER] Task cancelled, not calling onLoaded")
+                print("⚠️ [DISCOVER-iOS] Task cancelled, not calling onLoaded")
                 return
             }
             
             errorMessage = "Failed to load recommendations: \(error.localizedDescription)"
-            print("❌ [DISCOVER] Error: \(error)")
+            print("❌ [DISCOVER-iOS] Error: \(error)")
         }
         
         isLoading = false
@@ -229,7 +230,7 @@ struct DiscoverView: View {
         if !hasCalledOnLoaded {
             hasCalledOnLoaded = true
             onLoaded?()
-            print("🎯 [DISCOVER] Called onLoaded callback")
+            print("🎯 [DISCOVER-iOS] Called onLoaded callback")
         }
     }
     
@@ -243,7 +244,7 @@ struct DiscoverView: View {
         searchError = nil
         
         do {
-            print("🔍 [SEARCH] Starting search for: '\(searchQuery)'")
+            print("🔍 [SEARCH-iOS] Starting iOS-optimized search for: '\(searchQuery)'")
             
             // Get user's location
             let locationString = try await LocationService.shared.getCurrentLocation()
@@ -259,9 +260,9 @@ struct DiscoverView: View {
                 throw NSError(domain: "Not authenticated", code: 401)
             }
             
-            print("🔍 [SEARCH] Calling search API...")
+            print("🔍 [SEARCH-iOS] Calling iOS-optimized search API (10 candidates)...")
             
-            // Call search endpoint
+            // Call iOS-optimized search endpoint
             let response = try await NetworkService.shared.searchRestaurants(
                 query: searchQuery,
                 latitude: latitude,
@@ -269,12 +270,12 @@ struct DiscoverView: View {
                 authToken: token
             )
             
-            print("✅ [SEARCH] Got \(response.restaurants.count) results")
+            print("✅ [SEARCH-iOS] Got \(response.restaurants.count) results")
             searchResults = response.restaurants
             
         } catch {
             searchError = "Search failed: \(error.localizedDescription)"
-            print("❌ [SEARCH] Error: \(error)")
+            print("❌ [SEARCH-iOS] Error: \(error)")
         }
         
         isSearchLoading = false
@@ -381,12 +382,12 @@ struct SearchOverlay: View {
 
     var body: some View {
         ZStack {
-            // Modern gradient background
+            // Light gradient background matching app design
             LinearGradient(
-                colors: [
-                    Color(red: 0.05, green: 0.05, blue: 0.15),
-                    Color(red: 0.1, green: 0.05, blue: 0.2)
-                ],
+                gradient: Gradient(colors: [
+                    Color(red: 0.95, green: 0.96, blue: 0.98),
+                    Color(red: 0.98, green: 0.95, blue: 0.98)
+                ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -399,12 +400,10 @@ struct SearchOverlay: View {
                 // Top bar with close button
                 HStack {
                     Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .frame(width: 36, height: 36)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .symbolRenderingMode(.hierarchical)
                     }
                     Spacer()
                 }
@@ -418,49 +417,35 @@ struct SearchOverlay: View {
                         VStack(spacing: 12) {
                             if isSearchLoading {
                                 VStack(spacing: 20) {
-                                    // AI-style loading animation
-                                    ZStack {
-                                        Circle()
-                                            .stroke(
-                                                LinearGradient(
-                                                    colors: [.blue, .purple, .pink, .blue],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                ),
-                                                lineWidth: 3
-                                            )
-                                            .frame(width: 50, height: 50)
-                                            .rotationEffect(.degrees(0))
-
-                                        ProgressView()
-                                            .tint(.white)
-                                    }
-                                    .padding(.top, 80)
-
-                                    Text("Searching...")
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
+                                    ProgressView()
+                                        .scaleEffect(1.5)
+                                        .tint(.blue)
+                                    
+                                    Text("Searching for restaurants...")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
                                 }
+                                .padding(.top, 80)
                                 .frame(maxWidth: .infinity)
                             }
                             else if let error = searchError {
                                 VStack(spacing: 16) {
                                     Image(systemName: "exclamationmark.triangle.fill")
                                         .font(.system(size: 50))
-                                        .foregroundStyle(
-                                            LinearGradient(
-                                                colors: [.orange, .red],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
+                                        .foregroundColor(.orange)
                                     Text(error)
-                                        .font(.system(size: 15))
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
                                         .padding(.horizontal, 32)
+                                    
+                                    Button("Try Again") {
+                                        Task { await onSearch() }
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.blue)
                                 }
-                                .padding(.top, 80)
+                                .padding(.top, 60)
                             }
                             else if !searchResults.isEmpty {
                                 ForEach(searchResults) { restaurant in
@@ -473,105 +458,69 @@ struct SearchOverlay: View {
                         .padding(.bottom, 200)
                     }
                 } else {
+                    // Empty state - clean Apple design
+                    VStack(spacing: 32) {
                     Spacer()
 
-                    // Empty state with AI-style design
-                    VStack(spacing: 24) {
-                        // Animated icon
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.blue.opacity(0.3),
-                                            Color.purple.opacity(0.3)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 100, height: 100)
-                                .blur(radius: 20)
+                        // Icon
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 60))
+                            .foregroundColor(.blue)
+                            .padding(.bottom, 8)
 
-                            Image(systemName: "sparkles.rectangle.stack.fill")
-                                .font(.system(size: 50, weight: .light))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.blue, .cyan, .purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        }
+                        VStack(spacing: 12) {
+                            Text("Search for Restaurants")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
 
-                        VStack(spacing: 8) {
-                            Text("AI-Powered Restaurant Search")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-
-                            Text("Discover amazing places to eat")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white.opacity(0.7))
+                            Text("Find amazing places to eat with AI")
+                                .font(.body)
+                                .foregroundColor(.secondary)
                         }
 
                         // Suggestions
-                        VStack(spacing: 8) {
+                        VStack(spacing: 12) {
                             Text("Try searching for:")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
 
-                            HStack(spacing: 8) {
+                            HStack(spacing: 10) {
                                 ForEach(["Italian", "Sushi", "Pizza"], id: \.self) { suggestion in
-                                    Text(suggestion)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 20)
-                                                .fill(Color.white.opacity(0.1))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 20)
-                                                        .stroke(
-                                                            LinearGradient(
-                                                                colors: [.blue.opacity(0.5), .purple.opacity(0.5)],
-                                                                startPoint: .leading,
-                                                                endPoint: .trailing
-                                                            ),
-                                                            lineWidth: 1
-                                                        )
-                                                )
-                                        )
-                                        .onTapGesture {
+                                    Button {
                                             searchQuery = suggestion
                                             Task { await onSearch() }
-                                        }
+                                    } label: {
+                                        Text(suggestion)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.blue)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(Color.white)
+                                            .cornerRadius(20)
+                                            .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                                    }
                                 }
                             }
                         }
+                        
+                        Spacer()
                     }
                     .frame(maxWidth: .infinity)
-
-                    Spacer()
+                    .padding(.horizontal, 32)
                 }
 
-                // Modern search bar
+                // Clean search bar
                 HStack(spacing: 12) {
-                    // Search icon with gradient
-                    Image(systemName: "sparkles")
+                    Image(systemName: "magnifyingglass")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundColor(isSearchFocused.wrappedValue ? .blue : .secondary)
 
-                    TextField("", text: $searchQuery, prompt: Text("Ask me anything about restaurants...")
-                        .foregroundColor(.white.opacity(0.4)))
+                    TextField("", text: $searchQuery, prompt: Text("Search for restaurants...")
+                        .foregroundColor(.secondary))
                         .focused(isSearchFocused)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .onSubmit {
                             Task { await onSearch() }
                         }
@@ -582,7 +531,7 @@ struct SearchOverlay: View {
                             searchQuery = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(.secondary)
                                 .font(.system(size: 18))
                         }
                     }
@@ -590,26 +539,20 @@ struct SearchOverlay: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
                 .background(
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(Color.white.opacity(0.12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: isSearchFocused.wrappedValue ?
-                                            [.blue, .purple, .pink] :
-                                            [Color.white.opacity(0.15), Color.white.opacity(0.15)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    ),
-                                    lineWidth: isSearchFocused.wrappedValue ? 2 : 1
-                                )
-                        )
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white)
                         .shadow(
                             color: isSearchFocused.wrappedValue ?
-                                Color.blue.opacity(0.3) : Color.clear,
-                            radius: 20,
-                            y: 10
+                                Color.blue.opacity(0.2) : Color.black.opacity(0.08),
+                            radius: isSearchFocused.wrappedValue ? 12 : 4,
+                            y: isSearchFocused.wrappedValue ? 4 : 2
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            isSearchFocused.wrappedValue ? Color.blue : Color.clear,
+                            lineWidth: isSearchFocused.wrappedValue ? 2 : 0
                         )
                 )
                 .padding(.horizontal, 16)

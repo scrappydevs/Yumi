@@ -180,6 +180,12 @@ class NetworkService {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let review = try decoder.decode(Review.self, from: data)
+        
+        // Invalidate caches since new review affects both reviews and taste profile
+        CacheService.shared.clearReviewsCache()
+        CacheService.shared.clearTasteProfileCache()
+        print("🔄 [CACHE] Invalidated reviews and taste profile cache after new review")
+        
         return review
     }
 
@@ -207,7 +213,14 @@ class NetworkService {
     }
 
     // MARK: - Fetch User Reviews
-    func fetchUserReviews(authToken: String) async throws -> [Review] {
+    func fetchUserReviews(authToken: String, useCache: Bool = true) async throws -> [Review] {
+        // Try loading from cache first
+        if useCache, let cachedReviews = CacheService.shared.loadCachedReviews() {
+            print("✅ [REVIEWS] Loaded from cache")
+            return cachedReviews
+        }
+        
+        print("🌐 [REVIEWS] Fetching from API...")
         let url = URL(string: "\(baseURL)/api/reviews")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -226,11 +239,22 @@ class NetworkService {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let reviews = try decoder.decode([Review].self, from: data)
+        
+        // Cache the results
+        CacheService.shared.cacheReviews(reviews)
+        
         return reviews
     }
     
     // MARK: - Fetch Food Graph
-    func fetchFoodGraph(authToken: String, minSimilarity: Double = 0.5) async throws -> FoodGraphData {
+    func fetchFoodGraph(authToken: String, minSimilarity: Double = 0.5, useCache: Bool = true) async throws -> FoodGraphData {
+        // Try loading from cache first
+        if useCache, let cachedProfile = CacheService.shared.loadCachedTasteProfile() {
+            print("✅ [TASTE PROFILE] Loaded from cache")
+            return cachedProfile
+        }
+        
+        print("🌐 [TASTE PROFILE] Fetching from API...")
         let url = URL(string: "\(baseURL)/api/food-graph?min_similarity=\(minSimilarity)")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -250,6 +274,10 @@ class NetworkService {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = NetworkService.flexibleDateDecoding
         let graphData = try decoder.decode(FoodGraphData.self, from: data)
+        
+        // Cache the results
+        CacheService.shared.cacheTasteProfile(graphData)
+        
         return graphData
     }
     
@@ -413,9 +441,26 @@ class NetworkService {
     func discoverRestaurants(
         latitude: Double,
         longitude: Double,
-        authToken: String
+        authToken: String,
+        useCache: Bool = true
     ) async throws -> DiscoverResponse {
-        let url = URL(string: "\(baseURL)/api/restaurants/discover")!
+        // Try loading from cache first (only if location hasn't changed significantly)
+        if useCache, let cachedResponse = CacheService.shared.loadCachedDiscoverRestaurants() {
+            // Check if cached location is close enough (within ~500m)
+            let cachedLat = cachedResponse.location.latitude
+            let cachedLon = cachedResponse.location.longitude
+            let distance = haversineDistance(lat1: cachedLat, lon1: cachedLon, lat2: latitude, lon2: longitude)
+            
+            if distance < 500 { // Within 500 meters
+                print("✅ [DISCOVER] Loaded from cache (location similar)")
+                return cachedResponse
+            } else {
+                print("📍 [DISCOVER] Location changed (\(Int(distance))m), fetching fresh data")
+            }
+        }
+        
+        print("🌐 [DISCOVER] Fetching from API...")
+        let url = URL(string: "\(baseURL)/api/restaurants/discover-ios")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
@@ -440,7 +485,7 @@ class NetworkService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
         request.httpBody = body
-        request.timeoutInterval = 60 // LLM can take time (Gemini needs up to 60s)
+        request.timeoutInterval = 45 // iOS-optimized: 10 candidates = faster (was 60s for 50 candidates)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -449,17 +494,35 @@ class NetworkService {
         }
         
         guard httpResponse.statusCode == 200 else {
-            print("❌ [DISCOVER] Server error: \(httpResponse.statusCode)")
+            print("❌ [DISCOVER-iOS] Server error: \(httpResponse.statusCode)")
             if let responseText = String(data: data, encoding: .utf8) {
-                print("❌ [DISCOVER] Response: \(responseText)")
+                print("❌ [DISCOVER-iOS] Response: \(responseText)")
             }
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
         }
         
         let decoder = JSONDecoder()
         let discoverResponse = try decoder.decode(DiscoverResponse.self, from: data)
-        print("✅ [DISCOVER] Received \(discoverResponse.restaurants.count) restaurants")
+        print("✅ [DISCOVER-iOS] Received \(discoverResponse.restaurants.count) restaurants")
+        
+        // Cache the results
+        CacheService.shared.cacheDiscoverRestaurants(discoverResponse)
+        
         return discoverResponse
+    }
+    
+    // MARK: - Haversine Distance Helper
+    private func haversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
+        let R = 6371000.0 // Earth's radius in meters
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLon = (lon2 - lon1) * .pi / 180
+        
+        let a = sin(dLat/2) * sin(dLat/2) +
+                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
+                sin(dLon/2) * sin(dLon/2)
+        let c = 2 * atan2(sqrt(a), sqrt(1-a))
+        
+        return R * c
     }
     
     // MARK: - Search Restaurants
@@ -469,7 +532,7 @@ class NetworkService {
         longitude: Double,
         authToken: String
     ) async throws -> DiscoverResponse {
-        let url = URL(string: "\(baseURL)/api/restaurants/search")!
+        let url = URL(string: "\(baseURL)/api/restaurants/search-ios")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
@@ -500,7 +563,7 @@ class NetworkService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
         request.httpBody = body
-        request.timeoutInterval = 80 // LLM can take time (Gemini needs up to 60s)
+        request.timeoutInterval = 60 // iOS-optimized: 10 candidates = faster (was 80s for 50 candidates)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -509,16 +572,16 @@ class NetworkService {
         }
         
         guard httpResponse.statusCode == 200 else {
-            print("❌ [SEARCH] Server error: \(httpResponse.statusCode)")
+            print("❌ [SEARCH-iOS] Server error: \(httpResponse.statusCode)")
             if let responseText = String(data: data, encoding: .utf8) {
-                print("❌ [SEARCH] Response: \(responseText)")
+                print("❌ [SEARCH-iOS] Response: \(responseText)")
             }
             throw NetworkError.serverError(statusCode: httpResponse.statusCode)
         }
         
         // Debug: Print the actual JSON response
         if let responseText = String(data: data, encoding: .utf8) {
-            print("🔍 [SEARCH DEBUG] Raw JSON response:")
+            print("🔍 [SEARCH-iOS DEBUG] Raw JSON response:")
             print(responseText.prefix(500)) // First 500 chars
         }
         
@@ -541,7 +604,7 @@ class NetworkService {
         
         do {
             let searchResponse = try decoder.decode(SearchResponse.self, from: data)
-            print("✅ [SEARCH] Successfully decoded response")
+            print("✅ [SEARCH-iOS] Successfully decoded response")
             return DiscoverResponse(
                 status: searchResponse.status,
                 restaurants: searchResponse.topRestaurants,
@@ -549,22 +612,22 @@ class NetworkService {
                 location: searchResponse.location
             )
         } catch {
-            print("❌ [SEARCH DECODE ERROR] Failed to decode: \(error)")
+            print("❌ [SEARCH-iOS DECODE ERROR] Failed to decode: \(error)")
             if let decodingError = error as? DecodingError {
                 switch decodingError {
                 case .keyNotFound(let key, let context):
-                    print("❌ Missing key: \(key.stringValue)")
-                    print("❌ Context: \(context.debugDescription)")
+                    print("❌ [SEARCH-iOS] Missing key: \(key.stringValue)")
+                    print("❌ [SEARCH-iOS] Context: \(context.debugDescription)")
                 case .typeMismatch(let type, let context):
-                    print("❌ Type mismatch for type: \(type)")
-                    print("❌ Context: \(context.debugDescription)")
+                    print("❌ [SEARCH-iOS] Type mismatch for type: \(type)")
+                    print("❌ [SEARCH-iOS] Context: \(context.debugDescription)")
                 case .valueNotFound(let type, let context):
-                    print("❌ Value not found for type: \(type)")
-                    print("❌ Context: \(context.debugDescription)")
+                    print("❌ [SEARCH-iOS] Value not found for type: \(type)")
+                    print("❌ [SEARCH-iOS] Context: \(context.debugDescription)")
                 case .dataCorrupted(let context):
-                    print("❌ Data corrupted: \(context.debugDescription)")
+                    print("❌ [SEARCH-iOS] Data corrupted: \(context.debugDescription)")
                 @unknown default:
-                    print("❌ Unknown decoding error")
+                    print("❌ [SEARCH-iOS] Unknown decoding error")
                 }
             }
             throw error

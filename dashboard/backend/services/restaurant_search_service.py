@@ -232,7 +232,8 @@ class RestaurantSearchService:
         query: str,
         user_id: str,
         latitude: float,
-        longitude: float
+        longitude: float,
+        max_candidates: int = 50
     ) -> Dict[str, Any]:
         """
         Main orchestrator: Natural language restaurant search using LLM analysis.
@@ -246,6 +247,7 @@ class RestaurantSearchService:
             user_id: User UUID
             latitude: User's latitude
             longitude: User's longitude
+            max_candidates: Maximum number of candidate restaurants to consider (default: 50)
 
         Returns:
             Search results with top 3-4 restaurants and reasoning
@@ -294,7 +296,7 @@ class RestaurantSearchService:
                     latitude=latitude,
                     longitude=longitude,
                     radius=4828,  # 3 miles
-                    limit=30,
+                    limit=max_candidates,
                     min_rating=4.0,
                     cuisine_filter=detected_cuisine
                 )
@@ -307,7 +309,7 @@ class RestaurantSearchService:
                         latitude=latitude,
                         longitude=longitude,
                         radius=4828,
-                        limit=30,
+                        limit=max_candidates,
                         min_rating=4.0
                     )
             else:
@@ -320,7 +322,7 @@ class RestaurantSearchService:
                     latitude=latitude,
                     longitude=longitude,
                     radius=4828,  # 3 miles
-                    limit=50,
+                    limit=max_candidates,
                     min_rating=4.0
                 )
 
