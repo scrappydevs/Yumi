@@ -797,6 +797,35 @@ export default function DiscoverPage() {
         console.log(`📡 Fetch URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`);
         console.log(`📡 Starting fetch at: ${new Date().toISOString()}`);
         
+        // Add intermediate progress updates during the fetch
+        let progressPhaseIndex = 0;
+        const progressPhrases = [
+          'Computing compatibility scores',
+          'Ranking recommendations'
+        ];
+        
+        const progressTimer1 = setTimeout(() => {
+          if (progressPhaseIndex < progressPhrases.length) {
+            const phrase = progressPhrases[progressPhaseIndex];
+            setCurrentPhrase(phrase);
+            if (!isMuted) {
+              speak(phrase);
+            }
+            progressPhaseIndex++;
+          }
+        }, 3000); // First update after 3 seconds
+        
+        const progressTimer2 = setTimeout(() => {
+          if (progressPhaseIndex < progressPhrases.length) {
+            const phrase = progressPhrases[progressPhaseIndex];
+            setCurrentPhrase(phrase);
+            if (!isMuted) {
+              speak(phrase);
+            }
+            progressPhaseIndex++;
+          }
+        }, 6000); // Second update after 6 seconds
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
@@ -804,6 +833,10 @@ export default function DiscoverPage() {
           },
           body: searchFormData,
         });
+        
+        // Clear progress timers immediately when fetch completes
+        clearTimeout(progressTimer1);
+        clearTimeout(progressTimer2);
 
         console.log(`📡 Fetch completed at: ${new Date().toISOString()}`);
         console.log(`📡 Response status: ${response.status}`);
@@ -1665,9 +1698,6 @@ export default function DiscoverPage() {
                   if (isMentioned) {
                     // Remove mention
                     setMentions(mentions.filter(m => m.id !== friend.id));
-                    // Remove from prompt text
-                    const mentionText = `@${friend.username}`;
-                    setPrompt(prompt.replace(mentionText, '').trim());
                     console.log(`❌ Removed mention: ${friend.username}`);
                   } else {
                     // Add mention
@@ -1677,8 +1707,6 @@ export default function DiscoverPage() {
                       display_name: friend.display_name || null
                     };
                     setMentions([...mentions, newMention]);
-                    // Add to prompt text
-                    setPrompt(prompt ? `${prompt} @${friend.username}` : `@${friend.username}`);
                     console.log(`✅ Added mention: ${friend.username}`);
                   }
                 }}

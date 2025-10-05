@@ -120,18 +120,19 @@ class RestaurantSearchService:
         self,
         latitude: float,
         longitude: float,
-        radius: int = 9656,  # 6 miles default
+        # ~25,000 miles (entire database, no geo limit)
+        radius: int = 40000000,
         limit: int = 50,
         min_rating: float = 4.0,
         cuisine_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Tool function: Get nearby restaurants from database.
+        Tool function: Get restaurants from database.
 
         Args:
-            latitude: Latitude coordinate
-            longitude: Longitude coordinate
-            radius: Search radius in meters (default: 9656m = 6 miles)
+            latitude: Latitude coordinate (used for distance calculation, not filtering)
+            longitude: Longitude coordinate (used for distance calculation, not filtering)
+            radius: Search radius in meters (default: 40000000m = entire database)
             limit: Maximum number of restaurants to return (default: 50)
             min_rating: Minimum rating filter (default: 4.0)
             cuisine_filter: Optional cuisine type to filter by
@@ -331,11 +332,11 @@ class RestaurantSearchService:
             if detected_cuisine:
                 # PATH A: Cuisine detected in query
                 print(
-                    f"[RESTAURANT SEARCH] Path A: Getting {detected_cuisine} restaurants within 6 miles...")
+                    f"[RESTAURANT SEARCH] Path A: Getting {detected_cuisine} restaurants from entire database...")
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=9656,  # 6 miles
+                    radius=40000000,  # Entire database
                     limit=max_candidates,
                     min_rating=4.0,
                     cuisine_filter=detected_cuisine
@@ -348,7 +349,7 @@ class RestaurantSearchService:
                     restaurants = self.get_nearby_restaurants_tool(
                         latitude=latitude,
                         longitude=longitude,
-                        radius=9656,
+                        radius=40000000,
                         limit=max_candidates,
                         min_rating=4.0
                     )
@@ -361,7 +362,7 @@ class RestaurantSearchService:
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=9656,  # 6 miles
+                    radius=40000000,  # Entire database
                     limit=max_candidates,
                     min_rating=4.0
                 )
@@ -720,7 +721,7 @@ IMPORTANT:
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=9656,
+                    radius=40000000,
                     limit=20,
                     min_rating=4.0
                 )
@@ -792,12 +793,12 @@ IMPORTANT:
             print(
                 f"[GROUP RESTAURANT SEARCH] Merged preferences: {merged_preferences}")
 
-            # Step 2: Get nearby restaurants (same as individual search)
-            print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
+            # Step 2: Get restaurants from entire database
+            print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding restaurants...")
             restaurants = self.get_nearby_restaurants_tool(
                 latitude=latitude,
                 longitude=longitude,
-                radius=9656,
+                radius=40000000,
                 limit=10
             )
 
@@ -1091,7 +1092,7 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=9656,
+                    radius=40000000,
                     limit=10
                 )
                 print(
