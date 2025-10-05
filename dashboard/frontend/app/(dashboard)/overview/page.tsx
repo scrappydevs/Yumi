@@ -501,7 +501,6 @@ export default function DiscoverPage() {
             console.log(`👥 Ignoring stale friends fetch #${currentFetchId}`);
             return;
           }
-            .in('id', profile.friends);
 
           if (friends) {
             // Friends already ordered by DB, but sort again as defensive measure
@@ -575,12 +574,9 @@ export default function DiscoverPage() {
 
     let phraseIndex = 0;
     
-    // Speak the first selected phrase when thinking starts
-    console.log('[Overview] Starting thinking, first phrase:', selectedPhrases[0]);
-    setCurrentPhrase(selectedPhrases[0]);
-    if (!isMuted && speak) {
-      speak(selectedPhrases[0]).catch(err => console.error('Speak error:', err));
-    }
+    // Don't speak the first phrase - handleSubmit controls initial speech
+    // Just set it for display (handleSubmit will update it anyway)
+    console.log('[Overview] Thinking mode active, will rotate through phrases:', selectedPhrases);
 
     if (selectedPhrases.length === 1) {
       // Only one phrase, no need for interval
@@ -597,7 +593,7 @@ export default function DiscoverPage() {
       if (!isMuted && speak) {
         speak(newPhrase).catch(err => console.error('Speak error:', err));
       }
-    }, 6000); // Change phrase every 6 seconds (more spaced out)
+    }, 8000); // Change phrase every 8 seconds (ensures minimum 6s+ display time)
 
     return () => clearInterval(interval);
   }, [isThinking, loadingPhrases, isMuted, speak]);
