@@ -7,6 +7,7 @@ from routers import invites
 from routers import voice
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import os
@@ -1116,15 +1117,15 @@ async def discover_restaurants_ios(
     """
     iOS-optimized discover endpoint - faster version with 10 restaurant candidates.
     Returns 2 restaurants based on user's preferences and location.
-    
+
     Args:
         user_id: Extracted from JWT token (automatic)
         latitude: User's current latitude
         longitude: User's current longitude
-        
+
     Returns:
         { "status": "success", "restaurants": [...], "reasoning": "..." }
-    
+
     Example:
         POST /api/restaurants/discover-ios
         Form data:
@@ -1134,7 +1135,7 @@ async def discover_restaurants_ios(
     try:
         import time
         start_time = time.time()
-        
+
         print(f"\n{'='*80}")
         print(f"[DISCOVER-iOS] 🌟 NEW iOS DISCOVER REQUEST")
         print(f"{'='*80}")
@@ -1145,13 +1146,13 @@ async def discover_restaurants_ios(
 
         # Get restaurant search service
         search_service = get_restaurant_search_service()
-        
+
         # Use a neutral discovery query to get personalized recommendations
         query = "restaurants that match my taste profile perfectly"
-        
+
         print(f"[DISCOVER-iOS] Using query: '{query}'")
         print(f"[DISCOVER-iOS] Limiting to 10 candidates for speed")
-        
+
         # Execute search with iOS optimization (10 candidates only)
         results = await search_service.search_restaurants(
             query=query,
@@ -1160,16 +1161,16 @@ async def discover_restaurants_ios(
             longitude=longitude,
             max_candidates=10
         )
-        
+
         # Return only top 2 restaurants for discover
         top_restaurants = results.get('top_restaurants', [])[:2]
-        
+
         elapsed = time.time() - start_time
         print(f"\n{'='*80}")
         print(f"[DISCOVER-iOS] ✅ COMPLETED in {elapsed:.2f}s")
         print(f"[DISCOVER-iOS] Returning {len(top_restaurants)} restaurants")
         print(f"{'='*80}\n")
-        
+
         return {
             "status": "success",
             "restaurants": top_restaurants,
@@ -1179,7 +1180,7 @@ async def discover_restaurants_ios(
                 "longitude": longitude
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1187,7 +1188,7 @@ async def discover_restaurants_ios(
         import traceback
         traceback.print_exc()
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Failed to generate recommendations: {str(e)}"
         )
 
@@ -1388,6 +1389,73 @@ async def search_restaurants_group(
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Group restaurant search failed: {str(e)}")
+
+
+@app.post("/api/restaurants/search-group-stream")
+async def search_restaurants_group_stream(
+    user_id: str = Depends(get_user_id_from_token),
+    query: str = Form(...),
+    friend_ids: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...)
+):
+    """
+    Streaming version of group restaurant search with real-time progress updates.
+
+    Yields Server-Sent Events (SSE) with progress updates as the search proceeds.
+
+    Progress messages:
+    - Step 1: Analyzing group taste profiles
+    - Step 2: Finding nearby restaurants
+    - Step 3: Computing compatibility scores
+    - Final: Complete results
+
+    Returns:
+        StreamingResponse with SSE-formatted progress updates
+    """
+    try:
+        print(f"[GROUP SEARCH STREAM API] Request from user: {user_id}")
+        print(f"[GROUP SEARCH STREAM API] Query: '{query}'")
+        print(f"[GROUP SEARCH STREAM API] Friend IDs: '{friend_ids}'")
+
+        # Parse friend IDs
+        friend_id_list = [fid.strip()
+                          for fid in friend_ids.split(",") if fid.strip()]
+        all_user_ids = [user_id] + friend_id_list
+
+        print(f"[GROUP SEARCH STREAM API] Total users: {len(all_user_ids)}")
+
+        # Get search service
+        search_service = get_restaurant_search_service()
+
+        # Create streaming generator
+        async def generate():
+            async for sse_message in search_service.search_restaurants_for_group_stream(
+                query=query,
+                user_ids=all_user_ids,
+                latitude=latitude,
+                longitude=longitude
+            ):
+                yield sse_message
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Disable nginx buffering
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[GROUP SEARCH STREAM API ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Streaming group search failed: {str(e)}")
 
 
 # ============================================================================

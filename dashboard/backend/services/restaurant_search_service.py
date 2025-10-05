@@ -8,8 +8,9 @@ This service orchestrates:
 """
 import os
 import math
+import json
 from difflib import get_close_matches
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncGenerator
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.taste_profile_service import get_taste_profile_service
@@ -1153,6 +1154,208 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                     "longitude": longitude
                 }
             }
+
+    async def search_restaurants_for_group_stream(
+        self,
+        query: str,
+        user_ids: List[str],
+        latitude: float,
+        longitude: float
+    ) -> AsyncGenerator[str, None]:
+        """
+        Streaming version of group search that yields progress updates.
+
+        Yields SSE-formatted progress messages that can be sent to frontend in real-time.
+
+        Yields:
+            SSE-formatted strings: "data: {...}\\n\\n"
+        """
+        try:
+            print(f"\n{'='*80}")
+            print(f"[GROUP SEARCH STREAM] 🔍 STARTING STREAMING GROUP SEARCH")
+            print(f"[GROUP SEARCH STREAM] Query: '{query}'")
+            print(f"[GROUP SEARCH STREAM] Users: {len(user_ids)} people")
+            print(f"{'='*80}\n")
+
+            # STEP 1: Merge preferences
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Analyzing group taste profiles', 'step': 1})}\n\n"
+
+            merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(
+                user_ids)
+            print(f"[GROUP SEARCH STREAM] ✅ Step 1 complete: Merged preferences")
+
+            # STEP 2: Detect cuisine and get restaurants
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Finding nearby restaurants', 'step': 2})}\n\n"
+
+            # Detect cuisine
+            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
+                                'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
+                                'sushi', 'ramen', 'tacos', 'burgers', 'seafood', 'mediterranean',
+                                'spanish', 'middle eastern', 'ethiopian', 'caribbean', 'brazilian']
+            detected_cuisine = None
+            query_lower = query.lower()
+            for cuisine in cuisine_keywords:
+                if cuisine in query_lower:
+                    detected_cuisine = cuisine
+                    break
+
+            # Get restaurants
+            if detected_cuisine:
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=50,
+                    min_rating=4.0,
+                    cuisine_filter=detected_cuisine
+                )
+            else:
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=10
+                )
+
+            print(
+                f"[GROUP SEARCH STREAM] ✅ Step 2 complete: Found {len(restaurants) if restaurants else 0} restaurants")
+
+            if not restaurants:
+                result = {
+                    "status": "success",
+                    "stage": "group - no restaurants found",
+                    "query": query,
+                    "user_count": len(user_ids),
+                    "top_restaurants": [],
+                    "message": "No restaurants found nearby",
+                    "location": {"latitude": latitude, "longitude": longitude}
+                }
+                yield f"data: {json.dumps({'type': 'complete', 'data': result})}\n\n"
+                return
+
+            # STEP 3: LLM ranking
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Computing compatibility scores', 'step': 3})}\n\n"
+
+            # Build prompt (using same logic as non-streaming version)
+            restaurants_text = "\n".join([
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
+                for i, r in enumerate(restaurants)
+            ])
+
+            if isinstance(merged_preferences, str):
+                prefs_text = f"\n- {merged_preferences}"
+                has_group_preferences = False
+            else:
+                prefs_text = f"""
+- Favorite Cuisines: {', '.join(merged_preferences.get('cuisines', [])) or 'None specified'}
+- Price Range: {merged_preferences.get('priceRange') or 'No preference'}
+- Atmosphere: {', '.join(merged_preferences.get('atmosphere', [])) or 'No preference'}
+- Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
+"""
+                has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or
+                                             merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 5-6 for a GROUP of {len(user_ids)} people dining together.
+
+USER'S QUERY: "{query}"
+
+GROUP'S MERGED PREFERENCES:{prefs_text}
+
+AVAILABLE RESTAURANTS:
+{restaurants_text}
+
+GROUP RANKING RULES (PRIORITY ORDER):
+1. **QUERY OVERRIDE FOR CUISINE**: If the query explicitly mentions cuisine/food type (e.g., "sushi night", "Chinese food"), ONLY recommend that cuisine type.
+   - BUT STILL USE group preferences for atmosphere, price, and flavor preferences!
+   
+2. **BLEND QUERY + PREFERENCES**: The query sets the cuisine/main requirement, preferences refine the selection.
+   
+3. **EMPTY GROUP PREFERENCES**: If group has minimal/no preferences, rely on query and prioritize highly-rated restaurants.
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{{
+  "top_restaurants": [
+    {{
+      "name": "Restaurant Name",
+      "cuisine": "Cuisine Type",
+      "rating": 4.5,
+      "address": "Full address",
+      "price_level": 2,
+      "match_score": 0.95,
+      "reason": "Brief reason"
+    }}
+  ],
+  "overall_reasoning": "How you balanced query vs group preferences"
+}}
+
+GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - adjust accordingly.
+
+IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
+
+            # Call LLM
+            response = self.gemini_service.model.generate_content(
+                prompt,
+                request_options={'timeout': 30}
+            )
+            response_text = response.text.strip()
+
+            print(f"[GROUP SEARCH STREAM] ✅ Step 3 complete: LLM ranking done")
+
+            # Parse LLM response
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            try:
+                llm_result = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                print(f"[GROUP SEARCH STREAM] ❌ JSON parse failed: {e}")
+                llm_result = {"top_restaurants": restaurants[:5]}
+
+            # STEP 4: Enrich results
+            top_recommendations = llm_result.get("top_restaurants", [])
+            enriched = []
+
+            for llm_rec in top_recommendations:
+                llm_name = llm_rec.get("name", "")
+                for full_rest in restaurants:
+                    if full_rest.get("name") == llm_name:
+                        enriched_rest = {**full_rest, **llm_rec}
+                        enriched.append(enriched_rest)
+                        break
+
+            result = {
+                "status": "success",
+                "stage": "group - LLM ranking",
+                "query": query,
+                "user_count": len(user_ids),
+                "merged_preferences": merged_preferences,
+                "top_restaurants": enriched,
+                "all_nearby_restaurants": restaurants,
+                "llm_reasoning": llm_result.get("overall_reasoning", ""),
+                "location": {
+                    "latitude": latitude,
+                    "longitude": longitude
+                }
+            }
+
+            print(
+                f"[GROUP SEARCH STREAM] ✅ Complete: Returning {len(enriched)} restaurants")
+
+            # Final yield with complete results
+            yield f"data: {json.dumps({'type': 'complete', 'data': result})}\n\n"
+
+        except Exception as e:
+            print(f"[GROUP SEARCH STREAM] ❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+            # Yield error
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
 
 # Singleton instance
