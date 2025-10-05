@@ -10,6 +10,7 @@ interface MentionInputProps {
   value: string;
   onChange: (value: string) => void;
   onMentionsChange: (mentions: Mention[]) => void;
+  mentions?: Mention[]; // External mentions for synchronization
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -19,6 +20,7 @@ export function MentionInput({
   value,
   onChange,
   onMentionsChange,
+  mentions: externalMentions,
   placeholder = 'Type @ to mention friends...',
   className = '',
   disabled = false,
@@ -34,6 +36,14 @@ export function MentionInput({
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const { filteredFriends, filterFriends, loading } = useFriendMentions();
+
+  // Sync internal state with external mentions prop (for auto-detection)
+  useEffect(() => {
+    if (externalMentions !== undefined) {
+      console.log('[MENTION INPUT] Syncing with external mentions:', externalMentions);
+      setSelectedMentions(externalMentions);
+    }
+  }, [externalMentions]);
 
   // Calculate dropdown position (Slack-style: above input)
   const calculateDropdownPosition = () => {
@@ -207,26 +217,51 @@ export function MentionInput({
 
   return (
     <div className="relative w-full flex items-center gap-2">
-      {/* Selected Mentions Display - Inline badges */}
+      {/* Selected Mentions Display - Condensed format for multiple tags */}
       {selectedMentions.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {selectedMentions.map((mention) => (
+          {selectedMentions.length === 1 ? (
+            // Single mention: show full badge with name and X button
             <Badge
-              key={mention.id}
+              key={selectedMentions[0].id}
               variant="secondary"
               className="flex items-center gap-1 px-2 py-0.5 text-xs"
             >
               <User className="w-3 h-3" />
-              <span>{mention.display_name || mention.username}</span>
+              <span>{selectedMentions[0].display_name || selectedMentions[0].username}</span>
               <button
-                onClick={() => removeMention(mention.username)}
+                onClick={() => removeMention(selectedMentions[0].username)}
                 className="ml-1 hover:text-destructive"
                 type="button"
               >
                 <X className="w-3 h-3" />
               </button>
             </Badge>
-          ))}
+          ) : (
+            // Multiple mentions: show "FirstName +N" format with X button to remove all
+            <Badge
+              variant="secondary"
+              className="flex items-center gap-1 px-2 py-0.5 text-xs"
+            >
+              <User className="w-3 h-3" />
+              <span>
+                {selectedMentions[0].display_name || selectedMentions[0].username}
+                {selectedMentions.length > 1 && ` +${selectedMentions.length - 1}`}
+              </span>
+              <button
+                onClick={() => {
+                  // Clear all mentions
+                  setSelectedMentions([]);
+                  onMentionsChange([]);
+                }}
+                className="ml-1 hover:text-destructive"
+                type="button"
+                title={`Remove all ${selectedMentions.length} tagged friends`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          )}
         </div>
       )}
 

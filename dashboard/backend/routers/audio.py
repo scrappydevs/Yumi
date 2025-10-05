@@ -5,13 +5,15 @@ Provides endpoints for:
 - Text-to-Speech (ElevenLabs) - both streaming and conversion
 - Speech-to-Text (Whisper)
 - Voice management
+- Orchestrator status and health monitoring
 """
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from audio_service import get_audio_service
+from services.elevenlabs_orchestrator import get_elevenlabs_orchestrator
 
 # VAD service - will gracefully handle missing pydub internally
 from services.vad_service import get_vad_service, PYDUB_AVAILABLE as VAD_AVAILABLE
@@ -443,3 +445,26 @@ async def audio_health_check():
             "status": "unhealthy",
             "error": str(e)
         }
+
+
+@router.get("/orchestrator/stats")
+async def get_orchestrator_stats() -> Dict[str, Any]:
+    """
+    Get ElevenLabs orchestrator statistics
+    
+    Shows:
+    - Total requests processed
+    - Success/failure rates
+    - Rate limit errors
+    - Current queue size
+    - Current processing status
+    
+    Useful for monitoring and debugging concurrent speech issues.
+    """
+    try:
+        orchestrator = get_elevenlabs_orchestrator()
+        return orchestrator.get_stats()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get orchestrator stats: {str(e)}"
+        )

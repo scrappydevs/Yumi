@@ -205,9 +205,11 @@ class DataPipelineOrchestrator:
 
                 grid_manager = GridManager()
                 priority_coords = [
-                    (42.363859, -71.101230),
-                    (42.363056, -71.087005),
-                    (42.374229, -71.100899)
+                    (42.383102, -71.119437),
+                    (42.395719, -71.122226),
+                    (42.367099, -71.041439),
+                    (42.364305, -71.054843),
+                    (42.364337, -71.101982)
                 ]
 
                 grid_manager.prioritize_coordinates(priority_coords)
