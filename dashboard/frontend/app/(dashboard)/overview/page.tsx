@@ -176,6 +176,7 @@ export default function DiscoverPage() {
   const [mounted, setMounted] = useState(false);
   const [rotation, setRotation] = useState(0);
   const rotationCyclesRef = useRef(0);  // Use ref for real-time access in interval
+  const friendsFetchIdRef = useRef(0);  // Track latest friends fetch to prevent race conditions
   const [location, setLocation] = useState('Boston');  // Default to Boston
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dropdownPositionAbove, setDropdownPositionAbove] = useState(false);
@@ -208,7 +209,7 @@ export default function DiscoverPage() {
   const [lastLoadedLocation, setLastLoadedLocation] = useState<string>('');
   const [volume, setVolume] = useState(0.8); // 80% default volume
   const [friendsData, setFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string, recent_activity?: string}>>([]);
-  const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, recentReviews?: any[], favoriteRestaurants?: any[]} | null>(null);
+  const [hoveredFriend, setHoveredFriend] = useState<{id: string, username: string, display_name: string, avatar_url: string, preferences?: any} | null>(null);
   const [mentionedFriendsData, setMentionedFriendsData] = useState<Array<{id: string, username: string, display_name: string, avatar_url: string}>>([]);
   const { speak, isSpeaking, stop, setVolume: setAudioVolume } = useSimpleTTS();
   const { user } = useAuth();
@@ -230,10 +231,32 @@ export default function DiscoverPage() {
       console.log('[Overview] Received partial transcription:', text);
       setPrompt(text);
     },
-    onTranscriptionComplete: (text) => {
+    onTranscriptionComplete: async (text) => {
       // Final transcription (more accurate)
       console.log('[Overview] Received final transcription:', text);
       setPrompt(text);
+      
+      // Auto-detect friend mentions in the transcribed text
+      console.log('[Overview] 🤖 Auto-detecting friend mentions...');
+      const detectedMentions = await detectFriendMentions(text);
+      
+      if (detectedMentions.length > 0) {
+        console.log('[Overview] ✨ Auto-tagged friends:', detectedMentions.map(m => m.username).join(', '));
+        setMentions(detectedMentions);
+        
+        // Add detected friends to wheel
+        console.log('[Overview] 🎡 Adding detected friends to wheel...');
+        for (const mention of detectedMentions) {
+          await addFriendToWheel(mention);
+        }
+        
+        // Optional: Speak confirmation if not muted
+        if (!isMuted && detectedMentions.length > 0) {
+          const friendNames = detectedMentions.map(m => m.display_name || m.username).join(' and ');
+          const confirmationText = `Tagging ${friendNames}`;
+          speak(confirmationText).catch(err => console.error('Speak error:', err));
+        }
+      }
     },
     onError: (error) => {
       console.error('VAD Recording error:', error);
@@ -242,6 +265,99 @@ export default function DiscoverPage() {
   
   // Derived state: is this a group search?
   const isGroupSearch = mentions.length > 0;
+
+  /**
+   * Add manually tagged friend to the orbit wheel if not already present
+   * @param mention - The manually tagged friend mention
+   */
+  const addFriendToWheel = async (mention: Mention) => {
+    try {
+      // Check if friend is already in wheel
+      const alreadyInWheel = friendsData.some(f => f.id === mention.id);
+      if (alreadyInWheel) {
+        console.log(`[Overview] ✓ ${mention.username} already in wheel`);
+        return;
+      }
+
+      console.log(`[Overview] ➕ Adding ${mention.username} to wheel`);
+
+      // Fetch full friend profile
+      const supabase = createClient();
+      const { data: friendProfile } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .eq('id', mention.id)
+        .single();
+
+      if (friendProfile) {
+        // Add to wheel (prepend so they're visible)
+        setFriendsData(prev => {
+          // Limit to 8 total friends in wheel (don't make it too crowded)
+          const newFriends = [friendProfile, ...prev].slice(0, 8);
+          console.log(`[Overview] ✅ Wheel now has ${newFriends.length} friends`);
+          return newFriends;
+        });
+      }
+    } catch (error) {
+      console.error('[Overview] ❌ Error adding friend to wheel:', error);
+    }
+  };
+
+  /**
+   * Detect friend mentions in transcribed text using NLP API
+   * @param text - The transcribed text to analyze
+   * @returns Array of detected mentions
+   */
+  const detectFriendMentions = async (text: string): Promise<Mention[]> => {
+    try {
+      if (!text.trim()) {
+        console.warn('[Overview] ⚠️  Empty text, skipping mention detection');
+        return [];
+      }
+
+      console.log('[Overview] 🔍 Detecting friend mentions in:', text);
+
+      // Get auth session for JWT token
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.warn('[Overview] ⚠️  No session, skipping mention detection');
+        return [];
+      }
+
+      // Call NLP detection API (backend fetches fresh friends list from DB)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/nlp/detect-friend-mentions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('[Overview] ❌ Mention detection API failed:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      const detectedMentions: Mention[] = data.detected_mentions.map((dm: any) => ({
+        id: dm.id,
+        username: dm.username,
+        display_name: dm.display_name,
+      }));
+
+      console.log('[Overview] ✅ Detected mentions:', detectedMentions);
+      return detectedMentions;
+
+    } catch (error) {
+      console.error('[Overview] ❌ Error detecting mentions:', error);
+      return [];
+    }
+  };
 
   // Sync volume with audio output
   useEffect(() => {
@@ -339,7 +455,10 @@ export default function DiscoverPage() {
   useEffect(() => {
     if (!user || !mounted) return;
 
-    async function loadFriends() {
+      async function loadFriends() {
+      // Increment fetch ID to track this specific fetch
+      const currentFetchId = ++friendsFetchIdRef.current;
+
       try {
         const supabase = createClient();
         const { data: profile } = await supabase
@@ -348,18 +467,42 @@ export default function DiscoverPage() {
           .eq('id', user!.id)
           .single();
 
+        // Ignore stale fetch results
+        if (currentFetchId !== friendsFetchIdRef.current) {
+          console.log(`👥 Ignoring stale friends fetch #${currentFetchId}`);
+          return;
+        }
+
         if (profile?.friends && profile.friends.length > 0) {
+          // Fetch friend profiles with explicit ordering to prevent database-level inconsistency
           // Fetch all friend profiles
           const { data: friends } = await supabase
             .from('profiles')
             .select('id, username, display_name, avatar_url')
-            .in('id', profile.friends);
+            .in('id', profile.friends.slice(0, 6))
+            .order('id', { ascending: true });
+
+          // Ignore stale fetch results
+          if (currentFetchId !== friendsFetchIdRef.current) {
+            console.log(`👥 Ignoring stale friends fetch #${currentFetchId}`);
+            return;
+          }
 
           if (friends) {
-            // Sort by ID to maintain consistent positioning (prevent random swaps)
+            // Friends already ordered by DB, but sort again as defensive measure
             const sortedFriends = [...friends].sort((a, b) => a.id.localeCompare(b.id));
-            setFriendsData(sortedFriends);
-            console.log(`👥 Loaded ${sortedFriends.length} friends for orbit (sorted by ID)`);
+
+            // Only update if friend IDs/order have changed (compare exact order, not just set)
+            setFriendsData(prev => {
+              const prevIds = prev.map(f => f.id).join(',');
+              const newIds = sortedFriends.map(f => f.id).join(',');
+              if (prevIds === newIds) {
+                console.log(`👥 Friends unchanged, keeping previous array reference`);
+                return prev;
+              }
+              console.log(`👥 Loaded ${sortedFriends.length} friends for orbit (fetch #${currentFetchId})`);
+              return sortedFriends;
+            });
           }
         }
       } catch (error) {
@@ -372,8 +515,13 @@ export default function DiscoverPage() {
 
   // Load mentioned friends' full profiles
   useEffect(() => {
-    if (!user || mentions.length === 0) {
-      setMentionedFriendsData([]);
+    if (!user) {
+      return;
+    }
+
+    // Don't clear mentioned friends when mentions is empty
+    // This allows them to persist during thinking/results states
+    if (mentions.length === 0) {
       return;
     }
 
@@ -417,29 +565,24 @@ export default function DiscoverPage() {
 
     let phraseIndex = 0;
     
-    // Speak the first selected phrase when thinking starts
-    console.log('[Overview] Starting thinking, first phrase:', selectedPhrases[0]);
-    setCurrentPhrase(selectedPhrases[0]);
-    if (!isMuted && speak) {
-      speak(selectedPhrases[0]).catch(err => console.error('Speak error:', err));
-    }
+    // Don't speak the first phrase - handleSubmit controls initial speech
+    // Just set it for display (handleSubmit will update it anyway)
+    console.log('[Overview] Thinking mode active, will rotate through phrases:', selectedPhrases);
 
     if (selectedPhrases.length === 1) {
       // Only one phrase, no need for interval
       return;
     }
 
-    const interval = setInterval(() => {
-      phraseIndex = (phraseIndex + 1) % selectedPhrases.length;
-      const newPhrase = selectedPhrases[phraseIndex];
-      console.log('[Overview] Rotating to phrase:', newPhrase);
-      setCurrentPhrase(newPhrase);
-      
-      // Speak each new phrase if not muted (exact text match)
-      if (!isMuted && speak) {
-        speak(newPhrase).catch(err => console.error('Speak error:', err));
-      }
-    }, 6000); // Change phrase every 6 seconds (more spaced out)
+  const interval = setInterval(() => {
+    phraseIndex = (phraseIndex + 1) % selectedPhrases.length;
+    const newPhrase = selectedPhrases[phraseIndex];
+    console.log('[Overview] Rotating to phrase:', newPhrase);
+    setCurrentPhrase(newPhrase);
+    
+    // DON'T speak rotating phrases - only speak at start and end
+    // Visual feedback only during processing
+  }, 8000); // Change phrase every 8 seconds (visual only) (ensures minimum 6s+ display time)
 
     return () => clearInterval(interval);
   }, [isThinking, loadingPhrases, isMuted, speak]);
@@ -490,17 +633,23 @@ export default function DiscoverPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🚀🚀🚀 HANDLE SUBMIT CALLED 🚀🚀🚀');
+    console.log('\n\n\n');
+    console.log('╔═══════════════════════════════════════════════════════════════╗');
+    console.log('║  🚀🚀🚀 HANDLE SUBMIT CALLED 🚀🚀🚀                              ║');
+    console.log('╚═══════════════════════════════════════════════════════════════╝');
     console.log('🚀 Query:', prompt);
-    console.log('🚀 Mentions:', mentions);
+    console.log('🚀 Mentions:', mentions.length, mentions.map(m => m.username).join(', ') || 'none');
+    console.log('🚀 Timestamp:', new Date().toISOString());
+    console.log('🚀 User ID:', user?.id?.substring(0, 8) + '...');
+    console.log('🚀 Is muted:', isMuted);
+    console.log('🚀 Volume:', volume);
     
     // Check if prompt is empty
     if (!prompt.trim()) {
-      // If we have mentions but no text, show specific message
       if (mentions.length > 0) {
-        console.log('⚠️ Submission blocked: No query text. Please add what you want (e.g., "I want sushi")');
+        console.log('⚠️  Submission blocked: No query text. Please add what you want (e.g., "I want sushi")');
       } else {
-        console.log('⚠️ Submission blocked: Empty query');
+        console.log('⚠️  Submission blocked: Empty query');
       }
       return;
     }
@@ -508,31 +657,28 @@ export default function DiscoverPage() {
     const searchQuery = prompt;  // Save the query before clearing
     const searchMentions = [...mentions];  // Save mentions before clearing
     const searchMentionedFriends = [...mentionedFriendsData];  // Save mentioned friends to keep them visible
-    setPrompt('');  // Clear the input immediately
-    setMentions([]);  // Clear mentions from input
-    
-    // Keep mentioned friends visible during search - restore immediately after useEffect clears it
-    // Use setTimeout to restore after the useEffect has run
-    setTimeout(() => {
-      if (searchMentionedFriends.length > 0) {
-        setMentionedFriendsData(searchMentionedFriends);
-      }
-    }, 0);
-    
-    setIsThinking(true);
-    setShowingResults(false);  // Reset results state
-    setIsNarrowing(false);  // Reset narrowing state
-    setSearchError(null);
-    setSearchResults([]);
-    setAllNearbyImages([]); // Reset images for new search
-    setVisibleImageIds([]);
-    rotationCyclesRef.current = 0;  // Reset rotation cycles for next latent state
     
     // Check if this is a group search (has mentions)
     const isGroupSearch = searchMentions.length > 0;
     
-    // Note: The rotating phrases with voice are handled by the useEffect hook
-    // No need to speak here to avoid voice overlap
+    // Play greeting audio (matching tagging pattern)
+    if (!isMuted) {
+      const greetingMessage = isGroupSearch 
+        ? "Let me find something perfect for you all"
+        : "Let me find something perfect for you";
+      speak(greetingMessage).catch(err => console.error('Speak error:', err));
+    }
+    
+    // Clear input and state
+    setPrompt('');
+    setMentions([]);
+    
+    setIsThinking(true);
+    setShowingResults(false);
+    setIsNarrowing(false);
+    setSearchError(null);
+    setSearchResults([]);
+    rotationCyclesRef.current = 0;
     
     // Set up 60-second timeout (LLM can be slow)
     const timeoutId = setTimeout(() => {
@@ -543,7 +689,8 @@ export default function DiscoverPage() {
       setSearchError(timeoutText);
       setIsThinking(false);
       setShowingResults(false);
-      setMentionedFriendsData([]);  // Clear mentioned friends on timeout
+      // Keep mentioned friends visible even on timeout
+      // setMentionedFriendsData([]);
       if (!isMuted) {
         speak(timeoutText);
       }
@@ -553,6 +700,8 @@ export default function DiscoverPage() {
       // Get coordinates - use actual user location if available, otherwise use selected city
       const coords = userCoords || CITY_COORDINATES[location] || CITY_COORDINATES['Boston'];
       
+      console.log('📡 Coordinates:', coords);
+      
       // Get auth session for JWT token
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -561,14 +710,13 @@ export default function DiscoverPage() {
         throw new Error('Not authenticated. Please sign in.');
       }
       
-      // PHASE 1: Fetch nearby restaurants immediately (no LLM, fast)
-      // Step 1: Finding restaurants
-      const step1Text = 'Searching nearby restaurants';
-      setCurrentPhrase(step1Text);
-      if (!isMuted) {
-        await speak(step1Text);
-      }
-      console.log('📍 Fetching nearby restaurants...');
+      console.log('📡 Session obtained, user authenticated');
+      
+      // PHASE 2.1: Fetch nearby restaurants immediately (no LLM, fast)
+      setCurrentPhrase('Searching restaurants...');
+      
+      console.log('\n📍 Step 2.1: Fetching nearby restaurants...');
+      console.log('📍 Timestamp:', new Date().toISOString());
       const nearbyFormData = new FormData();
       nearbyFormData.append('latitude', coords.lat.toString());
       nearbyFormData.append('longitude', coords.lng.toString());
@@ -612,19 +760,7 @@ export default function DiscoverPage() {
         const initialImageIds = allImages.slice(0, initialCount).map((img: {id: string}) => img.id);
         setVisibleImageIds(initialImageIds);
         
-        // Wait for "Searching nearby restaurants" speech to complete
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Step 2: Analyzing food preferences (don't await - let it happen in parallel)
-        const step2Text = isGroupSearch 
-          ? "Analyzing group taste profiles"
-          : 'Analyzing your taste profile';
-        setCurrentPhrase(step2Text);
-        if (!isMuted) {
-          speak(step2Text);  // No await - don't block LLM call!
-        }
-        
-        // Don't wait for TTS - proceed immediately to LLM call
+        // Backend now handles ALL TTS calls - no frontend TTS needed
         // PHASE 2: Now call LLM for analysis (happens while images swap)
         console.log('🤖 Asking LLM to analyze restaurants...');
         console.log(`   Query: "${searchQuery}"`);
@@ -654,6 +790,7 @@ export default function DiscoverPage() {
         console.log(`📡 Fetch URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`);
         console.log(`📡 Starting fetch at: ${new Date().toISOString()}`);
         
+        // Backend now handles TTS internally - just make the request
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${searchEndpoint}`, {
           method: 'POST',
           headers: {
@@ -706,7 +843,6 @@ export default function DiscoverPage() {
             setCurrentPhrase(noResultsText);
             setIsThinking(false);
             setShowingResults(false);
-            // Keep mentioned friends visible even when no results
             if (!isMuted) {
               await speak(noResultsText);
             }
@@ -832,12 +968,9 @@ export default function DiscoverPage() {
           // Use the processed restaurants (with fallback images)
           setSearchResults(restaurantsWithIds.slice(0, finalCount));
           
-          // Keep mentioned friends visible after results are shown
-          // setMentionedFriendsData([]); // REMOVED - keep friends visible
-          
-          // Speak result if not muted - ensure TTS matches displayed text
-          if (!isMuted) {
-            await speak(step3Text);
+          // Speak result message (matching tagging pattern)
+          if (!isMuted && data.tts_message) {
+            await speak(data.tts_message);
           }
         } else {
           // No recommendations from LLM
@@ -1033,22 +1166,6 @@ export default function DiscoverPage() {
         )}
       </div>
 
-      {/* Test AI Button - Bottom Left */}
-      <div className="absolute bottom-6 left-6 z-10">
-        <motion.button
-          onClick={() => setIsThinking(!isThinking)}
-          className="glass-layer-1 px-4 py-2.5 rounded-full shadow-soft relative overflow-hidden flex items-center gap-2"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full" />
-          <div className={`w-2 h-2 rounded-full ${isThinking ? 'bg-purple-600 animate-pulse' : 'bg-gray-400'}`} />
-          <span className="text-xs font-medium">
-            {isThinking ? 'Thinking...' : 'Test AI'}
-          </span>
-        </motion.button>
-      </div>
-
       {/* Location Tagger - Top Right */}
       <div className="absolute top-6 right-6 z-10">
         <motion.div
@@ -1116,7 +1233,7 @@ export default function DiscoverPage() {
                 <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                 
                 <div className="relative py-2">
-                  {['Boston', 'New York City', 'San Francisco', 'Los Angeles', 'Chicago', 'Miami', 'Austin'].map((loc) => (
+                  {['Boston'].map((loc) => (
                     <motion.button
                       key={loc}
                       className="w-full px-2 py-1.5 text-left text-xs font-medium hover:bg-white/40 transition-colors truncate"
@@ -1295,8 +1412,8 @@ export default function DiscoverPage() {
               
               // Calculate position on circle (use visibleIndex for positioning)
               const angle = ((visibleIndex / Math.max(numImages, 3)) * 360 + rotation) * (Math.PI / 180);
-              // Different radius for each state: thinking (larger), results (medium), latent (medium)
-              const baseRadius = isThinking ? 440 : showingResults ? 360 : 320;
+              // Different radius for each state: thinking (medium), results (closer), latent (close)
+              const baseRadius = isThinking ? 360 : showingResults ? 340 : 320;
               const x = 350 + Math.cos(angle) * baseRadius;
               const y = 350 + Math.sin(angle) * baseRadius;
               
@@ -1487,26 +1604,36 @@ export default function DiscoverPage() {
                   cursor: (isThinking || showingResults) ? 'default' : 'pointer',
                 }}
                 onMouseEnter={async () => {
-                  // Fetch friend's recent activity
+                  // Fetch friend's preferences
                   try {
                     const supabase = createClient();
                     
-                    // Get recent reviews
-                    const { data: reviews } = await supabase
-                      .from('reviews')
-                      .select('restaurant_name, rating, comment, created_at')
-                      .eq('user_id', friend.id)
-                      .order('created_at', { ascending: false })
-                      .limit(3);
+                    // Get preferences from profile
+                    const { data: profile } = await supabase
+                      .from('profiles')
+                      .select('preferences')
+                      .eq('id', friend.id)
+                      .single();
                     
-                    console.log(`👤 Loaded activity for ${friend.display_name || friend.username}: ${reviews?.length || 0} reviews`);
+                    let parsedPreferences = null;
+                    if (profile?.preferences) {
+                      try {
+                        parsedPreferences = typeof profile.preferences === 'string' 
+                          ? JSON.parse(profile.preferences) 
+                          : profile.preferences;
+                      } catch {
+                        console.warn('Could not parse preferences for friend:', friend.id);
+                      }
+                    }
+                    
+                    console.log(`👤 Loaded preferences for ${friend.display_name || friend.username}`);
                     
                     setHoveredFriend({
                       ...friend,
-                      recentReviews: reviews || [],
+                      preferences: parsedPreferences,
                     });
                   } catch (error) {
-                    console.error('Error loading friend activity:', error);
+                    console.error('Error loading friend preferences:', error);
                     setHoveredFriend({...friend});
                   }
                 }}
@@ -1522,9 +1649,6 @@ export default function DiscoverPage() {
                   if (isMentioned) {
                     // Remove mention
                     setMentions(mentions.filter(m => m.id !== friend.id));
-                    // Remove from prompt text
-                    const mentionText = `@${friend.username}`;
-                    setPrompt(prompt.replace(mentionText, '').trim());
                     console.log(`❌ Removed mention: ${friend.username}`);
                   } else {
                     // Add mention
@@ -1534,8 +1658,6 @@ export default function DiscoverPage() {
                       display_name: friend.display_name || null
                     };
                     setMentions([...mentions, newMention]);
-                    // Add to prompt text
-                    setPrompt(prompt ? `${prompt} @${friend.username}` : `@${friend.username}`);
                     console.log(`✅ Added mention: ${friend.username}`);
                   }
                 }}
@@ -1666,46 +1788,67 @@ export default function DiscoverPage() {
                   </div>
                 </div>
                 
-                {/* Recent Reviews */}
-                {hoveredFriend.recentReviews && hoveredFriend.recentReviews.length > 0 ? (
+                {/* Taste Preferences */}
+                {hoveredFriend.preferences && (
+                  hoveredFriend.preferences.cuisines?.length > 0 || 
+                  hoveredFriend.preferences.atmosphere?.length > 0 || 
+                  hoveredFriend.preferences.priceRange
+                ) && (
                   <div className="pt-2 border-t border-gray-200/50">
                     <p className="text-sm font-medium text-gray-700 mb-3">
-                      Recent Activity
+                      Taste Preferences
                     </p>
                     <div className="space-y-3">
-                      {hoveredFriend.recentReviews.map((review: any, idx: number) => (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {review.restaurant_name}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              <span className="text-sm font-medium text-gray-700">
-                                {review.rating}
+                      {/* Favorite Cuisines */}
+                      {hoveredFriend.preferences.cuisines?.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                            Cuisines
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {hoveredFriend.preferences.cuisines.slice(0, 6).map((cuisine: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-medium"
+                              >
+                                {cuisine}
                               </span>
-                            </div>
+                            ))}
                           </div>
-                          {review.comment && (
-                            <p className="text-xs text-gray-600 line-clamp-2">
-                              "{review.comment}"
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400">
-                            {new Date(review.created_at).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
+                        </div>
+                      )}
+                      
+                      {/* Atmosphere */}
+                      {hoveredFriend.preferences.atmosphere?.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                            Atmosphere
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {hoveredFriend.preferences.atmosphere.slice(0, 6).map((vibe: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2.5 py-1 rounded-lg bg-pink-50 text-pink-700 font-medium"
+                              >
+                                {vibe}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Price Range */}
+                      {hoveredFriend.preferences.priceRange && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                            Price Range
+                          </p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {hoveredFriend.preferences.priceRange}
                           </p>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="pt-2 border-t border-gray-200/50">
-                    <p className="text-sm text-gray-500 italic">
-                      No recent activity yet
-                    </p>
                   </div>
                 )}
               </div>
@@ -1754,18 +1897,18 @@ export default function DiscoverPage() {
                 </div>
                 
                 {/* Match Score */}
-                {hoveredRestaurant.match_score && (
+                {(hoveredRestaurant.match_score !== undefined && hoveredRestaurant.match_score !== null) && (
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
                         initial={{ width: 0 }}
-                        animate={{ width: `${hoveredRestaurant.match_score * 100}%` }}
+                        animate={{ width: `${(hoveredRestaurant.match_score || 0.5) * 100}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut' }}
                       />
                     </div>
                     <span className="text-sm font-semibold text-gray-900">
-                      {Math.round(hoveredRestaurant.match_score * 100)}%
+                      {Math.round((hoveredRestaurant.match_score || 0.5) * 100)}%
                     </span>
                   </div>
                 )}
@@ -1864,7 +2007,19 @@ export default function DiscoverPage() {
               <MentionInput
                 value={prompt}
                 onChange={setPrompt}
-                onMentionsChange={(newMentions) => setMentions(newMentions)}
+                onMentionsChange={(newMentions) => {
+                  // Update mentions state
+                  setMentions(newMentions);
+                  
+                  // Add any newly tagged friends to the wheel
+                  const newlyAdded = newMentions.filter(
+                    newMention => !mentions.some(m => m.id === newMention.id)
+                  );
+                  newlyAdded.forEach(mention => {
+                    addFriendToWheel(mention);
+                  });
+                }}
+                mentions={mentions}
                 placeholder={isThinking ? "AI is thinking..." : isRecording ? "Listening..." : "Where should we eat? (Type @ to mention friends)"}
                 disabled={isThinking}
                 className="bg-transparent border-0 shadow-none text-sm px-0 py-0 h-auto focus:ring-0"
@@ -2123,13 +2278,13 @@ export default function DiscoverPage() {
                 <div className="mb-5">
                   <div className="flex items-center justify-between text-sm mb-2">
                     <span className="font-semibold">Match Score</span>
-                    <span className="text-purple-600 font-bold">{Math.round(selectedRestaurant.match_score * 100)}%</span>
+                    <span className="text-purple-600 font-bold">{Math.round((selectedRestaurant.match_score || 0.5) * 100)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                     <motion.div
                       className="h-full bg-purple-600"
                       initial={{ width: 0 }}
-                      animate={{ width: `${selectedRestaurant.match_score * 100}%` }}
+                      animate={{ width: `${(selectedRestaurant.match_score || 0.5) * 100}%` }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
                     />
                   </div>
@@ -2185,3 +2340,4 @@ export default function DiscoverPage() {
     </div>
   );
 }
+

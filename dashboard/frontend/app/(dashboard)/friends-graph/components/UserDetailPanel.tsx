@@ -132,7 +132,7 @@ export function UserDetailPanel({
                 height={100}
                 className="rounded-full border-4 border-white shadow-lg"
               />
-              {user.mutual_friends_count && user.mutual_friends_count > 0 && (
+              {(user.mutual_friends_count || 0) > 0 && (
                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full glass-panel text-xs font-semibold text-[hsl(var(--primary))]">
                   {user.mutual_friends_count} mutual
                 </div>

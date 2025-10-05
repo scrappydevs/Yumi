@@ -87,6 +87,8 @@ export default function UserProfilePage() {
       }
 
       console.log('✅ Profile loaded:', profileData);
+      console.log('📊 Profile preferences field:', profileData.preferences);
+      console.log('📊 Profile preferences type:', typeof profileData.preferences);
       setProfile(profileData);
 
       // Check if current user is following this user
@@ -191,12 +193,34 @@ export default function UserProfilePage() {
     }
   };
 
-  const parsePreferences = (preferencesString: string) => {
-    try {
-      return JSON.parse(preferencesString);
-    } catch {
-      return {};
+  const parsePreferences = (preferencesData: any) => {
+    // If it's already an object, return it
+    if (typeof preferencesData === 'object' && preferencesData !== null) {
+      console.log('✅ Preferences is already an object:', preferencesData);
+      return { parsed: true, data: preferencesData };
     }
+    
+    // If it's a string, try to parse it
+    if (typeof preferencesData === 'string' && preferencesData) {
+      try {
+        // Check if it looks like JSON (starts with { or [)
+        const trimmed = preferencesData.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          const parsed = JSON.parse(trimmed);
+          console.log('✅ Parsed preferences from JSON string:', parsed);
+          return { parsed: true, data: parsed };
+        } else {
+          console.log('📝 Preferences is raw text, displaying as-is');
+          return { parsed: false, rawText: trimmed };
+        }
+      } catch (error) {
+        console.error('❌ Error parsing preferences JSON:', error);
+        return { parsed: false, rawText: preferencesData };
+      }
+    }
+    
+    console.warn('⚠️ Preferences is empty');
+    return { parsed: true, data: {} };
   };
 
   if (loading) {
@@ -228,7 +252,9 @@ export default function UserProfilePage() {
     );
   }
 
-  const preferences = parsePreferences(profile.preferences || '{}');
+  const preferencesResult = parsePreferences(profile.preferences || '{}');
+  console.log('🎯 Final parsed preferences:', preferencesResult);
+  const preferences = preferencesResult.parsed ? preferencesResult.data : {};
 
   return (
     <div className="h-full overflow-y-auto bg-white">
@@ -309,23 +335,6 @@ export default function UserProfilePage() {
         {/* Stats Section */}
         <div className="grid grid-cols-2 gap-x-16 gap-y-6 pb-12 border-b border-slate-200/60">
           <div>
-            <div className="text-sm font-medium text-slate-500 mb-4">Activity</div>
-            <div className="grid grid-cols-2 gap-6">
-              {[
-                { label: 'Visits', value: visits.length, icon: MapPin },
-                { label: 'Restaurants', value: new Set(visits.map(v => v.restaurant_name)).size, icon: Utensils },
-              ].map((stat) => (
-                <div key={stat.label} className="space-y-1">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <stat.icon className="w-4 h-4" />
-                    <span className="text-xs font-medium uppercase tracking-wider">{stat.label}</span>
-                  </div>
-                  <div className="text-3xl font-bold">{stat.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
             <div className="text-sm font-medium text-slate-500 mb-4">Social</div>
             <div className="grid grid-cols-2 gap-6">
               {[
@@ -342,145 +351,99 @@ export default function UserProfilePage() {
               ))}
             </div>
           </div>
+          <div>
+            <div className="text-sm font-medium text-slate-500 mb-4">Photos</div>
+            <div className="grid grid-cols-2 gap-6">
+              {[
+                { label: 'Photos', value: photos.length, icon: Heart },
+              ].map((stat) => (
+                <div key={stat.label} className="space-y-1">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <stat.icon className="w-4 h-4" />
+                    <span className="text-xs font-medium uppercase tracking-wider">{stat.label}</span>
+                  </div>
+                  <div className="text-3xl font-bold">{stat.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Content Grid */}
-        <div className="grid grid-cols-2 gap-x-16 gap-y-12">
-          {/* Recent Visits */}
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-medium text-slate-500">Recent Visits</h2>
-              <button className="text-xs text-slate-500 hover:text-slate-900 transition-colors">
-                View all →
-              </button>
-            </div>
-            <div className="space-y-3">
-              {visits.length > 0 ? (
-                visits.map((visit) => (
-                  <div
-                    key={visit.id}
-                    className="flex items-center gap-3 py-2 hover:translate-x-1 transition-transform cursor-pointer"
-                  >
-                    <img
-                      src={visit.restaurant_image || '/default-restaurant.png'}
-                      alt={visit.restaurant_name}
-                      className="w-10 h-10 rounded-lg object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate">{visit.restaurant_name}</div>
-                      <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
-                        <Clock className="w-3 h-3" />
-                        {new Date(visit.visit_date).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span className="text-xs font-bold">{visit.rating}</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                  <Utensils className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No visits yet</p>
-                </div>
-              )}
-            </div>
+        {/* Preferences Section - Full Width */}
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-medium text-slate-500">Taste Preferences</h2>
           </div>
+          
+          <div className="space-y-6">
+            {/* Raw Text Display */}
+            {!preferencesResult.parsed && preferencesResult.rawText && (
+              <div className="prose prose-sm max-w-none">
+                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {preferencesResult.rawText}
+                </p>
+              </div>
+            )}
 
-          {/* Preferences */}
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-medium text-slate-500">Preferences</h2>
-            </div>
-            
-            <div className="space-y-4">
-              {preferences.cuisines && preferences.cuisines.length > 0 && (
-                <div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
-                    Favorite Cuisines
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {preferences.cuisines.map((cuisine: string) => (
-                      <span
-                        key={cuisine}
-                        className="glass-layer-1 text-xs px-3 py-1 rounded-xl shadow-soft"
-                      >
-                        {cuisine}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {preferences.priceRange && (
-                <div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
-                    Price Range
-                  </div>
-                  <div className="text-sm font-semibold">{preferences.priceRange}</div>
-                </div>
-              )}
-
-              {preferences.atmosphere && preferences.atmosphere.length > 0 && (
-                <div>
-                  <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
-                    Atmosphere
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {preferences.atmosphere.map((vibe: string) => (
-                      <span
-                        key={vibe}
-                        className="glass-layer-1 text-xs px-3 py-1 rounded-xl shadow-soft"
-                      >
-                        {vibe}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(!preferences.cuisines && !preferences.priceRange && !preferences.atmosphere) && (
-                <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                  <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No preferences set</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Photos */}
-          <div className="col-span-2">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-medium text-slate-500">Photos</h2>
-              <button className="text-xs text-slate-500 hover:text-slate-900 transition-colors">
-                View all →
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              {photos.length > 0 ? (
-                photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    className="relative rounded-lg overflow-hidden aspect-square cursor-pointer group"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={`Photo ${photo.id}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Heart className="w-4 h-4 text-white" />
+            {/* Structured Preferences Display */}
+            {preferencesResult.parsed && (
+              <>
+                {preferences.cuisines && preferences.cuisines.length > 0 && (
+                  <div>
+                    <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
+                      Favorite Cuisines
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {preferences.cuisines.map((cuisine: string) => (
+                        <span
+                          key={cuisine}
+                          className="glass-layer-1 text-sm px-4 py-2 rounded-xl shadow-soft font-medium"
+                        >
+                          {cuisine}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="col-span-4 text-center py-8 text-[hsl(var(--muted-foreground))]">
-                  <Heart className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No photos yet</p>
-                </div>
-              )}
-            </div>
+                )}
+
+                {preferences.priceRange && (
+                  <div>
+                    <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
+                      Price Range
+                    </div>
+                    <div className="text-lg font-semibold">{preferences.priceRange}</div>
+                  </div>
+                )}
+
+                {preferences.atmosphere && preferences.atmosphere.length > 0 && (
+                  <div>
+                    <div className="text-xs text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
+                      Preferred Atmosphere
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {preferences.atmosphere.map((vibe: string) => (
+                        <span
+                          key={vibe}
+                          className="glass-layer-1 text-sm px-4 py-2 rounded-xl shadow-soft font-medium"
+                        >
+                          {vibe}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(!preferences.cuisines && !preferences.priceRange && !preferences.atmosphere) && (
+                  <div className="text-center py-12 text-[hsl(var(--muted-foreground))]">
+                    <Settings className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm">No preferences set yet</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+                      Preferences are learned from your dining history
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

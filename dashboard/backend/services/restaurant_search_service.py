@@ -8,8 +8,11 @@ This service orchestrates:
 """
 import os
 import math
+import json
+import asyncio
+import httpx
 from difflib import get_close_matches
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncGenerator
 from services.gemini_service import get_gemini_service
 from services.supabase_service import get_supabase_service
 from services.taste_profile_service import get_taste_profile_service
@@ -19,14 +22,107 @@ from services.restaurant_db_service import get_restaurant_db_service
 class RestaurantSearchService:
     """Service for natural language restaurant search with LLM tool calls."""
 
+    # Map detected cuisine names to database cuisine types
+    # Note: LLM handles dish-to-cuisine mapping (e.g., "burritos" → "mexican")
+    # This just maps the cuisine name to database column values
+    CUISINE_KEYWORD_MAPPING = {
+        'italian': ['Italian', 'Italian/Pizza'],
+        'japanese': ['Japanese', 'Japanese/Sushi', 'Asian'],
+        'chinese': ['Chinese', 'Asian'],
+        'mexican': ['Mexican'],
+        'thai': ['Thai', 'Asian'],
+        'indian': ['Indian'],
+        'french': ['French'],
+        'korean': ['Korean', 'Asian'],
+        'vietnamese': ['Vietnamese', 'Asian'],
+        'greek': ['Greek', 'Mediterranean'],
+        'american': ['American'],
+        'mediterranean': ['Mediterranean', 'Greek'],
+        'spanish': ['Spanish'],
+        'middle eastern': ['Middle Eastern', 'Lebanese', 'Turkish'],
+        'ethiopian': ['Ethiopian'],
+        'caribbean': ['Caribbean', 'Jamaican', 'Cuban'],
+        'brazilian': ['Brazilian'],
+        'seafood': ['Seafood']
+    }
+
     def __init__(self):
         """Initialize with required services."""
-        self.gemini_service = get_gemini_service()
+        # Use full Flash model (not Lite) for complex restaurant search queries
+        # Reasoning: Restaurant search requires nuanced understanding of:
+        # - Complex user queries and preferences
+        # - Multi-factor ranking (rating, reviews, cuisine, atmosphere)
+        # - Accurate match score computation
+        # - Group preference blending
+        self.gemini_service = get_gemini_service('gemini-2.5-flash')
+
+        # Use 2.5 Flash Lite for fast cuisine detection (lightweight)
+        self.gemini_lite_service = get_gemini_service('gemini-2.5-flash-lite')
+
         self.supabase_service = get_supabase_service()
         self.taste_profile_service = get_taste_profile_service()
         self.restaurant_db_service = get_restaurant_db_service()
 
-        print(f"[RESTAURANT SEARCH] Service initialized (using database)")
+        print(
+            f"[RESTAURANT SEARCH] Service initialized (using Gemini Flash for complex queries)")
+
+    async def _detect_cuisine_from_query(self, query: str) -> Optional[str]:
+        """
+        Use Gemini Lite to detect cuisine type from natural language query.
+
+        Args:
+            query: User's search query (e.g., "burritos", "find me good sushi", "italian near me")
+
+        Returns:
+            Cuisine type string (e.g., "mexican", "japanese", "italian") or None if no cuisine detected
+        """
+        try:
+            print(f"[CUISINE DETECTION] 🤖 Analyzing query: '{query}'")
+
+            prompt = f"""Analyze this restaurant search query and identify the cuisine type if present.
+
+Query: "{query}"
+
+If the query mentions a specific cuisine OR a dish strongly associated with one cuisine, return that cuisine.
+Otherwise, return null.
+
+Examples:
+- "burritos" → mexican
+- "find me good sushi" → japanese  
+- "italian near me" → italian
+- "pad thai" → thai
+- "best restaurants" → null
+- "something upscale" → null
+- "lunch" → null
+
+Return ONLY valid JSON (no markdown):
+{{"cuisine": "mexican"}}  or  {{"cuisine": null}}
+
+Supported cuisines: mexican, italian, japanese, chinese, thai, indian, french, korean, vietnamese, greek, american, seafood, mediterranean, spanish, middle eastern, ethiopian, caribbean, brazilian"""
+
+            response = self.gemini_lite_service.model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # Remove markdown if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            result = json.loads(response_text)
+            detected_cuisine = result.get('cuisine')
+
+            if detected_cuisine:
+                print(f"[CUISINE DETECTION] ✅ Detected: {detected_cuisine}")
+            else:
+                print(f"[CUISINE DETECTION] ℹ️ No specific cuisine detected")
+
+            return detected_cuisine
+
+        except Exception as e:
+            print(f"[CUISINE DETECTION] ⚠️ Error (falling back to None): {e}")
+            return None
 
     def get_user_preferences_tool(self, user_id: str) -> Dict[str, Any]:
         """
@@ -86,18 +182,19 @@ class RestaurantSearchService:
         self,
         latitude: float,
         longitude: float,
-        radius: int = 4828,  # 3 miles default
+        # ~25,000 miles (entire database, no geo limit)
+        radius: int = 40000000,
         limit: int = 50,
         min_rating: float = 4.0,
         cuisine_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Tool function: Get nearby restaurants from database.
+        Tool function: Get restaurants from database.
 
         Args:
-            latitude: Latitude coordinate
-            longitude: Longitude coordinate
-            radius: Search radius in meters (default: 4828m = 3 miles)
+            latitude: Latitude coordinate (used for distance calculation, not filtering)
+            longitude: Longitude coordinate (used for distance calculation, not filtering)
+            radius: Search radius in meters (default: 40000000m = entire database)
             limit: Maximum number of restaurants to return (default: 50)
             min_rating: Minimum rating filter (default: 4.0)
             cuisine_filter: Optional cuisine type to filter by
@@ -125,9 +222,15 @@ class RestaurantSearchService:
             # Apply cuisine filter if specified
             if cuisine_filter and restaurants:
                 original_count = len(restaurants)
+                # Use keyword mapping if available
+                target_cuisines = self.CUISINE_KEYWORD_MAPPING.get(
+                    cuisine_filter.lower(), [cuisine_filter])
+                print(
+                    f"[TOOL] Mapping '{cuisine_filter}' to cuisines: {target_cuisines}")
+
                 restaurants = [
                     r for r in restaurants
-                    if cuisine_filter.lower() in (r.get('cuisine') or '').lower()
+                    if any(target.lower() in (r.get('cuisine') or '').lower() for target in target_cuisines)
                 ]
                 print(
                     f"[TOOL] Cuisine filter: {original_count} → {len(restaurants)} restaurants")
@@ -250,17 +353,19 @@ class RestaurantSearchService:
             max_candidates: Maximum number of candidate restaurants to consider (default: 50)
 
         Returns:
-            Search results with top 3-4 restaurants and reasoning
+            Search results with top 5-6 restaurants and reasoning
         """
         import time
         search_start = time.time()
 
-        print(f"\n{'='*80}")
-        print(f"[RESTAURANT SEARCH] 🍽️  STARTING SEARCH SERVICE")
-        print(f"{'='*80}")
-        print(f"[RESTAURANT SEARCH] Query: '{query}'")
-        print(f"[RESTAURANT SEARCH] User: {user_id[:8]}...")
-        print(f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
+        print(f"\n{'='*80}", flush=True)
+        print(f"[RESTAURANT SEARCH] 🍽️  STARTING SEARCH SERVICE", flush=True)
+        print(f"{'='*80}", flush=True)
+        print(f"[RESTAURANT SEARCH] Query: '{query}'", flush=True)
+        print(f"[RESTAURANT SEARCH] User: {user_id[:8]}...", flush=True)
+        print(
+            f"[RESTAURANT SEARCH] Location: ({latitude}, {longitude})", flush=True)
+
         try:
             # Step 1: Get user preferences
             step1_start = time.time()
@@ -271,19 +376,8 @@ class RestaurantSearchService:
             print(
                 f"[RESTAURANT SEARCH]    Found cuisines: {preferences.get('cuisines', [])[:3]}")
 
-            # Step 2: Detect cuisine from query
-            cuisine_keywords = ['italian', 'japanese', 'chinese', 'mexican', 'thai', 'indian',
-                                'french', 'korean', 'vietnamese', 'greek', 'american', 'pizza',
-                                'sushi', 'ramen', 'tacos', 'burgers', 'seafood', 'mediterranean',
-                                'spanish', 'middle eastern', 'ethiopian', 'caribbean', 'brazilian']
-            detected_cuisine = None
-            query_lower = query.lower()
-            for cuisine in cuisine_keywords:
-                if cuisine in query_lower:
-                    detected_cuisine = cuisine
-                    print(
-                        f"[RESTAURANT SEARCH] Detected cuisine in query: {detected_cuisine}")
-                    break
+            # Step 2: Detect cuisine from query using Gemini Lite
+            detected_cuisine = await self._detect_cuisine_from_query(query)
 
             restaurants = []
             step2_start = time.time()
@@ -291,11 +385,11 @@ class RestaurantSearchService:
             if detected_cuisine:
                 # PATH A: Cuisine detected in query
                 print(
-                    f"[RESTAURANT SEARCH] Path A: Getting {detected_cuisine} restaurants within 3 miles...")
+                    f"[RESTAURANT SEARCH] Path A: Getting {detected_cuisine} restaurants from entire database...")
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=4828,  # 3 miles
+                    radius=40000000,  # Entire database
                     limit=max_candidates,
                     min_rating=4.0,
                     cuisine_filter=detected_cuisine
@@ -308,7 +402,7 @@ class RestaurantSearchService:
                     restaurants = self.get_nearby_restaurants_tool(
                         latitude=latitude,
                         longitude=longitude,
-                        radius=4828,
+                        radius=40000000,
                         limit=max_candidates,
                         min_rating=4.0
                     )
@@ -321,7 +415,7 @@ class RestaurantSearchService:
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=4828,  # 3 miles
+                    radius=40000000,  # Entire database
                     limit=max_candidates,
                     min_rating=4.0
                 )
@@ -393,7 +487,7 @@ class RestaurantSearchService:
                 prefs_text) > 150 else f"[RESTAURANT SEARCH]   - Full preference text: {prefs_text}")
 
             # Create LLM prompt with quality-focused ranking
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3-4 that best match the user's query.
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 5-6 that best match the user's query.
 
 USER'S QUERY: "{query}"
 
@@ -437,7 +531,7 @@ TASK:
 1. Calculate match_score for each restaurant (0.0-1.0) using the formula:
    match_score = (query_match × 0.3) + (rating_score × 0.4) + (popularity_score × 0.3)
 
-2. Select TOP 3-4 restaurants with highest scores
+2. Select TOP 5-6 restaurants with highest scores
 3. Provide BRIEF reasoning (1-2 sentences max)
 
 Return ONLY valid JSON (no markdown, no code blocks):
@@ -499,12 +593,17 @@ IMPORTANT:
 
             # Step 4: Call Gemini LLM
             step4_start = time.time()
-            print(f"\n[RESTAURANT SEARCH] ⏱️  Step 4/4: Calling Gemini AI...")
+            print(
+                f"\n[RESTAURANT SEARCH] ⏱️  Step 4/4: Calling Gemini AI (timeout: 60s)...", flush=True)
             print(f"[RESTAURANT SEARCH]    🤖 Waiting for LLM response...")
 
             try:
                 model = self.gemini_service.model
-                response = model.generate_content(prompt)
+                response = model.generate_content(
+                    prompt,
+                    # Increased from 30s to 60s
+                    request_options={'timeout': 60}
+                )
                 llm_elapsed = time.time() - step4_start
                 print(
                     f"[RESTAURANT SEARCH] ✅ Gemini responded in {llm_elapsed:.2f}s")
@@ -537,6 +636,24 @@ IMPORTANT:
                     f"[RESTAURANT SEARCH]    Response text preview: {response_text[:200]}...")
                 raise
 
+            # Validate and compute fallback match_scores
+            print(f"\n[RESTAURANT SEARCH] 🔍 Validating match scores...")
+            for rec in result.get('top_restaurants', []):
+                if 'match_score' not in rec or not isinstance(rec.get('match_score'), (int, float)) or rec.get('match_score') is None:
+                    # Compute fallback based on rating and popularity
+                    rating = rec.get('rating', 4.0)
+                    reviews = rec.get('user_ratings_total', 0)
+                    rating_score = rating / 5.0
+                    popularity_score = min(reviews / 500.0, 1.0)
+                    fallback_score = (rating_score * 0.6) + \
+                        (popularity_score * 0.4)
+                    rec['match_score'] = round(fallback_score, 2)
+                    print(
+                        f"[RESTAURANT SEARCH]    ⚠️ '{rec.get('name')}': Missing match_score, computed fallback = {fallback_score:.2f}")
+                else:
+                    print(
+                        f"[RESTAURANT SEARCH]    ✓ '{rec.get('name')}': match_score = {rec['match_score']:.2f}")
+
             # Log what LLM recommended
             print(f"\n[RESTAURANT SEARCH] 📋 LLM recommendations:")
             for i, rec in enumerate(result.get('top_restaurants', []), 1):
@@ -565,6 +682,18 @@ IMPORTANT:
                 if matching:
                     # Merge: LLM fields (reasoning, match_score) + original fields (place_id, photo_url, etc.)
                     enriched = {**matching, **llm_rec}
+
+                    # Ensure match_score is preserved and valid
+                    if 'match_score' not in enriched or not isinstance(enriched.get('match_score'), (int, float)) or enriched.get('match_score') is None:
+                        rating = enriched.get('rating', 4.0)
+                        reviews = enriched.get('user_ratings_total', 0)
+                        rating_score = rating / 5.0
+                        popularity_score = min(reviews / 500.0, 1.0)
+                        enriched['match_score'] = round(
+                            (rating_score * 0.6) + (popularity_score * 0.4), 2)
+                        print(
+                            f"[RESTAURANT SEARCH]       ⚠️ Recomputed match_score after enrichment: {enriched['match_score']:.2f}")
+
                     enriched_restaurants.append(enriched)
                     print(
                         f"[RESTAURANT SEARCH]    ✅ Matched to '{matching['name']}'")
@@ -572,9 +701,14 @@ IMPORTANT:
                         f"[RESTAURANT SEARCH]       - place_id: {matching.get('place_id', 'N/A')}")
                     print(
                         f"[RESTAURANT SEARCH]       - Distance: {matching.get('distance_meters', 'N/A')}m")
+                    print(
+                        f"[RESTAURANT SEARCH]       - Match score: {enriched.get('match_score', 'N/A')}")
                 else:
                     # Fallback: keep LLM result as-is (shouldn't happen, but safety)
                     print(f"[RESTAURANT SEARCH]    ⚠️ No match found in database!")
+                    # Ensure match_score exists even for unmatched results
+                    if 'match_score' not in llm_rec or not isinstance(llm_rec.get('match_score'), (int, float)):
+                        llm_rec['match_score'] = 0.5
                     enriched_restaurants.append(llm_rec)
 
             # Ensure we have 3-4 restaurants
@@ -609,6 +743,9 @@ IMPORTANT:
                 "latitude": latitude,
                 "longitude": longitude
             }
+            # TTS message for frontend to speak
+            restaurant_count = len(enriched_restaurants)
+            result["tts_message"] = f"Found {restaurant_count} great options"
 
             total_elapsed = time.time() - search_start
             print(f"\n{'='*80}")
@@ -641,13 +778,13 @@ IMPORTANT:
                 restaurants = self.get_nearby_restaurants_tool(
                     latitude=latitude,
                     longitude=longitude,
-                    radius=4828,
+                    radius=40000000,
                     limit=20,
                     min_rating=4.0
                 )
 
-                # Return top 4 by quality score
-                top_restaurants = restaurants[:4]
+                # Return top 6 by quality score
+                top_restaurants = restaurants[:6]
 
                 return {
                     "status": "success",
@@ -693,31 +830,65 @@ IMPORTANT:
             longitude: Location longitude
 
         Returns:
-            Search results with top 3 restaurants matching merged group preferences
+            Search results with top 5-6 restaurants matching merged group preferences
         """
-        print(f"[GROUP RESTAURANT SEARCH] Query: '{query}'")
-        print(f"[GROUP RESTAURANT SEARCH] Users: {len(user_ids)} people")
-        print(f"[GROUP RESTAURANT SEARCH] Location: ({latitude}, {longitude})")
+        print(f"\n{'='*80}", flush=True)
+        print(f"[GROUP RESTAURANT SEARCH] 🔍 STARTING GROUP SEARCH", flush=True)
+        print(f"[GROUP RESTAURANT SEARCH] Query: '{query}'", flush=True)
+        print(
+            f"[GROUP RESTAURANT SEARCH] Users: {len(user_ids)} people", flush=True)
+        print(
+            f"[GROUP RESTAURANT SEARCH] Location: ({latitude}, {longitude})", flush=True)
+        print(f"{'='*80}\n", flush=True)
 
         try:
+            print(f"[GROUP RESTAURANT SEARCH] ✅ Entered try block")
+
             # Step 1: Merge preferences from all users
             print(
                 f"[GROUP RESTAURANT SEARCH] Step 1: Merging preferences for {len(user_ids)} users...")
+
             merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(
                 user_ids)
             print(
                 f"[GROUP RESTAURANT SEARCH] Merged preferences: {merged_preferences}")
 
-            # Step 2: Get nearby restaurants (same as individual search)
-            print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding nearby restaurants...")
-            restaurants = self.get_nearby_restaurants_tool(
-                latitude=latitude,
-                longitude=longitude,
-                radius=1000,
-                limit=10
-            )
+            # Step 1.5: Detect cuisine from query using Gemini Lite
+            detected_cuisine = await self._detect_cuisine_from_query(query)
+
+            # Step 2: Get restaurants from entire database
+            print(f"[GROUP RESTAURANT SEARCH] Step 2: Finding restaurants...")
+
+            # If cuisine detected, filter by it and get more candidates
+            if detected_cuisine:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Getting {detected_cuisine} restaurants with cuisine filter...")
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=50,  # Get more candidates when filtering by cuisine
+                    min_rating=4.0,
+                    cuisine_filter=detected_cuisine
+                )
+            else:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] No cuisine detected, getting top-rated restaurants...")
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=10
+                )
+
+            print(
+                f"[GROUP RESTAURANT SEARCH] Got {len(restaurants) if restaurants else 0} restaurants from tool")
+            print(
+                f"[GROUP RESTAURANT SEARCH] Restaurants type: {type(restaurants)}")
 
             if not restaurants:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] ⚠️  No restaurants found, returning empty result")
                 return {
                     "status": "success",
                     "stage": "group - no restaurants found",
@@ -733,29 +904,50 @@ IMPORTANT:
                 f"[GROUP RESTAURANT SEARCH] Step 3: Asking LLM to analyze for group...")
 
             # Build restaurants list for prompt
-            restaurants_text = "\n".join([
-                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
-                for i, r in enumerate(restaurants)
-            ])
+            print(
+                f"[GROUP RESTAURANT SEARCH] Building restaurants list for prompt...")
+            try:
+                restaurants_text = "\n".join([
+                    f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
+                    for i, r in enumerate(restaurants)
+                ])
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Restaurants text built successfully ({len(restaurants_text)} chars)")
+            except Exception as build_error:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] ❌ Failed to build restaurants text: {build_error}")
+                raise build_error
 
             # Build merged preferences text
-            # Handle case where merged_preferences is a string (fallback message) vs dict
-            if isinstance(merged_preferences, str):
-                prefs_text = f"\n- {merged_preferences}"
-                has_group_preferences = False
-            else:
-                prefs_text = f"""
+            print(f"[GROUP RESTAURANT SEARCH] Building preferences text...")
+            try:
+                # Handle case where merged_preferences is a string (fallback message) vs dict
+                if isinstance(merged_preferences, str):
+                    prefs_text = f"\n- {merged_preferences}"
+                    has_group_preferences = False
+                else:
+                    prefs_text = f"""
 - Favorite Cuisines: {', '.join(merged_preferences.get('cuisines', [])) or 'None specified'}
 - Price Range: {merged_preferences.get('priceRange') or 'No preference'}
 - Atmosphere: {', '.join(merged_preferences.get('atmosphere', [])) or 'No preference'}
 - Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
 """
-                # Check if merged preferences are substantial
-                has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or
-                                             merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+                    # Check if merged preferences are substantial
+                    has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or
+                                                 merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Preferences text built: {prefs_text.strip()}")
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Has substantial group preferences: {has_group_preferences}")
+            except Exception as pref_build_error:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] ❌ Failed to build preferences text: {pref_build_error}")
+                raise pref_build_error
 
             # Create LLM prompt with edge case handling for groups
-            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 3 for a GROUP of {len(user_ids)} people dining together.
+            print(f"[GROUP RESTAURANT SEARCH] Building LLM prompt...")
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 5-6 for a GROUP of {len(user_ids)} people dining together.
 
 USER'S QUERY: "{query}"
 
@@ -765,37 +957,47 @@ AVAILABLE RESTAURANTS:
 {restaurants_text}
 
 GROUP RANKING RULES (PRIORITY ORDER):
-1. **QUERY OVERRIDE**: If the query explicitly mentions cuisine/food type (e.g., "Chinese food"), ONLY recommend that type regardless of group preferences.
-2. **EMPTY GROUP PREFERENCES**: If group has minimal/no preferences, rely on query and prioritize:
+1. **QUERY OVERRIDE FOR CUISINE**: If the query explicitly mentions cuisine/food type (e.g., "sushi night", "Chinese food"), ONLY recommend that cuisine type.
+   - BUT STILL USE group preferences for atmosphere, price, and flavor preferences!
+   - Example: "sushi night" → Japanese cuisine ONLY, but pick the sushi place that matches group's atmosphere/price preferences
+   
+2. **BLEND QUERY + PREFERENCES**: The query sets the cuisine/main requirement, preferences refine the selection:
+   - Query "sushi" + Group likes "upscale, romantic" → Upscale sushi restaurant
+   - Query "lunch" + Group likes "casual, cheap" → Casual affordable lunch spot
+   - Query "Italian" + Group likes "spicy, bold" → Italian place with bold flavors
+   
+3. **EMPTY GROUP PREFERENCES**: If group has minimal/no preferences, rely on query and prioritize:
    - Highly-rated restaurants
    - Diverse menu options (good for groups with varied tastes)
    - Group-friendly atmosphere (casual, spacious)
-3. **VAGUE QUERIES**: If query is vague (e.g., "food for group"), use merged preferences. If both vague, prioritize:
-   - Highest ratings
-   - Restaurants that can accommodate groups
-   - Diverse cuisines from merged preferences
-4. **EXPLICIT GROUP NEEDS**: Respect requirements like "vegetarian options", "large tables", "family-friendly", "cheap eats"
-5. **CONFLICT RESOLUTION**: When group has diverse preferences (e.g., "Italian + Japanese + Mexican"), look for:
-   - Fusion restaurants
-   - Places with varied menu
-   - Or pick best-rated from each cuisine type
-6. **PREFERENCES AS SECONDARY**: Use merged preferences only when query doesn't override
+   
+4. **VAGUE QUERIES**: If query is vague (e.g., "where should we eat?"), use merged preferences fully:
+   - Apply group's favorite cuisines
+   - Match atmosphere preferences (romantic, casual, upscale, etc.)
+   - Consider price range preferences
+   
+5. **EXPLICIT GROUP NEEDS**: Always respect explicit requirements like "vegetarian", "family-friendly", "cheap eats", "date night"
+
+6. **ATMOSPHERE MATTERS**: When selecting between restaurants of the same cuisine, use group atmosphere preferences:
+   - Romantic, cozy, casual, upscale, lively, quiet, etc.
 
 EXAMPLES:
-- Query "Chinese food" + Group wants "Italian, French" → ONLY Chinese (query wins)
-- Query "where should we eat?" + Group wants "Mexican, Spicy" → Mexican restaurants
+- Query "sushi night" + Group likes "romantic, upscale" → Upscale romantic sushi restaurant (query sets cuisine, preferences refine)
+- Query "Chinese food" + Group wants "Italian, French" → ONLY Chinese cuisine, but pick the Chinese place with best ambiance
+- Query "where should we eat?" + Group wants "Mexican, casual, spicy" → Casual Mexican with spicy options
 - Query "lunch spot" + No group preferences → High-rated, group-friendly, diverse menus
-- Query "vegan options" + Group wants "Steakhouse" → Vegan-friendly places (query wins)
+- Query "date night Italian" + Group likes "cozy, intimate" → Cozy intimate Italian restaurant
 
 GROUP CONTEXT:
 - Dining with {len(user_ids)} people - ensure restaurants can accommodate
 - Merged preferences represent ALL members - aim to satisfy everyone
 - Group dynamics matter - consider noise level, seating, varied menu
+- CRITICAL: Query dominates for cuisine/food type, but atmosphere/price/flavor preferences ALWAYS apply!
 
 TASK:
 1. Identify if query has specific requirements
 2. Apply ranking rules above
-3. Select TOP 3 that work for the ENTIRE group
+3. Select TOP 5-6 that work for the ENTIRE group
 4. Explain your reasoning
 
 Return ONLY valid JSON (no markdown, no code blocks):
@@ -836,13 +1038,28 @@ GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - 
 
 IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
 
-            # Call Gemini
-            response = self.gemini_service.model.generate_content(prompt)
-            response_text = response.text.strip()
-            
-            print(f"\n[GROUP SEARCH LLM] Raw response received:")
-            print(f"[GROUP SEARCH LLM] {response_text[:500]}...")  # First 500 chars
-            print()
+            # Call Gemini with timeout configuration (60 seconds for complex group analysis)
+            print(
+                f"[GROUP RESTAURANT SEARCH] 🤖 Calling Gemini API (timeout: 60s)...", flush=True)
+            try:
+                response = self.gemini_service.model.generate_content(
+                    prompt,
+                    # Increased from 30s to 60s
+                    request_options={'timeout': 60}
+                )
+                response_text = response.text.strip()
+                print(
+                    f"[GROUP RESTAURANT SEARCH] ✅ Gemini API responded successfully")
+
+                # Add detailed debug logging from main branch
+                print(f"\n[GROUP SEARCH LLM] Raw response received:")
+                # First 500 chars
+                print(f"[GROUP SEARCH LLM] {response_text[:500]}...")
+                print()
+            except Exception as llm_error:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] ❌ Gemini API call failed: {type(llm_error).__name__}: {str(llm_error)}")
+                raise llm_error
 
             # Clean up markdown if present
             if response_text.startswith("```json"):
@@ -855,17 +1072,26 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
 
             # Parse JSON
             import json
+            print(f"[GROUP RESTAURANT SEARCH] Parsing LLM response...")
             result = json.loads(response_text)
-            
-            print(f"[GROUP SEARCH LLM] Parsed result: {len(result.get('top_restaurants', []))} restaurants")
+            print(f"[GROUP RESTAURANT SEARCH] Parsed JSON successfully")
+            print(
+                f"[GROUP RESTAURANT SEARCH] LLM returned {len(result.get('top_restaurants', []))} restaurants")
+
+            # Add detailed debugging from main branch
+            print(
+                f"[GROUP SEARCH LLM] Parsed result: {len(result.get('top_restaurants', []))} restaurants")
             if result.get('top_restaurants'):
                 for i, r in enumerate(result['top_restaurants']):
-                    print(f"  {i+1}. {r.get('name')} - {r.get('cuisine')} ({r.get('rating')}⭐)")
+                    print(
+                        f"  {i+1}. {r.get('name')} - {r.get('cuisine')} ({r.get('rating')}⭐)")
             else:
                 print(f"  ⚠️ NO RESTAURANTS in LLM response!")
                 print(f"  Result keys: {list(result.keys())}")
 
             # CRITICAL: Enrich LLM results with full restaurant data (place_id, photo_url, etc.)
+            print(
+                f"[GROUP RESTAURANT SEARCH] Enriching LLM recommendations with full restaurant data...")
             enriched_restaurants = []
             for llm_rec in result.get('top_restaurants', []):
                 matching = next(
@@ -887,16 +1113,20 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                     enriched_restaurants.append(llm_rec)
 
             result['top_restaurants'] = enriched_restaurants
+            print(
+                f"[GROUP RESTAURANT SEARCH] Final enriched count: {len(enriched_restaurants)}")
             result['all_nearby_restaurants'] = restaurants
 
             # Fallback: If LLM returned no restaurants, use top-rated nearby ones
             if not enriched_restaurants:
-                print(f"[GROUP SEARCH] ⚠️ LLM returned 0 restaurants, using top 3 nearby as fallback")
+                print(
+                    f"[GROUP SEARCH] ⚠️ LLM returned 0 restaurants, using top 6 nearby as fallback")
                 fallback_restaurants = sorted(
-                    restaurants, 
-                    key=lambda r: (r.get('rating', 0), r.get('user_ratings_total', 0)), 
+                    restaurants,
+                    key=lambda r: (r.get('rating', 0), r.get(
+                        'user_ratings_total', 0)),
                     reverse=True
-                )[:3]
+                )[:6]
                 result['top_restaurants'] = fallback_restaurants
                 result['stage'] = "group - fallback (LLM returned empty)"
 
@@ -911,24 +1141,59 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 "longitude": longitude
             }
 
+            # Add TTS message for frontend to play
+            restaurant_count = len(result.get('top_restaurants', []))
+            result["tts_message"] = f"Found {restaurant_count} great option{'s' if restaurant_count != 1 else ''} for your group"
+
             print(
                 f"[GROUP RESTAURANT SEARCH] ✅ Returning {len(result.get('top_restaurants', []))} restaurants for group")
+
             return result
 
         except Exception as e:
-            print(f"[GROUP RESTAURANT SEARCH ERROR] {str(e)}")
+            print(f"\n{'='*80}")
+            print(f"[GROUP RESTAURANT SEARCH] ❌❌❌ EXCEPTION CAUGHT ❌❌❌")
+            print(
+                f"[GROUP RESTAURANT SEARCH] Exception type: {type(e).__name__}")
+            print(f"[GROUP RESTAURANT SEARCH] Exception message: {str(e)}")
+            print(f"[GROUP RESTAURANT SEARCH] Exception args: {e.args}")
+            print(f"{'='*80}")
             import traceback
+            print(f"[GROUP RESTAURANT SEARCH] Full traceback:")
             traceback.print_exc()
+            print(f"{'='*80}\n")
 
-            # Fallback
-            merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(
-                user_ids)
-            restaurants = self.get_nearby_restaurants_tool(
-                latitude=latitude,
-                longitude=longitude,
-                radius=1000,
-                limit=10
-            )
+            # Fallback - still return top_restaurants for frontend compatibility
+            print(f"[GROUP RESTAURANT SEARCH] 🔄 Attempting fallback...")
+            try:
+                merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(
+                    user_ids)
+                print(f"[GROUP RESTAURANT SEARCH] Fallback: Merged preferences OK")
+            except Exception as pref_error:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Fallback: Preference merge failed: {pref_error}")
+                merged_preferences = {}
+
+            try:
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=10
+                )
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Fallback: Got {len(restaurants) if restaurants else 0} restaurants")
+            except Exception as rest_error:
+                print(
+                    f"[GROUP RESTAURANT SEARCH] Fallback: Restaurant fetch failed: {rest_error}")
+                restaurants = []
+
+            # Return top 6 restaurants as fallback (frontend expects top_restaurants key)
+            top_6 = restaurants[:6] if restaurants else []
+
+            print(
+                f"[GROUP RESTAURANT SEARCH] ⚠️  Using fallback with {len(top_6)} restaurants")
+            print(f"{'='*80}\n")
 
             return {
                 "status": "success",
@@ -937,12 +1202,206 @@ IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
                 "query": query,
                 "user_count": len(user_ids),
                 "merged_preferences": merged_preferences,
-                "nearby_restaurants": restaurants,
+                "top_restaurants": top_6,  # ✅ CRITICAL: Frontend expects this key
+                "all_nearby_restaurants": restaurants,
                 "location": {
                     "latitude": latitude,
                     "longitude": longitude
                 }
             }
+
+    async def search_restaurants_for_group_stream(
+        self,
+        query: str,
+        user_ids: List[str],
+        latitude: float,
+        longitude: float
+    ) -> AsyncGenerator[str, None]:
+        """
+        Streaming version of group search that yields progress updates.
+
+        Yields SSE-formatted progress messages that can be sent to frontend in real-time.
+
+        Yields:
+            SSE-formatted strings: "data: {...}\\n\\n"
+        """
+        try:
+            print(f"\n{'='*80}")
+            print(f"[GROUP SEARCH STREAM] 🔍 STARTING STREAMING GROUP SEARCH")
+            print(f"[GROUP SEARCH STREAM] Query: '{query}'")
+            print(f"[GROUP SEARCH STREAM] Users: {len(user_ids)} people")
+            print(f"{'='*80}\n")
+
+            # STEP 1: Merge preferences
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Analyzing group taste profiles', 'step': 1})}\n\n"
+
+            merged_preferences = self.taste_profile_service.merge_multiple_user_preferences(
+                user_ids)
+            print(f"[GROUP SEARCH STREAM] ✅ Step 1 complete: Merged preferences")
+
+            # STEP 2: Detect cuisine and get restaurants
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Finding nearby restaurants', 'step': 2})}\n\n"
+
+            # Detect cuisine using Gemini Lite
+            detected_cuisine = await self._detect_cuisine_from_query(query)
+
+            # Get restaurants
+            if detected_cuisine:
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=50,
+                    min_rating=4.0,
+                    cuisine_filter=detected_cuisine
+                )
+            else:
+                restaurants = self.get_nearby_restaurants_tool(
+                    latitude=latitude,
+                    longitude=longitude,
+                    radius=40000000,
+                    limit=10
+                )
+
+            print(
+                f"[GROUP SEARCH STREAM] ✅ Step 2 complete: Found {len(restaurants) if restaurants else 0} restaurants")
+
+            if not restaurants:
+                result = {
+                    "status": "success",
+                    "stage": "group - no restaurants found",
+                    "query": query,
+                    "user_count": len(user_ids),
+                    "top_restaurants": [],
+                    "message": "No restaurants found nearby",
+                    "location": {"latitude": latitude, "longitude": longitude}
+                }
+                yield f"data: {json.dumps({'type': 'complete', 'data': result})}\n\n"
+                return
+
+            # STEP 3: LLM ranking
+            yield f"data: {json.dumps({'type': 'progress', 'message': 'Computing compatibility scores', 'step': 3})}\n\n"
+
+            # Build prompt (using same logic as non-streaming version)
+            restaurants_text = "\n".join([
+                f"{i+1}. {r['name']} - {r['cuisine']} ({r['rating']}⭐, {'$' * (r.get('price_level') or 2)}) - {r['address']}"
+                for i, r in enumerate(restaurants)
+            ])
+
+            if isinstance(merged_preferences, str):
+                prefs_text = f"\n- {merged_preferences}"
+                has_group_preferences = False
+            else:
+                prefs_text = f"""
+- Favorite Cuisines: {', '.join(merged_preferences.get('cuisines', [])) or 'None specified'}
+- Price Range: {merged_preferences.get('priceRange') or 'No preference'}
+- Atmosphere: {', '.join(merged_preferences.get('atmosphere', [])) or 'No preference'}
+- Flavor Notes: {', '.join(merged_preferences.get('flavorNotes', [])) or 'No preference'}
+"""
+                has_group_preferences = bool(merged_preferences.get('cuisines') or merged_preferences.get('priceRange') or
+                                             merged_preferences.get('atmosphere') or merged_preferences.get('flavorNotes'))
+
+            prompt = f"""You are a restaurant recommendation expert. Analyze these restaurants and select the TOP 5-6 for a GROUP of {len(user_ids)} people dining together.
+
+USER'S QUERY: "{query}"
+
+GROUP'S MERGED PREFERENCES:{prefs_text}
+
+AVAILABLE RESTAURANTS:
+{restaurants_text}
+
+GROUP RANKING RULES (PRIORITY ORDER):
+1. **QUERY OVERRIDE FOR CUISINE**: If the query explicitly mentions cuisine/food type (e.g., "sushi night", "Chinese food"), ONLY recommend that cuisine type.
+   - BUT STILL USE group preferences for atmosphere, price, and flavor preferences!
+   
+2. **BLEND QUERY + PREFERENCES**: The query sets the cuisine/main requirement, preferences refine the selection.
+   
+3. **EMPTY GROUP PREFERENCES**: If group has minimal/no preferences, rely on query and prioritize highly-rated restaurants.
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{{
+  "top_restaurants": [
+    {{
+      "name": "Restaurant Name",
+      "cuisine": "Cuisine Type",
+      "rating": 4.5,
+      "address": "Full address",
+      "price_level": 2,
+      "match_score": 0.95,
+      "reason": "Brief reason"
+    }}
+  ],
+  "overall_reasoning": "How you balanced query vs group preferences"
+}}
+
+GROUP HAS {'MINIMAL' if not has_group_preferences else 'DIVERSE'} PREFERENCES - adjust accordingly.
+
+IMPORTANT: Keep reasoning CONCISE - maximum 1-2 sentences each."""
+
+            # Call LLM
+            response = self.gemini_service.model.generate_content(
+                prompt,
+                request_options={'timeout': 30}
+            )
+            response_text = response.text.strip()
+
+            print(f"[GROUP SEARCH STREAM] ✅ Step 3 complete: LLM ranking done")
+
+            # Parse LLM response
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            try:
+                llm_result = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                print(f"[GROUP SEARCH STREAM] ❌ JSON parse failed: {e}")
+                llm_result = {"top_restaurants": restaurants[:5]}
+
+            # STEP 4: Enrich results
+            top_recommendations = llm_result.get("top_restaurants", [])
+            enriched = []
+
+            for llm_rec in top_recommendations:
+                llm_name = llm_rec.get("name", "")
+                for full_rest in restaurants:
+                    if full_rest.get("name") == llm_name:
+                        enriched_rest = {**full_rest, **llm_rec}
+                        enriched.append(enriched_rest)
+                        break
+
+            result = {
+                "status": "success",
+                "stage": "group - LLM ranking",
+                "query": query,
+                "user_count": len(user_ids),
+                "merged_preferences": merged_preferences,
+                "top_restaurants": enriched,
+                "all_nearby_restaurants": restaurants,
+                "llm_reasoning": llm_result.get("overall_reasoning", ""),
+                "location": {
+                    "latitude": latitude,
+                    "longitude": longitude
+                }
+            }
+
+            print(
+                f"[GROUP SEARCH STREAM] ✅ Complete: Returning {len(enriched)} restaurants")
+
+            # Final yield with complete results
+            yield f"data: {json.dumps({'type': 'complete', 'data': result})}\n\n"
+
+        except Exception as e:
+            print(f"[GROUP SEARCH STREAM] ❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+            # Yield error
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
 
 # Singleton instance

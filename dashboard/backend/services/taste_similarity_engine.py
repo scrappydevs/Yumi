@@ -125,10 +125,78 @@ Return ONLY the explanation sentence, no quotes or extra text."""
         else:
             explanation = f"Diverse taste profiles"
     
+    # Extract shared cuisines from both profiles
+    shared_cuisines = []
+    try:
+        from services.taste_profile_service import get_taste_profile_service
+        taste_service = get_taste_profile_service()
+        
+        # Parse both users' preferences to extract structured data
+        prefs1_structured = taste_service.parse_preferences_to_structured(prefs1)
+        prefs2_structured = taste_service.parse_preferences_to_structured(prefs2)
+        
+        cuisines1 = set(prefs1_structured.get('cuisines', []))
+        cuisines2 = set(prefs2_structured.get('cuisines', []))
+        
+        # Find intersection
+        shared_cuisines = list(cuisines1.intersection(cuisines2))
+        
+        print(f"[SIMILARITY] User 1 cuisines: {cuisines1}")
+        print(f"[SIMILARITY] User 2 cuisines: {cuisines2}")
+        print(f"[SIMILARITY] Shared cuisines: {shared_cuisines}")
+        
+    except Exception as e:
+        print(f"[SIMILARITY] Failed to extract shared cuisines: {e}")
+        shared_cuisines = []
+    
+    # Extract shared restaurants from reviews/interactions
+    shared_restaurants = []
+    try:
+        # Get restaurants both users have interacted with
+        # Query reviews/interactions table for common restaurants
+        user1_restaurants = supabase.table('reviews')\
+            .select('restaurant_name, place_id')\
+            .eq('user_id', user_id_1)\
+            .execute()
+        
+        user2_restaurants = supabase.table('reviews')\
+            .select('restaurant_name, place_id')\
+            .eq('user_id', user_id_2)\
+            .execute()
+        
+        # Create sets of place_ids
+        restaurants1 = {r['place_id']: r['restaurant_name'] 
+                       for r in (user1_restaurants.data or []) 
+                       if r.get('place_id')}
+        
+        restaurants2 = {r['place_id']: r['restaurant_name'] 
+                       for r in (user2_restaurants.data or []) 
+                       if r.get('place_id')}
+        
+        # Find common place_ids
+        common_place_ids = set(restaurants1.keys()).intersection(set(restaurants2.keys()))
+        
+        # Create list of shared restaurants
+        shared_restaurants = [
+            {
+                'place_id': pid,
+                'name': restaurants1[pid]
+            }
+            for pid in common_place_ids
+        ][:10]  # Limit to 10 most relevant
+        
+        print(f"[SIMILARITY] User 1 restaurants: {len(restaurants1)}")
+        print(f"[SIMILARITY] User 2 restaurants: {len(restaurants2)}")
+        print(f"[SIMILARITY] Shared restaurants: {len(shared_restaurants)}")
+        
+    except Exception as e:
+        print(f"[SIMILARITY] Failed to extract shared restaurants: {e}")
+        shared_restaurants = []
+    
     return {
         'similarity_score': float(similarity_score),
-        'cuisine_overlap': [],  # Not extracted from text for now
-        'shared_restaurants': [],  # Not extracted from text for now
+        'cuisine_overlap': shared_cuisines,  # ✅ Now populated with common cuisines!
+        'shared_restaurants': shared_restaurants,  # ✅ Now populated with common restaurants!
         'explanation': explanation
     }
 
