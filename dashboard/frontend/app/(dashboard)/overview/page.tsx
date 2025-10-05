@@ -656,11 +656,6 @@ export default function DiscoverPage() {
     
     const searchQuery = prompt;  // Save the query before clearing
     const searchMentions = [...mentions];  // Save mentions before clearing
-<<<<<<< HEAD
-    // mentionedFriendsData will persist automatically now (no longer cleared by useEffect)
-    setPrompt('');  // Clear the input immediately
-    setMentions([]);  // Clear mentions from input
-=======
     const searchMentionedFriends = [...mentionedFriendsData];  // Save mentioned friends to keep them visible
     
     // Check if this is a group search (has mentions)
@@ -677,7 +672,6 @@ export default function DiscoverPage() {
     // Clear input and state
     setPrompt('');
     setMentions([]);
->>>>>>> main
     
     setIsThinking(true);
     setShowingResults(false);
