@@ -12,6 +12,14 @@ struct aegisApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onOpenURL { url in
+                    // Handle OAuth callback
+                    if url.scheme == "io.supabase.aegis" {
+                        Task {
+                            await AuthService.shared.handleOAuthCallback(url: url)
+                        }
+                    }
+                }
         }
     }
 }

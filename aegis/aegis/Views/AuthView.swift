@@ -9,9 +9,6 @@ import SwiftUI
 
 struct AuthView: View {
     @ObservedObject private var authService = AuthService.shared
-    @State private var email = ""
-    @State private var password = ""
-    @State private var isSignUp = false
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -20,26 +17,15 @@ struct AuthView: View {
             Spacer()
 
             // App Title
-            Text("Aegis")
+            Text("Yummy")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Report City Issues")
+            Text("Discover Great Food")
                 .font(.subheadline)
                 .foregroundColor(.gray)
 
             Spacer()
-
-            // Email Field
-            TextField("Email", text: $email)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .textInputAutocapitalization(.never)
-                .keyboardType(.emailAddress)
-                .autocorrectionDisabled()
-
-            // Password Field
-            SecureField("Password", text: $password)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
 
             // Error Message
             if let error = errorMessage {
@@ -48,58 +34,44 @@ struct AuthView: View {
                     .font(.caption)
             }
 
-            // Sign In/Sign Up Button
-            Button(action: handleAuth) {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Text(isSignUp ? "Sign Up" : "Sign In")
-                        .fontWeight(.semibold)
+            // Google Sign In Button
+            Button(action: handleGoogleSignIn) {
+                HStack {
+                    Image(systemName: "globe")
+                        .font(.system(size: 16))
+                    Text("Continue with Google")
+                        .fontWeight(.medium)
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color.white)
+                .foregroundColor(.black)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                )
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(10)
             .disabled(isLoading)
 
-            // Toggle Sign In/Sign Up
-            Button(action: {
-                isSignUp.toggle()
-                errorMessage = nil
-            }) {
-                Text(isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-            }
 
             Spacer()
         }
         .padding()
     }
 
-    private func handleAuth() {
-        guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Please enter email and password"
-            return
-        }
-
+    private func handleGoogleSignIn() {
         isLoading = true
         errorMessage = nil
-
+        
         Task {
             do {
-                if isSignUp {
-                    try await authService.signUp(email: email, password: password)
-                } else {
-                    try await authService.signIn(email: email, password: password)
-                }
+                try await authService.signInWithOAuth()
+                // OAuth will redirect and handle session automatically
             } catch {
                 errorMessage = error.localizedDescription
+                isLoading = false
             }
-            isLoading = false
         }
     }
 }

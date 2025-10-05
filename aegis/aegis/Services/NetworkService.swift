@@ -12,8 +12,8 @@ class NetworkService {
     static let shared = NetworkService()
 
     // Backend URL - Using ngrok tunnel to local backend
-    private let baseURL = "https://unsliding-deena-unsportful.ngrok-free.dev"
-
+    //private let baseURL = "https://unsliding-deena-unsportful.ngrok-free.dev"
+    private let baseURL = "https://yummy-wehd.onrender.com"
     private init() {}
 
     // MARK: - Flexible Date Decoding Strategy

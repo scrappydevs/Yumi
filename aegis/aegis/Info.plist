@@ -27,6 +27,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>davidjr.aegis</string>
+				<string>io.supabase.aegis</string>
 			</array>
 		</dict>
 	</array>
