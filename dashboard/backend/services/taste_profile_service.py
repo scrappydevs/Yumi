@@ -505,27 +505,36 @@ RECENT SEARCH QUERIES:
 {chr(10).join(f"- {q}" for q in recent_searches) if recent_searches else "None yet"}
 
 TASK:
-Generate a natural, engaging, ~2 paragraph preference profile. Write in third person (e.g., "The user loves...").
+Generate a concise, scannable preference profile using bullet points and short phrases. Write in third person (e.g., "Loves...", "Frequently visits...").
 
 GUIDELINES:
-1. **Be specific and descriptive** - mention actual restaurants, favorite cuisines, typical dining patterns
-2. **Weight signals appropriately**:
+1. **Use bullet points** - Each preference should be a clear, concise bullet
+2. **Be specific and descriptive** - mention actual restaurants, favorite cuisines, typical dining patterns
+3. **Weight signals appropriately**:
    - Reservations = strongest evidence of preference (weight: 10.0)
    - Maps views = strong intent (weight: 5.0)
    - Clicks = explicit interest (weight: 3.0)
    - Views = mild interest (weight: 2.0)
    - Searches = initial curiosity (weight: 1.0)
-3. **Keep the warmth** - write like you're describing a friend's taste
-4. **Update, don't replace** - if current preferences exist, MERGE them with new insights rather than replacing
-5. **Include context** - time of day, who they dine with, special occasions, atmosphere preferences
-6. **Be concise** - aim for ~150-250 words total
+4. **Group related items** - Organize bullets by theme (cuisines, restaurants, dining style, atmosphere)
+5. **Update, don't replace** - if current preferences exist, MERGE them with new insights rather than replacing
+6. **Be concise** - aim for 6-10 bullet points total
 
 EXAMPLE STYLE:
-"The user has a deep love for Indian cuisine, particularly dishes that balance spicy heat with sweet undertones. They frequently explore new restaurants with friends, especially trendy bars and late-night spots in the city. Their all-time favorite dining experience was the fresh seafood at The Pier in New York, where they discovered a passion for sushi. They return frequently to authentic Japanese restaurants, always seeking that perfect balance of traditional preparation and creative presentation.
+"• Loves Thai and Japanese cuisine - frequently orders spicy curries and fresh sushi
+• Favorite spots: The Pier (seafood), Sakura Sushi Bar, Bangkok Street Kitchen
+• Fine dining enthusiast - comfortable with $$$ to $$$$ for special occasions
+• Prefers vibrant, lively atmospheres over quiet, formal settings
+• Often dines with groups of friends - enjoys shareable plates and communal dining
+• Recent interests: Korean BBQ, Vietnamese pho, date-night pizza spots
+• Frequently makes reservations for weekend dinners
+• Searches for upscale experiences and hidden gems in the city"
 
-When choosing where to eat, they gravitate toward vibrant, lively atmospheres over quiet, formal settings. They're comfortable spending $$ to $$$ for a good meal, especially when trying new cuisines. Recent patterns show a growing interest in Korean BBQ and Thai food, with multiple visits to popular local spots. They appreciate restaurants that accommodate groups and offer shareable plates for communal dining experiences."
-
-IMPORTANT: If current preferences exist, MERGE the new insights with the existing text. Keep what's still relevant and add new patterns. Don't completely replace unless the new data contradicts old preferences.
+IMPORTANT: 
+- If current preferences exist, MERGE the new insights with existing bullets. Keep what's still relevant and add new patterns.
+- Use "•" for bullets
+- Keep each bullet to one line when possible
+- Start bullets with strong verbs or descriptive phrases (Loves, Enjoys, Prefers, Frequently visits, etc.)
 
 Return ONLY the natural language preference text (no JSON, no markdown, no explanations).
 """
