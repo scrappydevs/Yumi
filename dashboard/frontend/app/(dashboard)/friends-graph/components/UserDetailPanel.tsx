@@ -98,11 +98,11 @@ export function UserDetailPanel({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 100, opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="w-96 h-[700px] glass-panel rounded-2xl overflow-hidden shadow-2xl"
+      className="w-96 h-[700px] rounded-2xl overflow-hidden shadow-2xl"
       style={{
         backdropFilter: "blur(40px) saturate(180%)",
         background: "rgba(248, 250, 252, 0.85)",
-        border: "1px solid rgba(148, 163, 184, 0.2)",
+        border: "none",
       }}
     >
       {/* Close button */}
@@ -132,7 +132,9 @@ export function UserDetailPanel({
                 height={100}
                 className="rounded-full border-4 border-white shadow-lg"
               />
-              {user.mutual_friends_count && user.mutual_friends_count > 0 && (
+              {user.mutual_friends_count !== undefined && 
+               user.mutual_friends_count !== null && 
+               user.mutual_friends_count > 0 && (
                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full glass-panel text-xs font-semibold text-[hsl(var(--primary))]">
                   {user.mutual_friends_count} mutual
                 </div>
