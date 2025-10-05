@@ -79,7 +79,7 @@ export function useGraphLayout() {
 /**
  * Proper iterative force-directed layout simulation
  * This ensures that similarity-based distances are enforced through multiple iterations
- * until the system reaches equilibrium
+ * until the system reaches equilibrium (unlike the previous single-pass approach)
  */
 function calculateForceDirectedLayout(
   friends: GraphData['friends'],
@@ -102,6 +102,19 @@ function calculateForceDirectedLayout(
     });
     velocities.push({ x: 0, y: 0 });
   }
+  
+  // Build adjacency map for faster lookups
+  const adjacencyMap = new Map<string, Map<string, number>>();
+  similarities.forEach((sim) => {
+    if (!adjacencyMap.has(sim.source)) {
+      adjacencyMap.set(sim.source, new Map());
+    }
+    if (!adjacencyMap.has(sim.target)) {
+      adjacencyMap.set(sim.target, new Map());
+    }
+    adjacencyMap.get(sim.source)!.set(sim.target, sim.similarity_score);
+    adjacencyMap.get(sim.target)!.set(sim.source, sim.similarity_score);
+  });
   
   // Build index map
   const idToIndex = new Map<string, number>();

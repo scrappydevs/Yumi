@@ -44,7 +44,7 @@ function SimilarityEdge({
   const tasteOverlap = data?.tasteOverlap ?? {};
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent triggering pane click
     console.log('🔵 Edge CLICKED:', { 
       id, 
       source, 
