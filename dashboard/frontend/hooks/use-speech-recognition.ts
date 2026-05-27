@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// TypeScript declarations for Web Speech API
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
   resultIndex: number;
@@ -91,7 +90,6 @@ export function useSpeechRecognition(
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Check if speech recognition is supported
   useEffect(() => {
     const SpeechRecognitionAPI =
       (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) || null;
@@ -173,8 +171,6 @@ export function useSpeechRecognition(
       recognitionRef.current.start();
     } catch (err) {
       if (err instanceof Error && err.message.includes('already started')) {
-        // Already listening, ignore
-        console.log('Speech recognition already started');
       } else {
         setError(err instanceof Error ? err.message : 'Failed to start recognition');
       }

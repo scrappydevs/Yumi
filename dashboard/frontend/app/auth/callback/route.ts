@@ -13,11 +13,9 @@ export async function GET(request: NextRequest) {
     
     if (error) {
       console.error('Error exchanging code for session:', error)
-      // Redirect to home with error
       return NextResponse.redirect(`${origin}/?error=auth_failed`)
     }
     
-    // Check if user has completed onboarding
     const { data: { user } } = await supabase.auth.getUser()
     
     if (user) {
@@ -27,17 +25,14 @@ export async function GET(request: NextRequest) {
         .eq('id', user.id)
         .single()
       
-      // If profile doesn't exist or not onboarded, send to home for onboarding
       if (profileError || !profile?.onboarded) {
         return NextResponse.redirect(`${origin}/`)
       }
       
-      // User is fully set up, send to overview
       return NextResponse.redirect(`${origin}/overview`)
     }
   }
 
-  // No code provided, redirect to home
   return NextResponse.redirect(`${origin}/`)
 }
 

@@ -39,11 +39,9 @@ export function InviteRow({ phoneE164, text, href }: InviteRowProps) {
   
   return (
     <div className="glass-layer-1 rounded-2xl p-4 space-y-3 shadow-soft relative overflow-hidden">
-      {/* Specular highlight */}
       <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/20 to-transparent pointer-events-none rounded-t-2xl" />
       
       <div className="relative z-10">
-        {/* Phone number */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-semibold text-black">
             {formatPhoneForDisplay(phoneE164)}
@@ -64,7 +62,6 @@ export function InviteRow({ phoneE164, text, href }: InviteRowProps) {
           </AnimatePresence>
         </div>
         
-        {/* Message preview */}
         <div 
           className="bg-white/40 rounded-xl p-3 mb-3 text-sm text-gray-700 cursor-pointer hover:bg-white/60 transition-colors border border-gray-100"
           onClick={handleCopy}
@@ -81,7 +78,6 @@ export function InviteRow({ phoneE164, text, href }: InviteRowProps) {
           {text}
         </div>
         
-        {/* Action buttons */}
         <div className="flex gap-2">
           <Button
             asChild

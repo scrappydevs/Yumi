@@ -49,28 +49,21 @@ export function UserDetailPanel({
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(false);
 
-  console.log("🎭 UserDetailPanel render:", { userId, currentUserId, user });
-
   useEffect(() => {
     if (!userId) {
-      console.log("❌ No userId - clearing panel");
       setUser(null);
       return;
     }
 
     async function fetchUserDetails() {
-      console.log("🔍 Fetching user details for:", userId);
       setLoading(true);
       try {
-        // Fetch user profile and food preferences
         const url = currentUserId
           ? `/api/friends/profile/${userId}?current_user_id=${currentUserId}`
           : `/api/friends/profile/${userId}`;
-        console.log("📡 Fetching from:", url);
         const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
-          console.log("✅ User data received:", data);
           setUser(data);
         } else {
           console.error(
@@ -89,7 +82,6 @@ export function UserDetailPanel({
     fetchUserDetails();
   }, [userId, currentUserId]);
 
-  // Simplified return - Panel positioning handles placement
   if (!userId) return null;
 
   return (
@@ -105,7 +97,6 @@ export function UserDetailPanel({
         border: "1px solid rgba(148, 163, 184, 0.2)",
       }}
     >
-      {/* Close button */}
       <Button
         onClick={onClose}
         variant="ghost"
@@ -122,7 +113,6 @@ export function UserDetailPanel({
         </div>
       ) : (
         <div className="h-full overflow-y-auto p-6 space-y-6">
-          {/* User header */}
           <div className="flex flex-col items-center text-center space-y-3 pt-8">
             <div className="relative">
               <Image
@@ -146,7 +136,6 @@ export function UserDetailPanel({
             </div>
           </div>
 
-          {/* Taste Profile Summary */}
           {user.taste_profile_summary && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-slate-700">
@@ -167,10 +156,8 @@ export function UserDetailPanel({
             </div>
           )}
 
-          {/* Preferences sections */}
           {user.preferences && (
             <>
-              {/* Favorite Cuisines */}
               {user.preferences.favorite_cuisines &&
                 user.preferences.favorite_cuisines.length > 0 && (
                   <div className="space-y-2">
@@ -191,7 +178,6 @@ export function UserDetailPanel({
                   </div>
                 )}
 
-              {/* Favorite Restaurants */}
               {user.preferences.favorite_restaurants &&
                 user.preferences.favorite_restaurants.length > 0 && (
                   <div className="space-y-2">
@@ -215,7 +201,6 @@ export function UserDetailPanel({
                   </div>
                 )}
 
-              {/* Taste Profile */}
               {user.preferences.taste_profile &&
                 Object.keys(user.preferences.taste_profile).length > 0 && (
                   <div className="space-y-3">
@@ -248,7 +233,6 @@ export function UserDetailPanel({
                   </div>
                 )}
 
-              {/* Price Preference */}
               {user.preferences.price_preference && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-slate-700">
@@ -263,7 +247,6 @@ export function UserDetailPanel({
                 </div>
               )}
 
-              {/* Dietary Restrictions */}
               {user.preferences.dietary_restrictions &&
                 user.preferences.dietary_restrictions.length > 0 && (
                   <div className="space-y-2">
@@ -288,7 +271,6 @@ export function UserDetailPanel({
             </>
           )}
 
-          {/* No preferences available */}
           {!user.preferences && !user.taste_profile_summary && (
             <div className="text-center py-8 text-slate-500">
               <User className="w-12 h-12 mx-auto mb-3 opacity-50" />

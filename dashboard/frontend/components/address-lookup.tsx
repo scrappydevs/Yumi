@@ -34,7 +34,6 @@ export function AddressLookup() {
     
     setIsLoading(true);
     try {
-      // Using Nominatim (OpenStreetMap) for geocoding - free and no API key needed
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?` +
         `format=json&q=${encodeURIComponent(query)}&` +
@@ -90,7 +89,6 @@ export function AddressLookup() {
 
   return (
     <div className="space-y-3">
-      {/* Address Lookup Header */}
       <div className="flex items-center gap-2 px-3">
         <MapPin className="w-4 h-4 text-[hsl(var(--primary))]" />
         <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--foreground))]">
@@ -98,7 +96,6 @@ export function AddressLookup() {
         </span>
       </div>
 
-      {/* Search Input */}
       <div className="px-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
@@ -144,7 +141,6 @@ export function AddressLookup() {
         </Button>
       </div>
 
-      {/* Selected Location */}
       {selectedLocation && (
         <div className="px-3">
           <Card className="bg-[hsl(var(--primary))]/10 border-[hsl(var(--primary))]/30">
@@ -178,7 +174,6 @@ export function AddressLookup() {
         </div>
       )}
 
-      {/* Search Results */}
       {results.length > 0 && (
         <div className="px-3">
           <p className="text-[10px] text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-2">
@@ -215,7 +210,6 @@ export function AddressLookup() {
         </div>
       )}
 
-      {/* Empty State */}
       {!selectedLocation && results.length === 0 && !isLoading && (
         <div className="px-3 py-4 text-center">
           <MapPin className="w-8 h-8 mx-auto text-[hsl(var(--muted-foreground))] opacity-30 mb-2" />

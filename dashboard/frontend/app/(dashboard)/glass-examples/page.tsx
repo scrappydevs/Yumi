@@ -6,22 +6,18 @@ import { Play, Pause, Heart, Share2, Download, Music } from 'lucide-react';
 export default function GlassExamplesPage() {
   return (
     <div className="liquid-glass-demo">
-      {/* SVG Filters for Liquid Glass Effect */}
       <svg className="hidden">
         <defs>
-          {/* Container Glass Filter */}
           <filter id="container-glass" x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
             <feGaussianBlur stdDeviation="16 12" x="0%" y="0%" width="100%" height="100%" in="SourceGraphic" edgeMode="none" result="blur"/>
             <feColorMatrix type="saturate" values="1.5" x="0%" y="0%" width="100%" height="100%" in="blur" result="colormatrix"/>
           </filter>
 
-          {/* Button Glass Filter */}
           <filter id="btn-glass" x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
             <feGaussianBlur stdDeviation="8 6" x="0%" y="0%" width="100%" height="100%" in="SourceGraphic" edgeMode="none" result="blur"/>
             <feColorMatrix type="saturate" values="1.75" x="0%" y="0%" width="100%" height="100%" in="blur" result="colormatrix"/>
           </filter>
 
-          {/* Panel Glass Filter */}
           <filter id="panel-glass" x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
             <feGaussianBlur stdDeviation="20 15" x="0%" y="0%" width="100%" height="100%" in="SourceGraphic" edgeMode="none" result="blur"/>
             <feColorMatrix type="saturate" values="2" x="0%" y="0%" width="100%" height="100%" in="blur" result="colormatrix"/>
@@ -29,9 +25,7 @@ export default function GlassExamplesPage() {
         </defs>
       </svg>
 
-      {/* Demo Content */}
       <div className="demo-content">
-        {/* Example 1: Glass Container with Icon Button */}
         <motion.div 
           className="glass-container"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -43,7 +37,6 @@ export default function GlassExamplesPage() {
           </button>
         </motion.div>
 
-        {/* Example 2: Music Player Controls */}
         <motion.div 
           className="glass-panel music-panel"
           initial={{ opacity: 0, y: 20 }}
@@ -66,7 +59,6 @@ export default function GlassExamplesPage() {
           </div>
         </motion.div>
 
-        {/* Example 3: Social Actions */}
         <motion.div 
           className="glass-panel social-panel"
           initial={{ opacity: 0, y: 20 }}
@@ -89,7 +81,6 @@ export default function GlassExamplesPage() {
           </div>
         </motion.div>
 
-        {/* Example 4: Large Card */}
         <motion.div 
           className="glass-card"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -133,7 +124,6 @@ export default function GlassExamplesPage() {
           max-width: 1200px;
         }
 
-        /* Glass Container */
         .glass-container {
           position: relative;
           display: flex;
@@ -169,7 +159,6 @@ export default function GlassExamplesPage() {
           isolation: isolate;
         }
 
-        /* Glass Button */
         .glass-btn {
           position: relative;
           display: flex;
@@ -229,7 +218,6 @@ export default function GlassExamplesPage() {
           z-index: 1;
         }
 
-        /* Small Glass Button */
         .glass-btn-sm {
           position: relative;
           display: flex;
@@ -287,7 +275,6 @@ export default function GlassExamplesPage() {
           z-index: 1;
         }
 
-        /* Glass Panel */
         .glass-panel {
           position: relative;
           width: 280px;
@@ -327,7 +314,6 @@ export default function GlassExamplesPage() {
           align-items: center;
         }
 
-        /* Glass Card */
         .glass-card {
           position: relative;
           width: 350px;
@@ -364,7 +350,6 @@ export default function GlassExamplesPage() {
           z-index: 1;
         }
 
-        /* Inline Glass Button */
         .glass-btn-inline {
           position: relative;
           display: inline-flex;
@@ -418,7 +403,6 @@ export default function GlassExamplesPage() {
           z-index: 1;
         }
 
-        /* Animation */
         @keyframes moveBackground {
           from {
             background-position: 0% 0%;
@@ -428,7 +412,6 @@ export default function GlassExamplesPage() {
           }
         }
 
-        /* Respect motion preferences */
         @media (prefers-reduced-motion: reduce) {
           .liquid-glass-demo {
             animation: none !important;

@@ -48,7 +48,6 @@ export function useGeolocation(
         return;
       }
 
-      // Check if running on secure context
       const isSecureContext = typeof window !== 'undefined' && (window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
       
       if (!isSecureContext) {
@@ -59,7 +58,6 @@ export function useGeolocation(
         return;
       }
 
-      console.log('📍 Requesting geolocation permission...');
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
       navigator.geolocation.getCurrentPosition(
@@ -77,7 +75,6 @@ export function useGeolocation(
             isSupported: true,
           });
           
-          console.log('✅ Location detected:', coords);
           resolve(coords);
         },
         (error) => {
@@ -116,11 +113,9 @@ export function useGeolocation(
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Auto-fetch on mount if requested
   useEffect(() => {
     if (autoFetch && state.isSupported && !state.coords && !state.isLoading) {
       getCurrentLocation().catch(() => {
-        // Error already handled in getCurrentLocation
       });
     }
   }, [autoFetch, state.isSupported, state.coords, state.isLoading, getCurrentLocation]);

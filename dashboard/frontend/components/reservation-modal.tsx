@@ -95,7 +95,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const [currentUser, setCurrentUser] = useState<string | null>(null)
   const [userPhone, setUserPhone] = useState<string | null>(null)
   
-  // Create mode state
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
@@ -107,10 +106,8 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const [invitePhone, setInvitePhone] = useState('')
   const [copied, setCopied] = useState(false)
   
-  // Phone collection modal state
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   
-  // View mode state
   const [reservation, setReservation] = useState<ReservationData | null>(null)
   const [inviteeAvatarUrl, setInviteeAvatarUrl] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -118,25 +115,19 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
 
   useEffect(() => {
     if (isOpen) {
-      console.log('🔓 Modal opened:', { mode: initialMode, reservationId, currentUser })
       
-      // Reset mode to match initialMode
       setMode(initialMode)
       setShowDeleteConfirm(false) // Reset confirmation dialog
       
-      // Reset step when modal opens
       setStep(showIntro ? 'intro' : 'form')
       
-      // Reset success state
       setSuccess(false)
       
-      // Clear previous reservation data
       setReservation(null)
       
       if (initialMode === 'create') {
         loadCreateData()
         
-        // Load invitee profile picture if available
         if (prefillInvitee?.id) {
           loadInviteeAvatar(prefillInvitee.id)
         }
@@ -149,7 +140,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   useEffect(() => {
     const fetchPhoneAndSetInvitee = async () => {
       if (prefillInvitee?.id) {
-        // Try to fetch phone from profile if not provided
         let phone = prefillInvitee.phone
         
         if (!phone) {
@@ -162,7 +152,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
             
             if (data?.phone) {
               phone = data.phone
-              console.log(`📱 Auto-fetched phone for prefilled invitee: ${phone}`)
             }
           } catch (err) {
             console.error('Failed to fetch phone for prefilled invitee:', err)
@@ -184,7 +173,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     if (user) {
       setCurrentUser(user.id)
       
-      // Check if user has a phone number
       const { data: profile } = await supabase
         .from('profiles')
         .select('phone')
@@ -194,9 +182,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
       setUserPhone(profile?.phone || null)
     }
 
-    console.log('🍽️ Loading create data with prefillRestaurant:', prefillRestaurant)
-
-    // Load restaurants
     const { data: restaurantsData } = await supabase
       .from('restaurants')
       .select('id, name, formatted_address')
@@ -205,19 +190,13 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     if (restaurantsData) {
       setRestaurants(restaurantsData)
       
-      // If we have prefilled restaurant data, try to find or create it
       if (prefillRestaurant?.name && prefillRestaurant?.place_id) {
-        console.log('🔍 Looking for restaurant:', prefillRestaurant.name)
         
-        // Check if restaurant already exists
         const existing = restaurantsData.find(r => r.name === prefillRestaurant.name)
         
         if (existing) {
-          console.log('✅ Found existing restaurant:', existing.id)
           setSelectedRestaurant(existing.id)
         } else {
-          console.log('➕ Creating new restaurant entry...')
-          // Create new restaurant entry
           const { data: newRestaurant, error } = await supabase
             .from('restaurants')
             .insert({
@@ -231,17 +210,14 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
           if (error) {
             console.error('❌ Error creating restaurant:', error)
           } else if (newRestaurant) {
-            console.log('✅ Created new restaurant:', newRestaurant.id)
             setRestaurants([...restaurantsData, newRestaurant])
             setSelectedRestaurant(newRestaurant.id)
           }
         }
       } else {
-        console.log('ℹ️ No prefilled restaurant data')
       }
     }
 
-    // Load profiles
     const { data: profilesData } = await supabase
       .from('profiles')
       .select('id, username, display_name')
@@ -271,14 +247,11 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
   const loadReservation = async () => {
     setLoading(true)
     try {
-      // Get current user first
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUser(user.id)
-        console.log('👤 Current user set:', user.id)
       }
       
-      console.log('📥 Loading reservation:', reservationId)
       const data = await apiRequest<ReservationData>(
         API_CONFIG.endpoints.reservations.getById(reservationId!)
       )
@@ -301,7 +274,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     
     setDeleting(true)
     try {
-      // Delete the reservation from Supabase
       const { error } = await supabase
         .from('reservations')
         .delete()
@@ -314,7 +286,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
         return
       }
       
-      console.log('✅ Reservation deleted successfully')
       setShowDeleteConfirm(false)
       onClose() // Close modal after successful deletion
     } catch (err) {
@@ -340,7 +311,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     } else {
       updated[index].profileId = value || undefined
       
-      // Auto-fetch phone number from profile when profile is selected
       if (value) {
         try {
           const { data, error } = await supabase
@@ -351,7 +321,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
           
           if (data?.phone && !error) {
             updated[index].phone = data.phone
-            console.log(`📱 Auto-filled phone for profile ${value}: ${data.phone}`)
           } else {
             console.warn(`⚠️ No phone found for profile ${value}`)
           }
@@ -367,9 +336,7 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     e.preventDefault()
     if (!currentUser) return
 
-    // Check if user has phone number
     if (!userPhone) {
-      // Show phone collection modal
       setShowPhoneModal(true)
       return
     }
@@ -377,7 +344,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     setLoading(true)
 
     try {
-      // Format invitees (only if party size > 1)
       const inviteesFormatted = partySize > 1 ? invitees.map(inv => ({
         phone_e164: inv.phone.startsWith('+') ? inv.phone : `+${inv.phone}`,
         profile_id: inv.profileId || null
@@ -396,29 +362,20 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
         body: JSON.stringify(payload)
       })
 
-      console.log('✅ Reservation created:', response)
-
-      // For party size 1, just close immediately (no invites to send)
       if (partySize === 1) {
-        // Close modal immediately without showing intermediate success state
         onClose()
-        // Reset form after modal close animation completes
         setTimeout(() => {
           resetForm()
         }, 500)
         return
       }
 
-      // Store invite message for user to send (party size > 1)
       const invites = response.invites || []
       
       if (invites.length > 0) {
         const invite = invites[0] // First (and usually only) invitee
         
-        console.log('📱 Invite ready for:', invite.phoneE164)
-        console.log('📝 Message text:', invite.text)
         
-        // Store for display
         setInviteMessage(invite.text)
         setInvitePhone(invite.phoneE164)
       }
@@ -434,7 +391,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
 
   const handlePhoneSuccess = (phone: string) => {
     setUserPhone(phone)
-    // Automatically retry submission after phone is collected
     setTimeout(() => {
       const form = document.querySelector('form')
       if (form) {
@@ -452,8 +408,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
     setInviteMessage('')
     setInvitePhone('')
     setCopied(false)
-    // Don't reset inviteeAvatarUrl - keep it persistent across submissions
-    // setInviteeAvatarUrl(null)
   }
 
   const handleDownloadICS = () => {
@@ -492,7 +446,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
           onClick={(e) => e.stopPropagation()}
         >
           
-          {/* Header */}
           <div className="flex items-center justify-between mb-8 relative z-10">
             <h2 className="text-2xl font-bold text-black">
               {mode === 'create' ? (step === 'intro' ? 'Send Reservation' : 'Create Reservation') : 'Reservation Details'}
@@ -507,7 +460,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
             </Button>
           </div>
 
-          {/* Intro Step - Friend Invitation */}
           {mode === 'create' && step === 'intro' && prefillInvitee && (
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -515,7 +467,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
               exit={{ opacity: 0, x: 20 }}
               className="space-y-6 relative z-10"
             >
-              {/* Friend Info */}
               <div className="text-center space-y-3">
                 {inviteeAvatarUrl ? (
                   <img
@@ -534,7 +485,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </p>
               </div>
 
-              {/* Info Cards */}
               <div className="space-y-3">
                 <div className="glass-layer-1 rounded-2xl px-5 py-4 relative overflow-hidden shadow-soft">
                   <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
@@ -550,7 +500,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               </div>
 
-              {/* Continue Button */}
               <Button
                 onClick={() => setStep('form')}
                 className="w-full gradient-purple-blue text-white h-14 shadow-lg hover:shadow-xl transition-shadow"
@@ -561,7 +510,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
             </motion.div>
           )}
 
-          {/* Create Mode Form */}
           {mode === 'create' && step === 'form' && !success && (
             <motion.form 
               onSubmit={handleSubmit} 
@@ -570,7 +518,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              {/* Back Button (if coming from intro) */}
               {showIntro && (
                 <Button
                   type="button"
@@ -582,7 +529,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </Button>
               )}
               
-              {/* Restaurant */}
               <div>
                 <Label htmlFor="restaurant" className="text-sm font-semibold text-black mb-2 block">Restaurant</Label>
                 <select
@@ -601,7 +547,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </select>
               </div>
 
-              {/* Date & Time */}
               <div>
                 <Label htmlFor="datetime" className="text-sm font-semibold text-black mb-2 block">Date & Time</Label>
                 <Input
@@ -614,7 +559,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 />
               </div>
 
-              {/* Party Size */}
               <div>
                 <Label htmlFor="partySize" className="text-sm font-semibold text-black mb-2 block">Party Size</Label>
                 <Input
@@ -629,14 +573,12 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 />
               </div>
 
-              {/* Invitees (only show if party size > 1) */}
               {partySize > 1 && (
                 <div>
                   <Label className="text-sm font-semibold text-black mb-2 block">Invitees</Label>
                   <div className="space-y-3">
                     {invitees.map((invitee, index) => (
                       <div key={`invitee-${index}-${invitee.phone || index}`} className="flex flex-col gap-2">
-                        {/* Profile Selector (Primary) */}
                         <div className="flex gap-2">
                           <select
                             value={invitee.profileId || ''}
@@ -661,7 +603,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                           </Button>
                         </div>
                         
-                        {/* Phone Input (Auto-filled or manual) */}
                         {invitee.profileId ? (
                           <div className="flex items-center gap-2 text-xs text-gray-600 pl-3">
                             <span>📱 {invitee.phone || 'Loading phone...'}</span>
@@ -690,7 +631,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               )}
 
-              {/* Submit */}
               <motion.button
                 type="submit"
                 disabled={loading}
@@ -698,7 +638,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 whileHover={!loading ? { scale: 1.02 } : {}}
                 whileTap={!loading ? { scale: 0.98 } : {}}
               >
-                {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-full" />
                 
                 <span className="font-semibold relative z-10">
@@ -708,14 +647,12 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
             </motion.form>
           )}
 
-          {/* Success State - Open iMessage Card */}
           {mode === 'create' && success && inviteMessage && invitePhone && (
             <motion.div 
               className="space-y-6 relative z-10"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              {/* Success Header */}
               <div className="text-center space-y-3">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-50 border-2 border-green-200 mb-2">
                   <CheckCircle className="w-8 h-8 text-green-600" />
@@ -724,7 +661,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 <p className="text-gray-600">Send this invitation to confirm your reservation</p>
               </div>
 
-              {/* Phone Number */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Send to
@@ -756,7 +692,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               </div>
 
-              {/* Message */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Message
@@ -778,12 +713,10 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={() => {
                     onClose()
-                    // Reset form after modal close animation completes
                     setTimeout(() => {
                       resetForm()
                     }, 500)
@@ -811,14 +744,12 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
             </motion.div>
           )}
 
-          {/* View Mode */}
           {mode === 'view' && reservation && (
             <motion.div 
               className="space-y-5 relative z-10"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              {/* Restaurant Images Gallery */}
               {reservation.restaurant.images.length > 0 && (
                 <div className="grid grid-cols-3 gap-2 -mx-8 -mt-8 mb-6">
                   {reservation.restaurant.images.slice(0, 3).map((image, idx) => (
@@ -845,7 +776,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               )}
 
-              {/* Header with status */}
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-black mb-1">{reservation.restaurant_name}</h3>
@@ -861,7 +791,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </span>
               </div>
 
-              {/* Restaurant Details */}
               <div className="flex items-center gap-4 text-sm flex-wrap">
                 {reservation.restaurant.rating && (
                   <div className="flex items-center gap-1 text-amber-600">
@@ -897,14 +826,12 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 )}
               </div>
 
-              {/* Restaurant Description */}
               {reservation.restaurant.description && (
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <p className="text-sm text-gray-700 leading-relaxed">{reservation.restaurant.description}</p>
                 </div>
               )}
 
-              {/* Reservation Details */}
               <div className="flex items-center gap-6 text-sm pt-4 border-t border-gray-100">
                 <div className="flex items-center gap-2 text-gray-700">
                   <CalendarIcon className="w-4 h-4" />
@@ -918,7 +845,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               </div>
 
-              {/* Invites */}
               {reservation.invites && reservation.invites.length > 0 && (
                 <div className="pt-4 border-t border-gray-100">
                   <h4 className="text-sm font-semibold text-black mb-3">
@@ -946,7 +872,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
                 </div>
               )}
 
-              {/* Cancel Button - Always show for organizer */}
               {(() => {
                 console.log('🔍 CANCEL BUTTON DEBUG:', {
                   currentUser,
@@ -1016,7 +941,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
             </motion.div>
           )}
 
-          {/* Loading View Mode */}
           {mode === 'view' && loading && (
             <div className="flex items-center justify-center py-12">
               <div className="w-12 h-12 rounded-full gradient-purple-blue animate-pulse" />
@@ -1025,7 +949,6 @@ export function ReservationModal({ isOpen, onClose, mode: initialMode, reservati
         </motion.div>
       </motion.div>
 
-      {/* Phone Collection Modal */}
       <PhoneCollectionModal
         isOpen={showPhoneModal}
         onClose={() => setShowPhoneModal(false)}

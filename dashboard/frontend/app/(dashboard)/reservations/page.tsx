@@ -50,17 +50,14 @@ export default function ReservationsPage() {
   useEffect(() => {
     setMounted(true)
     
-    // Check if we should auto-open the reservation modal
     const params = new URLSearchParams(window.location.search)
     const shouldAutoOpen = params.get('autoOpen') === 'true'
     
     if (shouldAutoOpen) {
-      // Extract restaurant data from URL params
       const restaurantName = params.get('restaurant_name')
       const restaurantAddress = params.get('restaurant_address')
       const placeId = params.get('place_id')
       
-      console.log('🔗 URL params:', { restaurantName, restaurantAddress, placeId })
       
       if (restaurantName) {
         const restaurantData = {
@@ -68,14 +65,12 @@ export default function ReservationsPage() {
           address: restaurantAddress || undefined,
           place_id: placeId || undefined
         }
-        console.log('📝 Setting prefillRestaurant:', restaurantData)
         setPrefillRestaurant(restaurantData)
       }
       
       setModalMode('create')
       setModalOpen(true)
       
-      // Clean up URL by removing the parameters
       const url = new URL(window.location.href)
       url.searchParams.delete('autoOpen')
       url.searchParams.delete('restaurant_name')
@@ -97,11 +92,9 @@ export default function ReservationsPage() {
         
         setCurrentUserId(user.id)
 
-        // Check if we need to force refresh (cache-busting)
         const params = new URLSearchParams(window.location.search)
         const shouldRefresh = params.get('refresh') === 'true'
         
-        // Fetch reservations from backend (with cache-busting if needed)
         const endpoint = shouldRefresh 
           ? `/api/reservations/user/${user.id}?t=${Date.now()}`
           : `/api/reservations/user/${user.id}`
@@ -109,14 +102,11 @@ export default function ReservationsPage() {
         const data = await apiRequest<{ reservations: Reservation[] }>(endpoint)
         
         if (shouldRefresh) {
-          console.log('✅ Refreshed reservations after accepting invite')
-          console.log('📊 Fetched reservations:', data.reservations)
         }
         
         setReservations(data.reservations || [])
         
         if (shouldRefresh) {
-          // Clean up URL
           const url = new URL(window.location.href)
           url.searchParams.delete('refresh')
           window.history.replaceState({}, '', url.toString())
@@ -131,18 +121,15 @@ export default function ReservationsPage() {
     loadReservations()
   }, [supabase, router])
 
-  // Get reservations for selected date
   const selectedDateReservations = selectedDate
     ? reservations.filter(r => isSameDay(parseISO(r.starts_at), selectedDate))
     : []
 
-  // Get upcoming reservations (future only)
   const upcomingReservations = reservations
     .filter(r => new Date(r.starts_at) >= new Date())
     .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
     .slice(0, 5)
 
-  // Days with reservations (for calendar highlighting)
   const daysWithReservations = reservations.map(r => parseISO(r.starts_at))
 
   const getStatusBadge = (status: string) => {
@@ -164,7 +151,6 @@ export default function ReservationsPage() {
 
   return (
     <div className="h-full flex flex-col bg-white overflow-auto">
-      {/* Header */}
       <div className="border-b border-gray-100 px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
@@ -186,7 +172,6 @@ export default function ReservationsPage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-full" />
             
             <Plus className="w-4 h-4" />
@@ -201,7 +186,6 @@ export default function ReservationsPage() {
         </div>
       ) : (
         <div className="flex-1 flex gap-6 p-8">
-          {/* Calendar Column */}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm h-full flex flex-col">              
               <div className="flex justify-center">
@@ -219,7 +203,6 @@ export default function ReservationsPage() {
                 />
               </div>
 
-              {/* Reservations for Selected Date */}
               {selectedDate && selectedDateReservations.length > 0 && (
                 <div className="mt-8 pt-6 border-t border-gray-100">
                   <h3 className="text-sm font-semibold text-black mb-4">
@@ -265,7 +248,6 @@ export default function ReservationsPage() {
             </div>
           </div>
 
-          {/* Upcoming List */}
           <div className="w-80">
             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm sticky top-8">
               <h2 className="text-lg font-semibold text-black mb-4">Upcoming</h2>
@@ -313,7 +295,6 @@ export default function ReservationsPage() {
                           {format(parseISO(reservation.starts_at), 'MMM d, h:mm a')}
                         </div>
                         
-                        {/* Show all invitees */}
                         {reservation.invitees && reservation.invitees.length > 0 && (
                           <div className="pt-2 border-t border-gray-200">
                             <div className="flex items-center gap-1 mb-1.5">
@@ -354,13 +335,11 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* Reservation Modal */}
       <ReservationModal
         isOpen={modalOpen}
         onClose={() => {
           setModalOpen(false)
           setPrefillRestaurant(undefined) // Clear prefill data
-          // Reload reservations after modal closes
           if (currentUserId) {
             loadReservations()
           }

@@ -21,10 +21,8 @@ function MetallicSphere({ isActive }: SphereProps) {
     
     const time = state.clock.getElapsedTime();
     
-    // Very slow, subtle rotation
     meshRef.current.rotation.y = time * 0.1;
     
-    // Gentle breathing
     const pulse = 1 + Math.sin(time * 0.8) * 0.02;
     meshRef.current.scale.setScalar(pulse);
   });
@@ -82,26 +80,20 @@ export function MetallicSphereComponent({ isActive = false, className = '' }: Me
         frameloop="always"
       >
         <Suspense fallback={null}>
-          {/* Very bright ambient light */}
           <ambientLight intensity={2.5} color="#FFFFFF" />
           
-          {/* Key light - ultra intense purple */}
           <directionalLight position={[5, 5, 5]} intensity={6} color="#8B5CF6" />
           
-          {/* Fill light - ultra intense blue */}
           <directionalLight position={[-5, -3, -5]} intensity={5.5} color="#3B82F6" />
           
-          {/* Rim light - super bright cyan accent */}
           <directionalLight position={[0, 10, -5]} intensity={5} color="#06B6D4" />
           
-          {/* Accent point lights - ultra vibrant purple and blue gradient */}
           <pointLight position={[4, 2, 4]} intensity={6} color="#A78BFA" />
           <pointLight position={[-4, -2, -4]} intensity={5.5} color="#60A5FA" />
           <pointLight position={[0, -4, 2]} intensity={5.5} color="#C084FC" />
           <pointLight position={[2, 4, -2]} intensity={5.5} color="#38BDF8" />
           <pointLight position={[0, 0, 5]} intensity={4} color="#DDD6FE" />
           
-          {/* Apple-style white environment with purple-blue gradient hints */}
           <Environment resolution={512} background={false}>
             <mesh scale={100}>
               <sphereGeometry args={[1, 64, 64]} />
@@ -114,7 +106,6 @@ export function MetallicSphereComponent({ isActive = false, className = '' }: Me
                     canvas.height = 512;
                     const ctx = canvas.getContext('2d')!;
                     
-                    // Create vibrant gradient: purple-blue with high contrast
                     const gradient = ctx.createLinearGradient(0, 0, 0, 512);
                     gradient.addColorStop(0, '#F5F3FF');    // Light purple top
                     gradient.addColorStop(0.25, '#DDD6FE'); // Vibrant purple
@@ -134,7 +125,6 @@ export function MetallicSphereComponent({ isActive = false, className = '' }: Me
             </mesh>
           </Environment>
           
-          {/* The Sphere */}
           <MetallicSphere isActive={isActive} />
         </Suspense>
       </Canvas>

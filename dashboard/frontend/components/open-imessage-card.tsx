@@ -30,7 +30,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    // Fallback for older browsers
     try {
       const textArea = document.createElement('textarea')
       textArea.value = text
@@ -58,7 +57,6 @@ export function OpenIMessageCard({
   
   const isApple = isApplePlatform()
   
-  // Build the deep link
   const encoded = encodeURIComponent(presetBody)
   const href = `sms:${toNumber}?&body=${encoded}`
   
@@ -80,11 +78,9 @@ export function OpenIMessageCard({
   
   return (
     <div className={`glass-card rounded-3xl p-8 shadow-strong relative overflow-hidden ${className}`}>
-      {/* Specular highlight */}
       <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
       
       <div className="relative space-y-6">
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full glass-layer-1 shadow-soft mb-3 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent rounded-t-full pointer-events-none" />
@@ -96,7 +92,6 @@ export function OpenIMessageCard({
           </p>
         </div>
         
-        {/* Phone Number Section */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider block">
             Send to
@@ -139,7 +134,6 @@ export function OpenIMessageCard({
           </div>
         </div>
         
-        {/* Message Body Section */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider block">
             Message
@@ -184,7 +178,6 @@ export function OpenIMessageCard({
           </div>
         </div>
         
-        {/* CTA Button */}
         <motion.a
           href={href}
           rel="noopener"
@@ -198,7 +191,6 @@ export function OpenIMessageCard({
           {ctaText}
         </motion.a>
         
-        {/* Platform Note */}
         <p className="text-xs text-[hsl(var(--muted-foreground))] text-center px-4">
           {!isApple
             ? "If this doesn't open Messages, copy the text and number above and send manually."

@@ -32,8 +32,6 @@ export function InviteSheet({ invites, restaurantName }: InviteSheetProps) {
   }
   
   const handleOpenAll = () => {
-    // Try to open all iMessage links sequentially
-    // Note: May be blocked by popup blocker
     invites.forEach((invite, index) => {
       setTimeout(() => {
         const href = buildMessagesHref(invite.phoneE164, invite.text)
@@ -44,7 +42,6 @@ export function InviteSheet({ invites, restaurantName }: InviteSheetProps) {
   
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="text-center space-y-2">
         <div className="text-5xl mb-2">📱</div>
         <h3 className="text-2xl font-bold text-black">Send Invitations</h3>
@@ -53,7 +50,6 @@ export function InviteSheet({ invites, restaurantName }: InviteSheetProps) {
         </p>
       </div>
       
-      {/* Bulk Actions */}
       {invites.length > 1 && (
         <div className="flex gap-3">
           <Button
@@ -89,7 +85,6 @@ export function InviteSheet({ invites, restaurantName }: InviteSheetProps) {
         </div>
       )}
       
-      {/* Individual invite rows */}
       <div className="space-y-3">
         {invites.map((invite, index) => (
           <motion.div
@@ -106,7 +101,6 @@ export function InviteSheet({ invites, restaurantName }: InviteSheetProps) {
         ))}
       </div>
       
-      {/* Help text */}
       <div className="glass-layer-1 rounded-xl p-4 relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl pointer-events-none" />
         <div className="relative z-10">

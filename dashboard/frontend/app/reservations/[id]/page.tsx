@@ -40,7 +40,6 @@ export default function ReservationDetailPage() {
 
     async function loadReservation() {
       try {
-        // Get current user (for auth check)
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -49,7 +48,6 @@ export default function ReservationDetailPage() {
           setCurrentUserId(user.id)
         }
 
-        // Fetch reservation data from backend
         const data = await apiRequest<ReservationData>(
           API_CONFIG.endpoints.reservations.getById(reservationId)
         )
@@ -71,7 +69,6 @@ export default function ReservationDetailPage() {
   const handleCancel = async () => {
     if (!currentUserId) return
 
-    // Generate cancel token on client side (in production, do this server-side)
     const cancelUrl = `/r/cancel?token=GENERATE_ON_SERVER`
     window.location.href = cancelUrl
   }

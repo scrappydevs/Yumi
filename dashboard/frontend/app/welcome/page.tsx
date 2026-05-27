@@ -22,12 +22,10 @@ export default function WelcomePage() {
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
-          // Not logged in, redirect to home
           router.push('/');
           return;
         }
 
-        // Check if user has completed onboarding
         const { data: profileData } = await supabase
           .from('profiles')
           .select('onboarded')
@@ -35,7 +33,6 @@ export default function WelcomePage() {
           .single();
 
         if (profileData?.onboarded) {
-          // Already onboarded, redirect to app
           router.push('/overview');
           return;
         }
@@ -58,7 +55,6 @@ export default function WelcomePage() {
         throw new Error('Not authenticated');
       }
 
-      // Update profile - mark as onboarded
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -70,10 +66,8 @@ export default function WelcomePage() {
         throw updateError;
       }
 
-      // Wait a moment for database to update
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Redirect to app
       router.push('/overview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete setup');
@@ -96,7 +90,6 @@ export default function WelcomePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
-      {/* Demo Social Network Graph Background - takes up most of the page */}
       <div className="absolute inset-0 flex items-center justify-center opacity-100">
         <DemoSocialGraph className="w-full h-full" />
       </div>
@@ -107,13 +100,10 @@ export default function WelcomePage() {
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-md px-4"
       >
-        {/* Liquid Glass Card */}
         <div className="glass-card rounded-3xl p-8 shadow-strong relative overflow-hidden">
-          {/* Specular highlight */}
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
           
           <div className="relative space-y-6">
-            {/* Header */}
             <div className="text-center space-y-1">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -151,7 +141,6 @@ export default function WelcomePage() {
           
         </div>
 
-        {/* Submit Button */}
         <form onSubmit={handleSubmit} className="mt-6">
           <motion.button
             type="submit"

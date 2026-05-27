@@ -40,20 +40,17 @@ export default function NewReservationPage() {
     { phone: '' },
   ])
 
-  // Feature flag check
   const featureEnabled = process.env.NEXT_PUBLIC_RESERVATIONS_ENABLED !== 'false'
 
   useEffect(() => {
     if (!featureEnabled) return
 
     async function loadData() {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUser(user.id)
       }
 
-      // Load restaurants
       const { data: restaurantsData } = await supabase
         .from('restaurants')
         .select('id, name, formatted_address')
@@ -63,7 +60,6 @@ export default function NewReservationPage() {
         setRestaurants(restaurantsData)
       }
 
-      // Load profiles (friends)
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, username, display_name')
@@ -73,7 +69,6 @@ export default function NewReservationPage() {
         setProfiles(profilesData)
       }
 
-      // Check for pre-filled invitee from query params
       const params = new URLSearchParams(window.location.search)
       const inviteeId = params.get('inviteeId')
       const inviteeName = params.get('inviteeName')
@@ -118,7 +113,6 @@ export default function NewReservationPage() {
         throw new Error('You must be logged in to create a reservation')
       }
 
-      // Validate inputs
       if (!selectedRestaurant) {
         throw new Error('Please select a restaurant')
       }
@@ -132,13 +126,11 @@ export default function NewReservationPage() {
         throw new Error('Please add at least one invitee')
       }
 
-      // Format invitees for API
       const formattedInvitees = validInvitees.map((inv) => ({
         phone_e164: inv.phone.startsWith('+') ? inv.phone : `+1${inv.phone}`,
         profile_id: inv.profileId,
       }))
 
-      // Convert datetime to ISO string
       const starts_at_iso = new Date(dateTime).toISOString()
 
       const data = await apiRequest<{ ok: boolean; reservation_id: string; invites_sent: number }>(
@@ -311,7 +303,6 @@ export default function NewReservationPage() {
             disabled={loading}
             className="w-full glass-layer-1 h-14 rounded-full shadow-soft relative overflow-hidden flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-transform hover:scale-102 active:scale-98"
           >
-            {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-full" />
             
             <span className="font-semibold relative z-10">

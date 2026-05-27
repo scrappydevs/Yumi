@@ -25,7 +25,6 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0) {
       const timer = setTimeout(() => {
@@ -35,7 +34,6 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
     }
   }, [messages]);
 
-  // Focus input when opened
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
@@ -120,7 +118,6 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
         boxShadow: 'inset 0 0 30px -8px rgba(255, 255, 255, 0.85)',
       }}
     >
-      {/* Header */}
       <div className="h-16 px-4 py-2 flex items-center justify-between text-sm"
         style={{
           borderBottom: '0.25px solid rgba(0, 0, 0, 0.08)',
@@ -157,7 +154,6 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6">
@@ -198,7 +194,6 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="px-4 pb-4">
         <div 
           className="rounded-2xl focus-within:ring-2 focus-within:ring-[hsl(var(--primary))]/20 transition-all relative overflow-hidden"
@@ -209,7 +204,6 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
             boxShadow: 'inset 0 0 35px -10px rgba(255, 255, 255, 0.95), 0 6px 16px rgba(0, 0, 0, 0.06)',
           }}
         >
-          {/* Specular highlight */}
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/50 to-transparent pointer-events-none rounded-t-2xl" />
           
           <form
@@ -245,5 +239,4 @@ export function AIPanel({ isOpen, onClose }: AIPanelProps) {
     </div>
   );
 }
-
 

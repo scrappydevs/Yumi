@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   
-  // Image optimization for external images
   images: {
     remotePatterns: [
       {
@@ -35,22 +33,17 @@ const nextConfig: NextConfig = {
         hostname: 'maps.googleapis.com',
       },
     ],
-    // Optimize images for production
     formats: ['image/avif', 'image/webp'],
   },
   
-  // Enable React strict mode for better development experience
   reactStrictMode: true,
   
-  // Disable powered by header for security
   poweredByHeader: false,
   
-  // Disable ESLint during builds (warnings are blocking production)
   eslint: {
     ignoreDuringBuilds: true,
   },
   
-  // Disable TypeScript errors during builds
   typescript: {
     ignoreBuildErrors: true,
   },

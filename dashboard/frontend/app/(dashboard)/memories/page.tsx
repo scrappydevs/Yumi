@@ -14,7 +14,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-// Mock food memory photos (expanded)
 const MEMORY_PHOTOS = [
   { id: 1, src: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=400&h=400&fit=crop', location: 'Tokyo', date: '2024-03', friend: 'Aarush' },
   { id: 2, src: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=400&fit=crop', location: 'Paris', date: '2024-02', friend: 'Sarah' },
@@ -53,7 +52,6 @@ export default function MemoriesPage() {
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
-    console.log('Generating memory:', prompt);
   };
 
   const filteredPhotos = MEMORY_PHOTOS.filter(photo => {
@@ -77,11 +75,9 @@ export default function MemoriesPage() {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Top Bar - Search & Filters */}
       <div className="border-b border-[hsl(var(--border))] p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-4">
-            {/* Search */}
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
               <input
@@ -100,7 +96,6 @@ export default function MemoriesPage() {
               />
             </div>
 
-            {/* Pagination */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
@@ -122,7 +117,6 @@ export default function MemoriesPage() {
             </div>
           </div>
 
-          {/* Filters */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-[hsl(var(--muted-foreground))]">Filter:</span>
             <button
@@ -149,7 +143,6 @@ export default function MemoriesPage() {
         </div>
       </div>
 
-      {/* Photo Grid - Sliding */}
       <div className="flex-1 overflow-hidden p-6">
         <div className="h-full max-w-6xl mx-auto">
           <AnimatePresence mode="wait">
@@ -177,7 +170,6 @@ export default function MemoriesPage() {
                     boxShadow: 'inset 0 0 35px -8px rgba(255, 255, 255, 0.95), 0 12px 32px rgba(0, 0, 0, 0.12)',
                   }}
                 >
-                  {/* Specular */}
                   <div 
                     className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none rounded-t-2xl z-10"
                     style={{
@@ -190,7 +182,6 @@ export default function MemoriesPage() {
                     className="w-full h-full object-cover"
                   />
                   
-                  {/* Info overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2">
                     <div className="text-white text-[10px] font-semibold">{photo.location}</div>
                     <div className="text-white/80 text-[9px]">with {photo.friend}</div>
@@ -202,7 +193,6 @@ export default function MemoriesPage() {
         </div>
       </div>
 
-      {/* Bottom Chat Panel */}
       <div 
         className="p-6"
         style={{
@@ -213,7 +203,6 @@ export default function MemoriesPage() {
           <div
             className="glass-layer-1 rounded-full h-14 px-5 shadow-strong relative overflow-hidden flex items-center gap-3"
           >
-            {/* Specular highlight */}
             <div 
               className="absolute top-0 left-0 right-0 h-1/2 pointer-events-none rounded-t-full"
               style={{
@@ -257,7 +246,6 @@ export default function MemoriesPage() {
             </form>
           </div>
           
-          {/* Helper text */}
           <p className="text-xs text-[hsl(var(--muted-foreground))] text-center mt-3">
             {filteredPhotos.length} memories • Use natural language to create your story
           </p>

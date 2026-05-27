@@ -9,7 +9,6 @@ export function useGraphLayout() {
       friends: GraphData['friends'],
       similarities: GraphData['similarities']
     ): { nodes: FriendNode[]; edges: SimilarityEdgeType[] } => {
-      // Force-directed layout with similarity-based distances
       const nodes: FriendNode[] = friends.map((friend, idx) => {
         const position = calculateForceDirectedPosition(
           friend,
@@ -56,8 +55,6 @@ export function useGraphLayout() {
     []
   );
 
-  // No longer filter by similarity - show all edges with constant styling
-  // Distance between nodes represents similarity
   const layoutEdges = useCallback(
     (similarities: GraphData['similarities']): SimilarityEdgeType[] => {
       return similarities.map((sim) => ({
@@ -84,8 +81,6 @@ export function useGraphLayout() {
   return { layoutNodes, layoutEdges };
 }
 
-// Helper: Calculate position based on similarity to current user
-// Higher similarity to current user = closer to center
 function calculateForceDirectedPosition(
   friend: GraphData['friends'][0],
   allFriends: GraphData['friends'],
@@ -95,12 +90,10 @@ function calculateForceDirectedPosition(
   const centerX = 600;
   const centerY = 500;
   
-  // If this is the current user, place at center
   if (friend.is_current_user) {
     return { x: centerX, y: centerY };
   }
   
-  // Find similarity score to current user
   let similarityToCurrentUser = 0.5; // default
   const currentUser = allFriends.find(f => f.is_current_user);
   
@@ -116,18 +109,10 @@ function calculateForceDirectedPosition(
     }
   }
   
-  // Calculate distance from current user based on similarity
-  // Use exponential curve to make differences MORE dramatic
-  // Higher similarity (0.8+) → very close to center (~100px)
-  // Medium similarity (0.6) → medium distance (~150px)
-  // Low similarity (0.3) → far from center (~350px)
-  // Formula: distance = baseDistance * (1 - similarity)^exponent
-  // This creates a more dramatic difference: 30% is ~2.3x further than 60%
   const baseDistance = 600;
   const exponent = 1.5;
   const distanceFromCenter = baseDistance * Math.pow((1 - similarityToCurrentUser), exponent);
   
-  // Distribute friends in circular pattern around center
   const angle = (index / (allFriends.length - 1)) * 2 * Math.PI; // Exclude current user from count
   
   const x = centerX + Math.cos(angle) * distanceFromCenter;
@@ -136,7 +121,6 @@ function calculateForceDirectedPosition(
   return { x, y };
 }
 
-// Helper: Calculate stats for a node
 function calculateSimilarityStats(
   userId: string,
   similarities: GraphData['similarities']

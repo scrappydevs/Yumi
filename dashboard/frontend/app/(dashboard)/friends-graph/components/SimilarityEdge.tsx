@@ -35,11 +35,9 @@ function SimilarityEdge({
     targetPosition,
   });
 
-  // Extract data
   const similarityScore = data?.similarityScore ?? 0;
   const explanation = data?.explanation ?? '';
   
-  // Parse JSON strings if needed (backend may return strings instead of arrays)
   const parseIfString = (value: any, fallback: any = []) => {
     if (!value) return fallback;
     if (typeof value === 'string') {
@@ -73,13 +71,11 @@ function SimilarityEdge({
     setIsSelected(!isSelected);
   }, [isSelected]);
 
-  // Styling - highlight when selected
   const strokeWidth = isSelected ? 3 : 2;
   const edgeColor = isSelected ? `rgba(99, 102, 241, 0.9)` : `rgba(155, 135, 245, 0.4)`;
 
   return (
     <>
-      {/* Visible edge with click detection */}
       <path
         d={edgePath}
         fill="none"
@@ -93,7 +89,6 @@ function SimilarityEdge({
         }}
       />
       
-      {/* Invisible wide hitbox for easier clicking */}
       <path
         d={edgePath}
         fill="none"
@@ -106,7 +101,6 @@ function SimilarityEdge({
         }}
       />
 
-      {/* Always visible similarity percentage label */}
       <EdgeLabelRenderer>
         <div
           style={{
@@ -136,7 +130,6 @@ function SimilarityEdge({
         </div>
       </EdgeLabelRenderer>
 
-      {/* Detailed tooltip on hover/click */}
       {isSelected && (
         <EdgeLabelRenderer>
           <div
@@ -161,7 +154,6 @@ function SimilarityEdge({
                 animation: 'fadeInScale 0.2s ease',
               }}
             >
-              {/* Explanation */}
               {explanation && (
                 <p style={{ 
                   fontSize: '0.8125rem', 
@@ -174,7 +166,6 @@ function SimilarityEdge({
                 </p>
               )}
               
-              {/* Shared Restaurants */}
               {sharedRestaurants.length > 0 && (
                 <div style={{ marginBottom: '0.5rem' }}>
                   <div style={{ 
@@ -202,7 +193,6 @@ function SimilarityEdge({
                 </div>
               )}
               
-              {/* Shared Cuisines */}
               {sharedCuisines.length > 0 && (
                 <div style={{ marginBottom: '0.5rem' }}>
                   <div style={{ 
@@ -239,7 +229,6 @@ function SimilarityEdge({
                 </div>
               )}
               
-              {/* Taste Profile Details */}
               {(tasteOverlap.shared_atmosphere?.length > 0 || 
                 tasteOverlap.shared_flavors?.length > 0 || 
                 tasteOverlap.price_compatible !== undefined) && (
@@ -255,9 +244,7 @@ function SimilarityEdge({
                     Taste Profile
                   </div>
                   
-                  {/* Combined atmosphere, flavors, and price compatibility */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                    {/* Shared Atmosphere */}
                     {tasteOverlap.shared_atmosphere?.map((atm: string, i: number) => (
                       <span
                         key={`atm-${i}`}
@@ -274,7 +261,6 @@ function SimilarityEdge({
                       </span>
                     ))}
                     
-                    {/* Shared Flavors */}
                     {tasteOverlap.shared_flavors?.map((flavor: string, i: number) => (
                       <span
                         key={`flavor-${i}`}
@@ -291,7 +277,6 @@ function SimilarityEdge({
                       </span>
                     ))}
                     
-                    {/* Price Compatible Badge */}
                     {tasteOverlap.price_compatible !== undefined && tasteOverlap.price_compatible !== null && (
                       <span
                         style={{
@@ -310,7 +295,6 @@ function SimilarityEdge({
                 </div>
               )}
               
-              {/* Fallback message */}
               {!explanation && sharedRestaurants.length === 0 && sharedCuisines.length === 0 && (
                 <p style={{ 
                   fontSize: '0.8125rem', 

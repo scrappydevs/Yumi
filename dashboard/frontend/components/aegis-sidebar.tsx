@@ -84,7 +84,6 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
         boxShadow: 'inset 0 0 40px -10px rgba(155, 135, 245, 0.1), 0 8px 32px rgba(71, 85, 105, 0.08)',
       }}
     >
-      {/* Specular highlight - softer purple/blue tint */}
       <div 
         className="absolute top-0 left-0 right-0 h-1/3 pointer-events-none"
         style={{
@@ -92,10 +91,8 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
         }}
       />
       
-      {/* Header */}
       <div className="h-16 border-b border-[hsl(var(--border))] flex items-center justify-center px-4">
         <div className="flex items-center justify-center mt-3">
-          {/* Yummy Logo */}
           {!isCollapsed && (
             <img 
               src="/assets/yummylogo.png"
@@ -106,7 +103,6 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
         </div>
       </div>
 
-      {/* Toggle Button with Tooltip */}
       <Tooltip delayDuration={1000}>
         <TooltipTrigger asChild>
           <Button
@@ -137,7 +133,6 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
         </TooltipContent>
       </Tooltip>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto relative z-10">
         {navigation.map((item) => {
           const Icon = item.icon;
@@ -205,7 +200,6 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
         })}
       </nav>
 
-      {/* Footer - Mute and Logout */}
       <div 
         className="relative z-50 p-2.5 space-y-2"
         style={{
@@ -214,7 +208,6 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
           backdropFilter: 'blur(30px) saturate(180%)',
         }}
       >
-        {/* Mute Button */}
         {onToggleMute && (
           <Button
             variant="ghost"
@@ -235,7 +228,6 @@ export function AegisSidebar({ isCollapsed, onToggle, isMuted = false, onToggleM
           </Button>
         )}
         
-        {/* Logout Button */}
         <Button
           variant="ghost"
           size="sm"

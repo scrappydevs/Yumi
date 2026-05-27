@@ -35,28 +35,23 @@ import {
 import { useIssues } from '@/hooks/use-issues';
 import { reverseGeocode } from '@/lib/geocoding';
 
-// City presets for navigation - All 50 US States
 const CITIES = {
-  // West Coast
   seattle: { name: 'Seattle, WA', latitude: 47.6062, longitude: -122.3321, zoom: 12, pitch: 45, bearing: 0 },
   portland: { name: 'Portland, OR', latitude: 45.5152, longitude: -122.6784, zoom: 12, pitch: 45, bearing: 0 },
   sanFrancisco: { name: 'San Francisco, CA', latitude: 37.7749, longitude: -122.4194, zoom: 12, pitch: 45, bearing: 0 },
   losAngeles: { name: 'Los Angeles, CA', latitude: 34.0522, longitude: -118.2437, zoom: 12, pitch: 45, bearing: 0 },
   sanDiego: { name: 'San Diego, CA', latitude: 32.7157, longitude: -117.1611, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Southwest
   phoenix: { name: 'Phoenix, AZ', latitude: 33.4484, longitude: -112.0740, zoom: 12, pitch: 45, bearing: 0 },
   lasVegas: { name: 'Las Vegas, NV', latitude: 36.1699, longitude: -115.1398, zoom: 12, pitch: 45, bearing: 0 },
   denver: { name: 'Denver, CO', latitude: 39.7392, longitude: -104.9903, zoom: 12, pitch: 45, bearing: 0 },
   albuquerque: { name: 'Albuquerque, NM', latitude: 35.0844, longitude: -106.6504, zoom: 12, pitch: 45, bearing: 0 },
   saltLakeCity: { name: 'Salt Lake City, UT', latitude: 40.7608, longitude: -111.8910, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Mountain States
   boise: { name: 'Boise, ID', latitude: 43.6150, longitude: -116.2023, zoom: 12, pitch: 45, bearing: 0 },
   billings: { name: 'Billings, MT', latitude: 45.7833, longitude: -108.5007, zoom: 12, pitch: 45, bearing: 0 },
   cheyenne: { name: 'Cheyenne, WY', latitude: 41.1400, longitude: -104.8202, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Midwest
   chicago: { name: 'Chicago, IL', latitude: 41.8781, longitude: -87.6298, zoom: 12, pitch: 45, bearing: 0 },
   detroit: { name: 'Detroit, MI', latitude: 42.3314, longitude: -83.0458, zoom: 12, pitch: 45, bearing: 0 },
   minneapolis: { name: 'Minneapolis, MN', latitude: 44.9778, longitude: -93.2650, zoom: 12, pitch: 45, bearing: 0 },
@@ -64,7 +59,6 @@ const CITIES = {
   indianapolis: { name: 'Indianapolis, IN', latitude: 39.7684, longitude: -86.1581, zoom: 12, pitch: 45, bearing: 0 },
   columbus: { name: 'Columbus, OH', latitude: 39.9612, longitude: -82.9988, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Great Plains
   kansasCity: { name: 'Kansas City, MO', latitude: 39.0997, longitude: -94.5786, zoom: 12, pitch: 45, bearing: 0 },
   omaha: { name: 'Omaha, NE', latitude: 41.2565, longitude: -95.9345, zoom: 12, pitch: 45, bearing: 0 },
   desMoines: { name: 'Des Moines, IA', latitude: 41.5868, longitude: -93.6250, zoom: 12, pitch: 45, bearing: 0 },
@@ -72,7 +66,6 @@ const CITIES = {
   fargo: { name: 'Fargo, ND', latitude: 46.8772, longitude: -96.7898, zoom: 12, pitch: 45, bearing: 0 },
   siouxFalls: { name: 'Sioux Falls, SD', latitude: 43.5446, longitude: -96.7311, zoom: 12, pitch: 45, bearing: 0 },
   
-  // South
   dallas: { name: 'Dallas, TX', latitude: 32.7767, longitude: -96.7970, zoom: 12, pitch: 45, bearing: 0 },
   houston: { name: 'Houston, TX', latitude: 29.7604, longitude: -95.3698, zoom: 12, pitch: 45, bearing: 0 },
   austin: { name: 'Austin, TX', latitude: 30.2672, longitude: -97.7431, zoom: 12, pitch: 45, bearing: 0 },
@@ -83,7 +76,6 @@ const CITIES = {
   memphis: { name: 'Memphis, TN', latitude: 35.1495, longitude: -90.0490, zoom: 12, pitch: 45, bearing: 0 },
   nashville: { name: 'Nashville, TN', latitude: 36.1627, longitude: -86.7816, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Southeast
   atlanta: { name: 'Atlanta, GA', latitude: 33.7490, longitude: -84.3880, zoom: 12, pitch: 45, bearing: 0 },
   miami: { name: 'Miami, FL', latitude: 25.7617, longitude: -80.1918, zoom: 12, pitch: 45, bearing: 0 },
   orlando: { name: 'Orlando, FL', latitude: 28.5383, longitude: -81.3792, zoom: 12, pitch: 45, bearing: 0 },
@@ -94,7 +86,6 @@ const CITIES = {
   birmingham: { name: 'Birmingham, AL', latitude: 33.5186, longitude: -86.8104, zoom: 12, pitch: 45, bearing: 0 },
   jackson: { name: 'Jackson, MS', latitude: 32.2988, longitude: -90.1848, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Northeast
   newYork: { name: 'New York, NY', latitude: 40.7128, longitude: -74.0060, zoom: 12, pitch: 45, bearing: 0 },
   boston: { name: 'Boston, MA', latitude: 42.3601, longitude: -71.0589, zoom: 12, pitch: 45, bearing: 0 },
   philadelphia: { name: 'Philadelphia, PA', latitude: 39.9526, longitude: -75.1652, zoom: 12, pitch: 45, bearing: 0 },
@@ -102,18 +93,15 @@ const CITIES = {
   providence: { name: 'Providence, RI', latitude: 41.8240, longitude: -71.4128, zoom: 12, pitch: 45, bearing: 0 },
   hartford: { name: 'Hartford, CT', latitude: 41.7658, longitude: -72.6734, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Mid-Atlantic
   baltimore: { name: 'Baltimore, MD', latitude: 39.2904, longitude: -76.6122, zoom: 12, pitch: 45, bearing: 0 },
   washington: { name: 'Washington, DC', latitude: 38.9072, longitude: -77.0369, zoom: 12, pitch: 45, bearing: 0 },
   richmond: { name: 'Richmond, VA', latitude: 37.5407, longitude: -77.4360, zoom: 12, pitch: 45, bearing: 0 },
   
-  // Other States
   louisville: { name: 'Louisville, KY', latitude: 38.2527, longitude: -85.7585, zoom: 12, pitch: 45, bearing: 0 },
   anchorage: { name: 'Anchorage, AK', latitude: 61.2181, longitude: -149.9003, zoom: 12, pitch: 45, bearing: 0 },
   honolulu: { name: 'Honolulu, HI', latitude: 21.3099, longitude: -157.8581, zoom: 12, pitch: 45, bearing: 0 },
 };
 
-// Issue data type for map visualization
 type IssueData = {
   id: string;
   coordinates: [number, number];
@@ -123,13 +111,10 @@ type IssueData = {
   status: 'pending' | 'in_progress' | 'resolved';
 };
 
-// Parse geolocation string to coordinates
 const parseGeolocation = (geolocation: string | null): [number, number] | null => {
   if (!geolocation) return null;
   
-  // Expected format: "lat,lng" or "{lat: X, lng: Y}" or similar
   try {
-    // Try parsing as JSON first
     if (geolocation.includes('{')) {
       const parsed = JSON.parse(geolocation);
       if (parsed.lat && parsed.lng) {
@@ -137,7 +122,6 @@ const parseGeolocation = (geolocation: string | null): [number, number] | null =
       }
     }
     
-    // Try parsing as comma-separated values
     const parts = geolocation.split(',').map(p => parseFloat(p.trim()));
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
       return [parts[1], parts[0]]; // [lng, lat]
@@ -170,14 +154,12 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     ...CITIES.sanFrancisco,
   });
 
-  // Handle URL parameters for direct navigation to coordinates
   useEffect(() => {
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
     const zoom = searchParams.get('zoom');
     
     if (lat && lng) {
-      // Clear selected city when navigating to specific coordinates
       setSelectedCity('' as keyof typeof CITIES);
       setViewState({
         latitude: parseFloat(lat),
@@ -188,7 +170,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
         transitionDuration: 1500,
       });
 
-      // Find the issue at this location and get its name
       const issue = rawIssues.find(i => i.geolocation === `${lat},${lng}`);
       if (issue && issue.geolocation) {
         reverseGeocode(issue.geolocation).then(result => {
@@ -200,7 +181,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     }
   }, [searchParams, rawIssues]);
 
-  // Convert Supabase issues to map visualization format
   const issuesData = useMemo<IssueData[]>(() => {
     if (!rawIssues.length) return [];
     
@@ -226,11 +206,9 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     return mapped;
   }, [rawIssues]);
 
-  // Filter issues by status
   const activeIssues = issuesData.filter(i => i.status !== 'resolved');
   const resolvedIssues = issuesData.filter(i => i.status === 'resolved');
 
-  // Navigation between issues
   const navigateToIssue = (index: number) => {
     if (index < 0 || index >= issuesData.length) return;
     
@@ -247,7 +225,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
       transitionDuration: 800,
     });
 
-    // Update custom location name
     if (rawIssue?.geolocation) {
       reverseGeocode(rawIssue.geolocation).then(result => {
         setCustomLocationName(result.formatted);
@@ -271,7 +248,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     }
   };
 
-  // Extract unique states from cities
   const states = useMemo(() => {
     const stateSet = new Set(
       Object.values(CITIES).map(city => city.name.split(', ')[1])
@@ -279,7 +255,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     return Array.from(stateSet).sort();
   }, []);
 
-  // Filter cities based on search and state
   const filteredCities = useMemo(() => {
     return Object.entries(CITIES).filter(([key, city]) => {
       const matchesSearch = city.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -289,7 +264,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     });
   }, [searchQuery, stateFilter]);
 
-  // Filter issues based on search
   const filteredIssuesForSearch = useMemo(() => {
     if (!issueSearchQuery) return [];
     
@@ -302,7 +276,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
       .slice(0, 10); // Limit to 10 results
   }, [rawIssues, issueSearchQuery]);
 
-  // Handle city change
   const handleCityChange = (city: keyof typeof CITIES) => {
     setSelectedCity(city);
     setViewState({
@@ -312,7 +285,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     });
   };
 
-  // Toggle 2D/3D view
   const toggle3DView = () => {
     setViewMode(prev => prev === '3d' ? '2d' : '3d');
     setViewState({
@@ -322,7 +294,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
     });
   };
 
-  // Deck.gl layers
   const layers = useMemo(() => {
     const baseLayerProps = {
       id: 'issues-layer',
@@ -457,7 +428,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               if (!object) return null;
               const issue = rawIssues.find(i => i.id === object.id);
               if (!issue) {
-                // Fallback tooltip if issue data not found
                 return {
                   html: `
                     <div style="background: #1C2127; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; max-width: 300px;">
@@ -519,9 +489,7 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
             />
           </DeckGL>
 
-          {/* Control Panel - Top Left */}
           <div className="absolute top-4 left-4 space-y-2">
-            {/* City Selector */}
             <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -531,7 +499,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                   </span>
                 </div>
                 
-                {/* Search Bar */}
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
                   <Input
@@ -551,7 +518,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                   )}
                 </div>
 
-                {/* State Filter */}
                 <Select value={stateFilter} onValueChange={setStateFilter}>
                   <SelectTrigger className="h-8 text-xs bg-[hsl(var(--card))]/60 backdrop-blur-xl border-white/10 shadow-lg">
                     <SelectValue placeholder="All States" />
@@ -566,7 +532,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                   </SelectContent>
                 </Select>
 
-                {/* Cities List */}
                 <div className="max-h-[220px] overflow-y-auto">
                   <div className="grid grid-cols-1 gap-0.5">
                     {filteredCities.length > 0 ? (
@@ -593,7 +558,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                   </div>
                 </div>
 
-                {/* Results count */}
                 {(searchQuery || stateFilter !== 'all') && (
                   <div className="text-[10px] text-[hsl(var(--muted-foreground))] text-center pt-1 border-t border-white/5">
                     {filteredCities.length} {filteredCities.length === 1 ? 'city' : 'cities'} found
@@ -602,7 +566,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               </CardContent>
             </Card>
 
-            {/* Layer Controls */}
             <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -631,7 +594,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               </CardContent>
             </Card>
 
-            {/* 3D Toggle */}
             <Button
               variant="outline"
               size="sm"
@@ -642,7 +604,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               {viewMode === '3d' ? '3D View' : '2D View'}
             </Button>
 
-            {/* Issue Search */}
             <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center gap-2 mb-2">
@@ -652,7 +613,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                   </span>
                 </div>
                 
-                {/* Search Bar */}
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-[hsl(var(--muted-foreground))]" />
                   <Input
@@ -672,7 +632,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
                   )}
                 </div>
 
-                {/* Search Results */}
                 {issueSearchQuery && (
                   <div className="max-h-[300px] overflow-y-auto">
                     {filteredIssuesForSearch.length > 0 ? (
@@ -716,9 +675,7 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
             </Card>
           </div>
 
-          {/* Stats Panel - Top Right */}
           <div className="absolute top-4 right-4 space-y-2">
-            {/* Issue Navigation - Only show when an issue is selected */}
             {selectedIssueIndex >= 0 && issuesData[selectedIssueIndex] && (
               <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
                 <CardContent className="p-3">
@@ -768,7 +725,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
               </Card>
             )}
 
-            {/* Stats Card */}
             <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
               <CardContent className="p-3 space-y-3 min-w-[200px]">
                 <div className="flex items-center justify-between">
@@ -804,7 +760,6 @@ export function Interactive3DMap({ className }: Interactive3DMapProps) {
             </Card>
           </div>
 
-          {/* Legend - Bottom Right */}
           <div className="absolute bottom-4 right-4">
             <Card className="bg-[hsl(var(--card))]/90 backdrop-blur-xl border-white/10 shadow-xl">
               <CardContent className="p-3">

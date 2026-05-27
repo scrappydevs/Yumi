@@ -6,7 +6,6 @@ export function createClient() {
   
   if (!supabaseUrl || !supabaseKey) {
     console.warn('Supabase not configured');
-    // Return a dummy client that won't crash
     return createBrowserClient(
       'https://placeholder.supabase.co',
       'placeholder-key'

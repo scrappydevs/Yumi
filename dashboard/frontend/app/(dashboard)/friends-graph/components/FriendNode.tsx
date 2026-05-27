@@ -10,15 +10,12 @@ function FriendNodeComponent({ id, selected, data }: NodeProps<FriendNode>) {
   const { updateNodeData } = useReactFlow();
 
   const onAvatarLoad = useCallback(() => {
-    // Could update node size if needed
   }, []);
 
-  // Handles at all 4 positions - both source and target for flexible connections
   const handlePositions = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
   return (
     <>
-      {/* Source handles at all sides */}
       {handlePositions.map((position) => (
         <Handle
           key={`${position}-source`}
@@ -28,7 +25,6 @@ function FriendNodeComponent({ id, selected, data }: NodeProps<FriendNode>) {
           style={{ opacity: 0 }}
         />
       ))}
-      {/* Target handles at all sides */}
       {handlePositions.map((position) => (
         <Handle
           key={`${position}-target`}
@@ -39,13 +35,11 @@ function FriendNodeComponent({ id, selected, data }: NodeProps<FriendNode>) {
         />
       ))}
 
-      {/* Node content with liquid glass */}
       <div
         className={`friend-node glass-panel transition-all duration-300 ${
           selected ? 'selected' : ''
         } ${isCurrentUser ? 'current-user' : ''}`}
       >
-        {/* Avatar */}
         <div className="friend-avatar-container">
           <Image
             src={avatarUrl || '/default-avatar.png'}
@@ -60,17 +54,14 @@ function FriendNodeComponent({ id, selected, data }: NodeProps<FriendNode>) {
           )}
         </div>
 
-        {/* Name label */}
         <div className="friend-name">{name}</div>
 
-        {/* Stats */}
         {(mutualFriends || 0) > 0 && (
           <div className="friend-stats">
             {mutualFriends} mutual
           </div>
         )}
 
-        {/* Similarity indicator - don't show for current user */}
         {!isCurrentUser && similarityStats && (
           <div className="similarity-indicator">
             <div

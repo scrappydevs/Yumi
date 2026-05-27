@@ -24,7 +24,6 @@ export default function Home() {
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
-          // Not logged in, show sign in page
           setIsAuthenticated(false);
           setLoading(false);
           return;
@@ -32,7 +31,6 @@ export default function Home() {
 
         setIsAuthenticated(true);
 
-        // Check if user has completed onboarding
         const { data: profileData } = await supabase
           .from('profiles')
           .select('onboarded')
@@ -40,12 +38,10 @@ export default function Home() {
           .single();
 
         if (profileData?.onboarded) {
-          // Already onboarded, redirect to app
           router.push('/overview');
           return;
         }
 
-        // User is authenticated but not onboarded
         setIsOnboarded(false);
       } finally {
         setLoading(false);
@@ -82,7 +78,6 @@ export default function Home() {
         throw new Error('Not authenticated');
       }
 
-      // Update profile - mark as onboarded
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -94,10 +89,8 @@ export default function Home() {
         throw updateError;
       }
 
-      // Wait a moment for database to update
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Redirect to app
       router.push('/overview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete setup');
@@ -108,12 +101,10 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
-      {/* Demo Social Network Graph Background - takes up most of the page */}
       <div className="absolute inset-0 flex items-center justify-center opacity-100">
         <DemoSocialGraph className="w-full h-full" />
       </div>
         
-        {/* Central spinner */}
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
@@ -126,7 +117,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40 relative overflow-hidden">
-      {/* Demo Social Network Graph Background - takes up most of the page */}
       <div className="absolute inset-0 flex items-center justify-center opacity-60">
         <DemoSocialGraph className="w-full h-full" />
       </div>
@@ -137,14 +127,11 @@ export default function Home() {
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-md px-4"
       >
-        {/* Liquid Glass Card */}
         <div className="glass-card rounded-3xl p-8 shadow-strong relative overflow-hidden">
-          {/* Specular highlight */}
           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
           
           <div className="relative space-y-6">
 
-            {/* Header */}
             <div className="text-center space-y-1">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -180,9 +167,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Action Button */}
         {!isAuthenticated ? (
-          // Sign In Button for non-authenticated users
           <motion.button
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -206,7 +191,6 @@ export default function Home() {
             )}
           </motion.button>
         ) : (
-          // Get Started Button for authenticated but not onboarded users
           <form onSubmit={handleGetStarted} className="mt-6">
             <motion.button
               type="submit"

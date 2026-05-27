@@ -33,11 +33,9 @@ function InvitePageContent() {
 
   const init = async () => {
     try {
-      // Check if user is logged in
       const { data: { user: authUser } } = await supabase.auth.getUser()
       
       if (!authUser) {
-        // Store token and redirect to login
         if (token) {
           if (typeof window !== 'undefined') {
             sessionStorage.setItem('pendingInviteToken', token)
@@ -49,7 +47,6 @@ function InvitePageContent() {
       
       setUser(authUser)
       
-      // Load token (from query or storage)
       let activeToken = token
       if (resume && typeof window !== 'undefined') {
         activeToken = sessionStorage.getItem('pendingInviteToken')
@@ -63,7 +60,6 @@ function InvitePageContent() {
         return
       }
       
-      // Decode token for preview
       const decoded = decodeTokenUnsafe(activeToken)
       if (!decoded) {
         throw new Error('Invalid token')
@@ -75,7 +71,6 @@ function InvitePageContent() {
       
       setTokenData({ ...decoded, rawToken: activeToken })
       
-      // Fetch reservation details for preview
       const response = await fetch(`${API_CONFIG.baseURL}/api/reservations/${decoded.resvId}`)
       if (response.ok) {
         const data = await response.json()
@@ -95,7 +90,6 @@ function InvitePageContent() {
     
     setAccepting(true)
     try {
-      console.log('📤 Accepting invite...', { token: tokenData.rawToken, user_id: user.id })
       
       const response = await fetch(`${API_CONFIG.baseURL}/api/invites/accept`, {
         method: 'POST',
@@ -106,7 +100,6 @@ function InvitePageContent() {
         })
       })
       
-      console.log('📥 Response status:', response.status)
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -115,13 +108,10 @@ function InvitePageContent() {
       }
       
       const data = await response.json()
-      console.log('✅ Invite accepted successfully:', data)
       
       setResult('accepted')
       
-      // Redirect after a short delay to show success message
       setTimeout(() => {
-        console.log('🔄 Redirecting to reservations...')
         router.push('/reservations?refresh=true')
       }, 1500)
     } catch (err) {
@@ -152,7 +142,6 @@ function InvitePageContent() {
       
       setResult('declined')
       
-      // Redirect to home after 2 seconds
       setTimeout(() => {
         router.push('/overview')
       }, 2000)
@@ -219,11 +208,9 @@ function InvitePageContent() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-white">
       <Card className="p-8 max-w-2xl w-full glass-layer-1 shadow-strong relative overflow-hidden">
-        {/* Specular highlight */}
         <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
         
         <div className="relative z-10">
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">🍽️</div>
             <h1 className="text-3xl font-bold mb-2 text-black">You're Invited!</h1>
@@ -232,7 +219,6 @@ function InvitePageContent() {
             </p>
           </div>
 
-          {/* Reservation Details */}
           <div className="space-y-4 mb-8">
             <div className="glass-layer-1 rounded-2xl p-5 shadow-soft relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl pointer-events-none" />
@@ -278,7 +264,6 @@ function InvitePageContent() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3">
             <Button
               onClick={handleAccept}

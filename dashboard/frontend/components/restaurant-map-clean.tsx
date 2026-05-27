@@ -86,7 +86,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   const [routeDirections, setRouteDirections] = useState<any>(null);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
-  // Load preloaded restaurants from sessionStorage (if redirected from overview)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -101,17 +100,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       if (restaurantsData) {
         try {
           const restaurants = JSON.parse(restaurantsData);
-          console.log('📍 Loaded preselected restaurants:', restaurants);
           setPreloadedRestaurants(restaurants);
           
-          // Route sidebar disabled - just show restaurants on map
-          // if (showAsRoute && viewParam === 'route') {
-          //   console.log('🗺️ Initializing route mode with', restaurants.length, 'restaurants');
-          //   setRouteList(restaurants);
-          //   setShowRouteSidebar(true);
-          // }
           
-          // Clear sessionStorage after loading
           sessionStorage.removeItem('selectedRestaurants');
           sessionStorage.removeItem('showAsRoute');
         } catch (error) {
@@ -131,7 +122,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     }
   }, []);
 
-  // Load Google Maps API using singleton loader
   useEffect(() => {
     if (window.google?.maps) {
       setApiLoaded(true);
@@ -140,7 +130,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
     loadGoogleMaps()
       .then(() => {
-        console.log('✅ Google Maps loaded in RestaurantMap');
         setApiLoaded(true);
       })
       .catch((error) => {
@@ -148,17 +137,14 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       });
   }, []);
 
-  // Initialize map with performance optimizations
   useEffect(() => {
     if (!apiLoaded || !mapRef.current || map) return;
 
-    // Additional safety check - ensure google.maps.Map is actually available
     if (!window.google?.maps?.Map) {
       console.error('❌ Google Maps API not fully loaded yet');
       return;
     }
 
-    console.log('🗺️ Initializing Google Map...');
     const newMap = new window.google.maps.Map(mapRef.current, {
       center: { lat: 42.3601, lng: -71.0589 }, // Boston, MA
       zoom: 16,
@@ -171,10 +157,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       scrollwheel: true, // Enable scroll zoom
       clickableIcons: false, // Disable default POI clicks for better performance
       isFractionalZoomEnabled: true, // Smoother zoom transitions
-      // Performance optimizations
       renderingType: window.google?.maps?.RenderingType?.VECTOR, // Vector rendering for smoother performance
       controlSize: 32, // Smaller controls for better performance
-      // Reduce map features for better performance
       mapTypeControlOptions: {
         mapTypeIds: ['roadmap', 'satellite'],
       },
@@ -192,14 +176,12 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     setMap(newMap);
     setPlacesService(new window.google.maps.places.PlacesService(newMap));
 
-    // Get user location and add flashing blue dot
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const userPos = { lat: position.coords.latitude, lng: position.coords.longitude };
           setUserLocation(userPos);
           
-          // Create flashing blue dot for user location
           const userMarker = new window.google.maps.Marker({
             position: userPos,
             map: newMap,
@@ -215,7 +197,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             zIndex: 1000,
           });
 
-          // Add pulsing circle animation
           const pulseCircle = new window.google.maps.Circle({
             strokeColor: '#4285F4',
             strokeOpacity: 0.6,
@@ -227,7 +208,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             radius: 25,
           });
 
-          // Animate pulse
           let radius = 25;
           let growing = true;
           setInterval(() => {
@@ -251,7 +231,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
   }, [apiLoaded, map]);
 
-  // Calculate distances from user location to all restaurants
   const calculateAverageDistances = useCallback((restaurants: PreloadedRestaurant[], userLoc: { lat: number; lng: number }) => {
     if (!window.google || restaurants.length === 0) return;
 
@@ -262,7 +241,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
 
     if (destinations.length === 0) return;
 
-    // Calculate walking distances
     distanceService.getDistanceMatrix(
       {
         origins: [new window.google.maps.LatLng(userLoc.lat, userLoc.lng)],
@@ -279,7 +257,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           const avgWalkingMeters = walkingDistances.reduce((a, b) => a + b, 0) / walkingDistances.length;
           const avgWalkingMiles = (avgWalkingMeters * 0.000621371).toFixed(1);
 
-          // Calculate driving distances
           distanceService.getDistanceMatrix(
             {
               origins: [new window.google.maps.LatLng(userLoc.lat, userLoc.lng)],
@@ -308,13 +285,9 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     );
   }, []);
 
-  // Display preloaded restaurants on map
   useEffect(() => {
     if (!map || !placesService || preloadedRestaurants.length === 0) return;
 
-    console.log('🗺️ Displaying preloaded restaurants on map');
-
-    // Clear existing markers (with safety check)
     markersRef.current.forEach(item => {
       if (item.infoWindow) item.infoWindow.close();
       if (item.marker && typeof item.marker.setMap === 'function') {
@@ -326,21 +299,16 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     const bounds = new window.google.maps.LatLngBounds();
     const displayedRestaurants: PlaceResult[] = [];
 
-    // Add user location to bounds if available
     if (userLocation) {
       bounds.extend(userLocation);
       
-      // Calculate average distances
       calculateAverageDistances(preloadedRestaurants, userLocation);
     }
 
-    // Fetch details and add markers for each preloaded restaurant
     preloadedRestaurants.forEach((restaurant, index) => {
-      // If we have coordinates, use them directly
       if (restaurant.latitude && restaurant.longitude) {
         const position = { lat: restaurant.latitude, lng: restaurant.longitude };
         
-        // Create numbered marker
         const marker = new window.google.maps.Marker({
           position,
           map,
@@ -365,7 +333,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         markersRef.current.push({ marker, infoWindow: null });
         bounds.extend(position);
 
-        // Create a PlaceResult object for display
         const placeResult: PlaceResult = {
           place_id: restaurant.place_id,
           name: restaurant.name,
@@ -377,12 +344,10 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         };
         displayedRestaurants.push(placeResult);
 
-        // Add click listener
         marker.addListener('click', () => {
           handleSelectPlace(placeResult);
         });
       } else {
-        // Fetch place details using place_id
         placesService.getDetails(
           { placeId: restaurant.place_id, fields: ['name', 'formatted_address', 'geometry', 'rating', 'photos', 'types', 'opening_hours'] },
           (place, status) => {
@@ -392,7 +357,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                 lng: place.geometry.location.lng()
               };
 
-              // Create numbered marker
               const marker = new window.google.maps.Marker({
                 position,
                 map,
@@ -429,7 +393,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
               };
               displayedRestaurants.push(placeResult);
 
-              // Add click listener
               marker.addListener('click', () => {
                 handleSelectPlace(placeResult);
               });
@@ -439,22 +402,17 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       }
     });
 
-    // Fit map to show all markers
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, 50);
     }
 
-    // Update visible results
     setSearchResults(displayedRestaurants);
     setVisibleResults(displayedRestaurants);
   }, [map, placesService, preloadedRestaurants, userLocation, calculateAverageDistances]);
 
-  // Get place details - Define BEFORE updateVisibleResults uses it
-  // Optimized with fewer fields to reduce API quota usage and latency
   const handleSelectPlace = useCallback((place: PlaceResult) => {
     if (!placesService) return;
 
-    // Track the click interaction
     trackClick({
       place_id: place.place_id,
       name: place.name || 'Unknown',
@@ -489,7 +447,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
   }, [placesService]);
 
-  // Update visible results when map moves or search results change
   const updateVisibleResults = useCallback(() => {
     if (!map || searchResults.length === 0) return;
     
@@ -500,17 +457,14 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       place.geometry?.location && bounds.contains(place.geometry.location)
     );
     
-    console.log('Updating visible results:', resultsInView.length, 'of', searchResults.length);
     setVisibleResults(resultsInView);
     
-    // Clear all existing markers
     markersRef.current.forEach(item => {
       if (item.infoWindow) item.infoWindow.close();
       if (item.marker) item.marker.setMap(null);
     });
     markersRef.current = [];
     
-    // Add markers ONLY for visible results with optimized rendering
     resultsInView.forEach((place) => {
       if (place.geometry?.location) {
         const marker = new window.google.maps.Marker({
@@ -553,14 +507,12 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
   }, [map, searchResults, handleSelectPlace]);
 
-  // Listen for map bounds changes with debouncing for smoother scrolling
   useEffect(() => {
     if (!map) return;
     
     let debounceTimer: NodeJS.Timeout;
     
     const listener = map.addListener('idle', () => {
-      // Debounce updates to reduce processing during smooth scrolling
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         updateVisibleResults();
@@ -573,20 +525,17 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     };
   }, [map, updateVisibleResults]);
 
-  // Update visible results when search results change
   useEffect(() => {
     if (searchResults.length > 0) {
       updateVisibleResults();
     }
   }, [searchResults, updateVisibleResults]);
 
-  // Search restaurants
   const searchRestaurants = useCallback(async () => {
     if (!placesService || !searchQuery.trim()) return;
 
     setIsLoading(true);
 
-    // AI location detection
     let searchLocation = new window.google.maps.LatLng(42.3601, -71.0589); // Boston
     if (searchQuery.toLowerCase().includes('near') || searchQuery.toLowerCase().includes('on')) {
       const locationMatch = searchQuery.match(/(?:near|on)\s+(.+)/i);
@@ -623,14 +572,12 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
         ) : results;
         setVisibleResults(resultsInView as PlaceResult[]);
         
-        // Clear existing markers
         markersRef.current.forEach((item) => {
           if (item.infoWindow) item.infoWindow.close();
           if (item.marker) item.marker.setMap(null);
         });
         markersRef.current = [];
 
-        // Create markers with optimization
         results.forEach((place) => {
           if (place.geometry?.location && map) {
             const marker = new window.google.maps.Marker({
@@ -677,8 +624,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     });
   }, [placesService, map, searchQuery]);
 
-  // Change map type
-  // Calculate route with Google Maps Directions API
   const calculateRoute = useCallback(async () => {
     if (!map || !userLocation || routeList.length === 0) return;
     
@@ -687,13 +632,11 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     try {
       const directionsService = new window.google.maps.DirectionsService();
       
-      // Create waypoints from route list
       const waypoints = routeList.map(restaurant => ({
         location: new window.google.maps.LatLng(restaurant.latitude!, restaurant.longitude!),
         stopover: true,
       }));
       
-      // Request directions
       const request: google.maps.DirectionsRequest = {
         origin: new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
         destination: waypoints[waypoints.length - 1].location,
@@ -704,10 +647,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
       
       directionsService.route(request, (result, status) => {
         if (status === 'OK' && result) {
-          console.log('🗺️ Route calculated successfully');
           setRouteDirections(result);
           
-          // Display route on map
           const directionsRenderer = new window.google.maps.DirectionsRenderer({
             map,
             directions: result,
@@ -729,7 +670,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     }
   }, [map, userLocation, routeList]);
   
-  // Calculate route when route list changes
   useEffect(() => {
     if (routeList.length > 0 && map && userLocation) {
       calculateRoute();
@@ -755,7 +695,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
     }
   }, [map]);
 
-  // Helper functions
   const getPriceLevel = (level?: number) => level ? '$'.repeat(level) : '';
   
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -806,7 +745,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
   return (
     <div className={className}>
       <div className="relative h-full overflow-hidden">
-        {/* Map Container */}
         <div className="absolute inset-0">
           <div 
             ref={mapRef} 
@@ -824,7 +762,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           />
         </div>
 
-        {/* Route Sidebar - Disabled */}
         <AnimatePresence>
           {false && showRouteSidebar && routeList.length > 0 && (
             <motion.div
@@ -835,9 +772,7 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
               className="absolute left-0 top-0 bottom-0 w-96 z-30 pointer-events-none"
             >
               <div className="h-full flex flex-col pointer-events-auto">
-                {/* Glass background */}
                 <div className="h-full bg-white/95 backdrop-blur-md shadow-2xl border-r border-gray-200 flex flex-col">
-                  {/* Header */}
                   <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-5 h-5 text-purple-600" />
@@ -854,7 +789,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     </Button>
                   </div>
                   
-                  {/* Route Summary */}
                   {routeDirections && (
                     <div className="p-4 bg-purple-50 border-b border-purple-100">
                       <div className="flex items-center justify-between text-sm">
@@ -870,7 +804,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     </div>
                   )}
                   
-                  {/* Route List */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {isCalculatingRoute ? (
                       <div className="flex items-center justify-center py-8">
@@ -879,7 +812,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                       </div>
                     ) : (
                       <>
-                        {/* Starting Point */}
                         <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
                           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
                             Start
@@ -892,12 +824,10 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                           </div>
                         </div>
                         
-                        {/* Route Stops */}
                         {routeList.map((restaurant, index) => {
                           const leg = routeDirections?.routes[0]?.legs[index];
                           return (
                             <div key={restaurant.place_id} className="relative">
-                              {/* Connecting Line */}
                               {index < routeList.length && (
                                 <div className="absolute left-4 top-10 bottom-[-12px] w-0.5 bg-gradient-to-b from-purple-300 to-purple-200" />
                               )}
@@ -915,7 +845,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                                     </div>
                                   )}
                                   
-                                  {/* Travel info */}
                                   {leg && (
                                     <div className="mt-2 p-2 bg-gray-50 rounded-lg">
                                       <div className="flex items-center gap-3 text-xs">
@@ -932,7 +861,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                                   )}
                                 </div>
                                 
-                                {/* Remove button */}
                                 <button
                                   onClick={() => {
                                     const newRouteList = routeList.filter(r => r.place_id !== restaurant.place_id);
@@ -950,12 +878,10 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     )}
                   </div>
                   
-                  {/* Footer Actions */}
                   {routeList.length > 0 && (
                     <div className="p-4 border-t border-gray-200 space-y-2">
                       <Button
                         onClick={() => {
-                          // Clear route
                           setRouteList([]);
                           setRouteDirections(null);
                         }}
@@ -972,7 +898,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           )}
         </AnimatePresence>
         
-        {/* Toggle Route Sidebar Button - Disabled */}
         {false && routeList.length > 0 && !showRouteSidebar && (
           <motion.button
             initial={{ x: -50, opacity: 0 }}
@@ -987,7 +912,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           </motion.button>
         )}
 
-        {/* Average Distance Info - Below Quick Search */}
         <AnimatePresence>
           {averageDistances && !showRouteSidebar && (
             <motion.div
@@ -1022,10 +946,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           )}
         </AnimatePresence>
 
-        {/* Quick Search - Top Left */}
         <div className="absolute top-4 left-4 z-20 w-32">
           <div className="bg-white rounded-2xl shadow-lg p-3 relative overflow-hidden border border-gray-200">
-            {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
             <div className="relative">
               <div className="space-y-2">
@@ -1073,10 +995,8 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           </div>
         </div>
 
-        {/* Map Type Toggle - Top Right */}
         <div className="absolute top-4 right-4 z-20">
           <div className="bg-white rounded-2xl shadow-lg p-3 relative overflow-hidden border border-gray-200">
-            {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
             <div className="relative">
               <div className="flex gap-2">
@@ -1124,7 +1044,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           </div>
         </div>
 
-        {/* Results Sidebar */}
         {searchResults.length > 0 && (
           <motion.div
             initial={{ x: 300, opacity: 0 }}
@@ -1132,7 +1051,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
             className="absolute top-20 right-4 w-64 h-[calc(100vh-200px)] z-20"
           >
             <div className="bg-white rounded-2xl shadow-lg p-4 h-full flex flex-col relative overflow-hidden border border-gray-200">
-              {/* Specular highlight */}
               <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
               <div className="relative h-full flex flex-col">
                 <div className="flex items-center justify-between mb-3">
@@ -1221,7 +1139,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Navigate to reservations page with restaurant details and auto-open modal
                           const params = new URLSearchParams({
                             restaurant_name: place.name,
                             restaurant_address: place.formatted_address || '',
@@ -1246,7 +1163,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           </motion.div>
         )}
 
-        {/* Bottom Search Bar - Compact */}
         <div className="absolute bottom-3 left-0 right-0 pointer-events-none z-15">
           <div className="max-w-2xl mx-auto px-3 pointer-events-auto">
             <div className="bg-white rounded-full shadow-strong px-4 py-2 relative overflow-hidden">
@@ -1295,7 +1211,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
           </div>
         </div>
 
-        {/* Restaurant Detail Drawer - Fixed Height */}
         <AnimatePresence>
           {selectedPlace && (
             <motion.div
@@ -1305,7 +1220,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
               className="absolute top-20 right-[280px] w-96 h-[calc(100vh-200px)] z-25"
             >
               <div className="bg-white rounded-[32px] overflow-hidden h-full flex flex-col relative shadow-xl border border-gray-200">
-                {/* Specular highlight */}
                 <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/20 to-transparent pointer-events-none rounded-t-[32px]" />
                 
                 <button
@@ -1315,7 +1229,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                   <X className="w-4 h-4" />
                 </button>
 
-                {/* Photo Gallery */}
                 <div className="relative h-48 flex-shrink-0">
                   {selectedPlace.photos && selectedPlace.photos.length > 0 ? (
                     <>
@@ -1354,7 +1267,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                   )}
                 </div>
 
-                {/* Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-4">
                   <div>
                     <h2 className="text-xl font-bold text-[hsl(var(--foreground))] mb-2">
@@ -1376,7 +1288,6 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     </p>
                   </div>
 
-                  {/* Contact Info */}
                   <div className="space-y-2">
                     {selectedPlace.formatted_phone_number && (
                       <div className="flex items-center gap-2">
@@ -1429,21 +1340,18 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     </div>
                   </div>
 
-                  {/* Menu Section - Scrollable */}
                   <div className="pt-3 border-t border-purple-100">
                     <h3 className="text-sm font-semibold text-[hsl(var(--foreground))] mb-3 flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-purple-400" />
                       Menu
                     </h3>
                     
-                    {/* Menu items */}
                     <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
                       {(() => {
                         const cuisineType = getCuisineType(selectedPlace.types);
                         const priceRange = selectedPlace.price_level || 2;
                         const basePrice = priceRange * 10;
                         
-                        // Generate cuisine-appropriate menu items
                         const menuItems = cuisineType === 'Italian' ? [
                           { name: 'Margherita Pizza', price: basePrice + 2 },
                           { name: 'Pasta Carbonara', price: basePrice + 6 },
@@ -1480,12 +1388,10 @@ export function RestaurantMapClean({ className }: RestaurantMapProps) {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-2 pt-3">
                     <Button
                       className="flex-1 bg-purple-600 text-white hover:bg-purple-700"
                       onClick={() => {
-                        // Track maps view (high intent signal)
                         trackMapsView({
                           place_id: selectedPlace.place_id,
                           name: selectedPlace.name || 'Unknown',

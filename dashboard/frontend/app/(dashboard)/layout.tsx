@@ -8,10 +8,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { isMuted, setIsMuted } = useAudio();
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+B / Ctrl+B for sidebar toggle
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
         setSidebarCollapsed((prev) => !prev);
@@ -24,7 +22,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-white text-[hsl(var(--foreground))]">
-      {/* Sidebar */}
       <AegisSidebar 
         isCollapsed={sidebarCollapsed} 
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -33,7 +30,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         isSpeaking={false}
       />
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

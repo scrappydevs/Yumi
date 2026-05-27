@@ -6,7 +6,6 @@ export default function LiquidGlassDemo() {
   return (
     <div className="h-full liquid-glass p-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] bg-clip-text text-transparent mb-2">
             Liquid Glass Components
@@ -16,10 +15,8 @@ export default function LiquidGlassDemo() {
           </p>
         </div>
 
-        {/* Component Showcase */}
         <div className="space-y-12">
           
-          {/* Music Player Panel */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-slate-800">Music Player Panel</h2>
             <div className="glass-panel music-panel max-w-sm">
@@ -38,7 +35,6 @@ export default function LiquidGlassDemo() {
             </div>
           </div>
 
-          {/* Social Actions Panel */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-slate-800">Social Actions Panel</h2>
             <div className="glass-panel social-panel max-w-sm">
@@ -54,7 +50,6 @@ export default function LiquidGlassDemo() {
             </div>
           </div>
 
-          {/* Button Sizes */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-slate-800">Button Sizes</h2>
             <div className="flex items-center gap-6">
@@ -80,7 +75,6 @@ export default function LiquidGlassDemo() {
             </div>
           </div>
 
-          {/* Mixed Layout Example */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-slate-800">Mixed Layout Example</h2>
             <div className="glass-panel p-6 max-w-md">
@@ -100,7 +94,6 @@ export default function LiquidGlassDemo() {
             </div>
           </div>
 
-          {/* CSS Classes Reference */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-slate-800">CSS Classes Reference</h2>
             <div className="glass-panel p-6 max-w-2xl">

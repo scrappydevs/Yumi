@@ -26,20 +26,16 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
     setError(null)
 
     try {
-      // Validate phone number (basic)
       const cleanPhone = phoneNumber.trim()
       if (!cleanPhone) {
         throw new Error('Phone number is required')
       }
 
-      // Format to E.164 if not already
       let formattedPhone = cleanPhone
       if (!cleanPhone.startsWith('+')) {
-        // Assume US number
         formattedPhone = `+1${cleanPhone.replace(/\D/g, '')}`
       }
 
-      // Validate E.164 format
       if (!formattedPhone.match(/^\+[1-9]\d{1,14}$/)) {
         throw new Error('Invalid phone number. Use format: +1234567890')
       }
@@ -49,7 +45,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
         throw new Error('Not authenticated')
       }
 
-      // Update profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -61,7 +56,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
         throw updateError
       }
 
-      // Success - call the callback
       onSuccess(formattedPhone)
       onClose()
     } catch (err) {
@@ -74,7 +68,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -83,7 +76,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
             className="fixed inset-0 bg-black/60 z-50 backdrop-blur-md"
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -92,7 +84,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
           >
             <div className="bg-white rounded-3xl p-6 shadow-2xl m-4 border border-gray-100">
               <div>
-                {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -121,7 +112,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
                   </motion.div>
                 )}
 
-                {/* Phone Input Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium">
@@ -146,7 +136,6 @@ export function PhoneCollectionModal({ isOpen, onClose, onSuccess }: PhoneCollec
                     </p>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-3 pt-2">
                     <Button
                       type="button"

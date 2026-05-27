@@ -20,7 +20,6 @@ function ConfirmReservationContent() {
 
   useEffect(() => {
     if (token) {
-      // Decode token on backend for security - for now just show generic info
       setTokenInfo({
         resvId: 'pending',
         action: 'confirm',

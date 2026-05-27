@@ -25,13 +25,11 @@ export function useFriendMentions() {
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
-  // Load all friends on mount
   useEffect(() => {
     loadFriends();
   }, []);
 
   const loadFriends = async () => {
-    console.log('[FRIENDS HOOK] Starting to load friends...');
     setLoading(true);
     setError(null);
 
@@ -42,8 +40,6 @@ export function useFriendMentions() {
         console.error('[FRIENDS HOOK] No session found');
         throw new Error('Not authenticated');
       }
-
-      console.log('[FRIENDS HOOK] Session found, fetching friends...');
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/friends/search`,
@@ -60,7 +56,6 @@ export function useFriendMentions() {
       }
 
       const data = await response.json();
-      console.log('[FRIENDS HOOK] Loaded friends:', data.friends);
       setFriends(data.friends || []);
       setFilteredFriends(data.friends || []);
     } catch (err) {
@@ -71,7 +66,6 @@ export function useFriendMentions() {
     }
   };
 
-  // Filter friends based on search query
   const filterFriends = useCallback((query: string) => {
     if (!query.trim()) {
       setFilteredFriends(friends);
@@ -88,13 +82,10 @@ export function useFriendMentions() {
     setFilteredFriends(filtered);
   }, [friends]);
 
-  // Extract mentions from text (e.g., "lunch with @julian @sarah" -> [julian, sarah])
   const extractMentions = useCallback((text: string, selectedMentions: Mention[]): Mention[] => {
-    // Return the mentions that were explicitly selected by the user
     return selectedMentions;
   }, []);
 
-  // Parse @ mentions from input text to get IDs
   const getMentionIds = useCallback((mentions: Mention[]): string[] => {
     return mentions.map(m => m.id);
   }, []);

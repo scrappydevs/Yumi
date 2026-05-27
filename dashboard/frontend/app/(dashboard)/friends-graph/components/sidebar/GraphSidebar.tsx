@@ -15,7 +15,6 @@ export default function GraphSidebar({
   return (
     <div className="glass-panel graph-sidebar">
       <div className="sidebar-content">
-        {/* How it works */}
         <div className="space-y-3 mb-6">
           <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
@@ -33,7 +32,6 @@ export default function GraphSidebar({
           </div>
         </div>
 
-        {/* Network Stats */}
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />

@@ -7,17 +7,13 @@ export function useVoiceOutput() {
   const speak = useCallback(async (text: string) => {
     try {
       setIsSpeaking(true);
-      console.log('🔊 Speaking:', text);
       
-      // Use streaming endpoint with Fahco4VZzobUeiPqni1S voice
       const audioUrl = `http://localhost:8000/api/audio/tts/stream?text=${encodeURIComponent(text)}&voice_id=Fahco4VZzobUeiPqni1S&stability=0.97&similarity_boost=0.65`;
       
-      // Create and play audio
       const audio = new Audio(audioUrl);
       setAudioElement(audio);
       
       audio.onended = () => {
-        console.log('✅ Speech finished');
         setIsSpeaking(false);
       };
       
@@ -27,11 +23,9 @@ export function useVoiceOutput() {
       };
       
       audio.onloadstart = () => {
-        console.log('🎵 Audio loading...');
       };
       
       audio.oncanplay = () => {
-        console.log('✅ Audio ready, playing...');
       };
       
       await audio.play();

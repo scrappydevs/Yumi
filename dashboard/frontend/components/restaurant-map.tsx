@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Restaurant data type
 type Restaurant = {
   id: string;
   name: string;
@@ -44,7 +43,6 @@ type Restaurant = {
   popularDishes: string[];
 };
 
-// Mock restaurant data - Replace with API call
 const SAMPLE_RESTAURANTS: Restaurant[] = [
   {
     id: '1',
@@ -140,7 +138,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
     bearing: 0,
   });
 
-  // Filter restaurants based on search
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     
@@ -153,13 +150,11 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
     );
   }, [searchQuery]);
 
-  // Handle restaurant selection
   const handleSelectRestaurant = useCallback((restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
     setShowSearchResults(false);
     setSearchQuery('');
     
-    // Fly to restaurant location
     setViewState({
       latitude: restaurant.coordinates[1],
       longitude: restaurant.coordinates[0],
@@ -170,7 +165,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
     });
   }, []);
 
-  // Deck.gl layer for restaurants
   const layers = useMemo(() => {
     return [
       new ScatterplotLayer({
@@ -187,7 +181,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
         getPosition: (d: Restaurant) => d.coordinates,
         getRadius: (d: Restaurant) => d.rating * 3,
         getFillColor: (d: Restaurant) => {
-          // Purple-blue gradient based on rating
           if (d.rating >= 4.7) return [155, 135, 245, 255]; // Purple for high rated
           if (d.rating >= 4.5) return [139, 92, 246, 255]; // Mid purple
           return [96, 165, 250, 255]; // Blue
@@ -203,7 +196,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
   return (
     <div className={className}>
       <div className="relative h-[calc(100vh-80px)] overflow-hidden">
-        {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 pointer-events-none opacity-30" />
         
         <DeckGL
@@ -247,7 +239,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
           />
         </DeckGL>
 
-        {/* Bottom Search Bar - Apple Style Liquid Glass */}
         <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto">
             <motion.div
@@ -255,7 +246,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
               initial={{ y: 100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
             >
-              {/* Gradient border */}
               <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 opacity-60" />
               
               <div className="relative bg-white/90 backdrop-blur-2xl rounded-[31px] p-4">
@@ -287,7 +277,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                   )}
                 </div>
 
-                {/* Search Results Dropdown */}
                 <AnimatePresence>
                   {showSearchResults && searchResults.length > 0 && (
                     <motion.div
@@ -339,7 +328,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                   )}
                 </AnimatePresence>
 
-                {/* No results */}
                 {showSearchResults && searchResults.length === 0 && searchQuery && (
                   <div className="mt-3 p-4 text-center text-sm text-[hsl(var(--muted-foreground))]">
                     No restaurants found. Try a different search.
@@ -350,7 +338,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
           </div>
         </div>
 
-        {/* Restaurant Detail Sidebar */}
         <AnimatePresence>
           {selectedRestaurant && (
             <motion.div
@@ -360,12 +347,10 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="absolute top-4 right-4 w-[400px] max-h-[calc(100vh-120px)] overflow-y-auto"
             >
-              {/* Gradient border wrapper */}
               <div className="relative rounded-[28px] p-[1px] shadow-2xl overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-400 via-blue-400 to-indigo-400 opacity-70" />
                 
                 <div className="relative bg-white/95 backdrop-blur-2xl rounded-[27px] overflow-hidden">
-                  {/* Hero Image */}
                   <div className="relative h-48">
                     <img
                       src={selectedRestaurant.image}
@@ -374,7 +359,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                     
-                    {/* Close button */}
                     <button
                       onClick={() => setSelectedRestaurant(null)}
                       className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm 
@@ -383,7 +367,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                       <X className="w-4 h-4" />
                     </button>
 
-                    {/* Rating badge */}
                     <div className="absolute bottom-3 left-3">
                       <div className="liquid-glass-dark px-3 py-1.5 rounded-full">
                         <div className="flex items-center gap-1.5">
@@ -394,9 +377,7 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                     </div>
                   </div>
 
-                  {/* Content */}
                   <div className="p-5 space-y-4">
-                    {/* Header */}
                     <div>
                       <h2 className="text-2xl font-bold text-[hsl(var(--foreground))] mb-1">
                         {selectedRestaurant.name}
@@ -411,12 +392,10 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                       </div>
                     </div>
 
-                    {/* Description */}
                     <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed">
                       {selectedRestaurant.description}
                     </p>
 
-                    {/* Popular Dishes */}
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <Sparkles className="w-4 h-4 text-purple-400" />
@@ -438,7 +417,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                       </div>
                     </div>
 
-                    {/* Contact Info */}
                     <div className="space-y-2.5 pt-3 border-t border-purple-100">
                       <div className="flex items-center gap-2.5">
                         <MapPin className="w-4 h-4 text-purple-400 flex-shrink-0" />
@@ -475,7 +453,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex gap-2 pt-2">
                       <Button
                         className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 
@@ -504,7 +481,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
           )}
         </AnimatePresence>
 
-        {/* Legend - Top Right */}
         {!selectedRestaurant && (
           <div className="absolute top-4 right-4">
             <div className="relative rounded-2xl p-[1px] shadow-xl overflow-hidden">
@@ -533,7 +509,6 @@ export function RestaurantMap({ className }: RestaurantMapProps) {
           </div>
         )}
 
-        {/* Stats Badge - Top Left */}
         <div className="absolute top-4 left-4">
           <div className="relative rounded-2xl p-[1px] shadow-xl overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-300 to-blue-300 opacity-50" />

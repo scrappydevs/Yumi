@@ -29,17 +29,14 @@ export function SendReservationCard({
 
   return (
     <Card className={`glass-card rounded-3xl p-6 shadow-strong relative overflow-hidden ${className}`}>
-      {/* Specular highlight */}
       <div className="absolute top-0 left-0 right-0 h-1/4 bg-gradient-to-b from-white/30 to-transparent pointer-events-none rounded-t-3xl" />
 
       <div className="relative space-y-6">
-        {/* Header */}
         <div className="space-y-1">
           <h3 className="text-xl font-bold text-[hsl(var(--foreground))]">Send Reservation</h3>
           <p className="text-sm text-[hsl(var(--muted-foreground))]">Invite {friendName} to dine with you</p>
         </div>
 
-        {/* Info Cards */}
         <div className="space-y-3">
           <div className="glass-layer-1 rounded-xl px-4 py-3 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent rounded-t-xl pointer-events-none" />
@@ -68,7 +65,6 @@ export function SendReservationCard({
           </div>
         </div>
 
-        {/* CTA Button */}
         <motion.button
           onClick={handleSendReservation}
           disabled={loading}
@@ -92,13 +88,11 @@ export function SendReservationCard({
           </div>
         </motion.button>
 
-        {/* Info note */}
         <p className="text-xs text-center text-[hsl(var(--muted-foreground))] px-2">
           {friendName} will receive an SMS invitation to confirm
         </p>
       </div>
 
-      {/* Reservation Modal */}
       <ReservationModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

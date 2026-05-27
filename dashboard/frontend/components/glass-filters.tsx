@@ -26,7 +26,6 @@ export function GlassFilters() {
   return (
     <svg width="0" height="0" className="absolute pointer-events-none" aria-hidden="true">
       <defs>
-        {/* Container glass filter - softer, more diffused */}
         <filter id="container-glass" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
           <feColorMatrix
@@ -41,7 +40,6 @@ export function GlassFilters() {
           <feComposite in2="SourceGraphic" operator="in" />
         </filter>
 
-        {/* Button glass filter - sharper, more defined */}
         <filter id="btn-glass" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
           <feColorMatrix
@@ -56,7 +54,6 @@ export function GlassFilters() {
           <feComposite in2="SourceGraphic" operator="in" />
         </filter>
 
-        {/* Glass glow filter - for hover states */}
         <filter id="glass-glow" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4" />
           <feColorMatrix
@@ -71,7 +68,6 @@ export function GlassFilters() {
           <feComposite in2="SourceGraphic" operator="in" />
         </filter>
 
-        {/* Intense glass filter - for focal elements */}
         <filter id="glass-intense" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="12" />
           <feColorMatrix

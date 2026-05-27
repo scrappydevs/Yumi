@@ -16,7 +16,6 @@ export async function reverseGeocode(geolocation: string | null): Promise<Geocod
     return { city: null, state: null, country: null, formatted: 'Unknown location' };
   }
 
-  // Check cache first
   if (geocodeCache.has(geolocation)) {
     return geocodeCache.get(geolocation)!;
   }
@@ -29,8 +28,6 @@ export async function reverseGeocode(geolocation: string | null): Promise<Geocod
 
     const [lat, lng] = coords;
 
-    // Use OpenStreetMap Nominatim API (free, no API key needed)
-    // Note: Add User-Agent header as per their usage policy
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`,
       {

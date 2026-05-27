@@ -26,7 +26,6 @@ export function buildInviteText(params: InviteTextParams): string {
  */
 export function buildMessagesHref(toE164: string, body: string): string {
   const encoded = encodeURIComponent(body)
-  // Use sms: scheme with ?& separator (iOS compatibility)
   return `sms:${toE164}?&body=${encoded}`
 }
 
@@ -48,7 +47,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    // Fallback for older browsers
     try {
       const textArea = document.createElement('textarea')
       textArea.value = text
@@ -69,17 +67,14 @@ export async function copyToClipboard(text: string): Promise<boolean> {
  * Use Web Share API if available, fallback to copy
  */
 export async function shareOrCopy(text: string): Promise<'shared' | 'copied' | 'failed'> {
-  // Try Web Share API first (mobile)
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
       await navigator.share({ text })
       return 'shared'
     } catch {
-      // User canceled or not supported
     }
   }
   
-  // Fallback to clipboard
   const copied = await copyToClipboard(text)
   return copied ? 'copied' : 'failed'
 }
@@ -89,15 +84,12 @@ export async function shareOrCopy(text: string): Promise<'shared' | 'copied' | '
  * +14155551234 → (415) 555-1234
  */
 export function formatPhoneForDisplay(e164: string): string {
-  // Remove + and country code (assume US +1 for now)
   const cleaned = e164.replace(/\D/g, '')
   
   if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    // US number
     const number = cleaned.substring(1)
     return `(${number.substring(0, 3)}) ${number.substring(3, 6)}-${number.substring(6)}`
   }
   
-  // Return as-is for non-US numbers
   return e164
 }

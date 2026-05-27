@@ -44,7 +44,6 @@ export default function FriendsPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  // Load current user and their friends
   useEffect(() => {
     if (user) {
       loadCurrentUser();
@@ -155,7 +154,6 @@ export default function FriendsPage() {
       if (!error) {
         setCurrentUser({ ...currentUser, friends: updatedFriends });
         await loadFriends(updatedFriends);
-        // Refresh filtered users to update follow status
         filterUsers(searchQuery);
       }
     } catch (error) {
@@ -177,7 +175,6 @@ export default function FriendsPage() {
       if (!error) {
         setCurrentUser({ ...currentUser, friends: updatedFriends });
         await loadFriends(updatedFriends);
-        // Refresh filtered users to update follow status
         filterUsers(searchQuery);
       }
     } catch (error) {
@@ -216,7 +213,6 @@ export default function FriendsPage() {
   return (
     <div className="h-full bg-gradient-to-br from-blue-50/40 via-white to-purple-50/40">
       <div className="max-w-5xl mx-auto h-full flex flex-col px-8 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-semibold text-[hsl(var(--foreground))] mb-1 tracking-tight">
             Friends
@@ -224,10 +220,8 @@ export default function FriendsPage() {
           <p className="text-[hsl(var(--muted-foreground))] text-sm">Connect and discover</p>
         </div>
 
-        {/* Tab Switcher - Liquid Glass Style */}
         <div className="mb-6">
           <div className="inline-flex p-1.5 glass-layer-1 rounded-2xl shadow-soft relative overflow-hidden">
-            {/* Specular highlight */}
             <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-2xl" />
             
             <motion.button
@@ -269,7 +263,6 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             {activeTab === 'friends' ? (
@@ -301,9 +294,7 @@ export default function FriendsPage() {
                         whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)' }}
                         whileTap={{ scale: 0.98 }}
                       >
-                        {/* Specular highlight */}
                         <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-3xl" />
-                        {/* Avatar */}
                         <div className="flex flex-col items-center mb-4">
                           {friend.avatar_url ? (
                             <img
@@ -324,14 +315,12 @@ export default function FriendsPage() {
                           <p className="text-xs text-slate-500 mt-0.5">@{friend.username}</p>
                         </div>
 
-                        {/* Bio */}
                         {friend.bio && (
                           <p className="text-xs text-slate-600 text-center line-clamp-2 mb-4 px-2">
                             {friend.bio}
                           </p>
                         )}
 
-                        {/* Actions */}
                         <div className="flex gap-2">
                           <Button
                             variant="ghost"
@@ -391,9 +380,7 @@ export default function FriendsPage() {
                         whileHover={{ scale: 1.02, boxShadow: '0 12px 48px rgba(0, 0, 0, 0.15)' }}
                         whileTap={{ scale: 0.98 }}
                       >
-                        {/* Specular highlight */}
                         <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-3xl" />
-                        {/* Avatar */}
                         <div className="flex flex-col items-center mb-4">
                           {follower.avatar_url ? (
                             <img
@@ -414,14 +401,12 @@ export default function FriendsPage() {
                           <p className="text-xs text-slate-500 mt-0.5">@{follower.username}</p>
                         </div>
 
-                        {/* Bio */}
                         {follower.bio && (
                           <p className="text-xs text-slate-600 text-center line-clamp-2 mb-4 px-2">
                             {follower.bio}
                           </p>
                         )}
 
-                        {/* Actions */}
                         <div className="flex gap-2">
                           <Button
                             variant="ghost"
@@ -462,10 +447,8 @@ export default function FriendsPage() {
                 transition={{ duration: 0.2 }}
                 className="h-full flex flex-col"
               >
-                {/* Search Bar */}
                 <div className="mb-6">
                   <div className="relative glass-layer-1 rounded-2xl shadow-soft overflow-hidden">
-                    {/* Specular highlight */}
                     <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))] z-10" />
                     <Input
@@ -478,7 +461,6 @@ export default function FriendsPage() {
                   </div>
                 </div>
 
-                {/* Users List */}
                 <div className="flex-1 overflow-auto pb-6">
                   {usersLoading ? (
                     <div className="flex justify-center py-12">
@@ -501,10 +483,8 @@ export default function FriendsPage() {
                           whileHover={{ scale: 1.01, boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)' }}
                           whileTap={{ scale: 0.99 }}
                         >
-                          {/* Specular highlight */}
                           <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/25 to-transparent pointer-events-none rounded-t-2xl" />
                           <div className="flex items-center gap-4">
-                            {/* Avatar */}
                             <div
                               className="cursor-pointer flex-shrink-0"
                               onClick={() => navigateToProfile(user.id)}
@@ -524,7 +504,6 @@ export default function FriendsPage() {
                               )}
                             </div>
 
-                            {/* Info */}
                             <div
                               className="flex-1 min-w-0 cursor-pointer"
                               onClick={() => navigateToProfile(user.id)}
@@ -535,7 +514,6 @@ export default function FriendsPage() {
                               <p className="text-xs text-slate-500 truncate">@{user.username}</p>
                             </div>
 
-                            {/* Action Buttons */}
                             <div className="flex gap-2 flex-shrink-0">
                               <Button
                                 variant="ghost"

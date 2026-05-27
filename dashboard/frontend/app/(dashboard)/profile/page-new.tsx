@@ -17,7 +17,6 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/auth-context';
 
-// Types for the database
 interface Profile {
   id: string;
   username: string;
@@ -88,7 +87,6 @@ export default function ProfilePage() {
         .single();
 
       if (profileError && profileError.code === 'PGRST116') {
-        // Create profile if it doesn't exist
         const { data: newProfile } = await supabase
           .from('profiles')
           .insert([{
@@ -110,11 +108,9 @@ export default function ProfilePage() {
         setProfile(profileData);
       }
 
-      // Load visits and photos (mock data for now)
       setVisits([]);
       setPhotos([]);
       
-      // Load reviews with images
       const { data: reviewsData } = await supabase
         .from('reviews')
         .select(`
@@ -135,23 +131,17 @@ export default function ProfilePage() {
   };
 
   const parsePreferences = (preferencesData: any) => {
-    // If it's already an object, return it
     if (typeof preferencesData === 'object' && preferencesData !== null) {
-      console.log('✅ Preferences is already an object:', preferencesData);
       return { parsed: true, data: preferencesData };
     }
     
-    // If it's a string, try to parse it
     if (typeof preferencesData === 'string' && preferencesData) {
       try {
-        // Check if it looks like JSON (starts with { or [)
         const trimmed = preferencesData.trim();
         if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
           const parsed = JSON.parse(trimmed);
-          console.log('✅ Parsed preferences from JSON string:', parsed);
           return { parsed: true, data: parsed };
         } else {
-          console.log('📝 Preferences is raw text, displaying as-is');
           return { parsed: false, rawText: trimmed };
         }
       } catch (error) {
@@ -186,7 +176,6 @@ export default function ProfilePage() {
   return (
     <div className="h-full overflow-y-auto bg-white">
       <div className="max-w-5xl mx-auto p-12 space-y-12">
-        {/* Profile Header */}
         <div className="grid grid-cols-[auto_1fr_auto] gap-8 items-start pb-12 border-b border-slate-200/60">
           <img
             src={profile.avatar_url || '/default-avatar.png'}
@@ -208,7 +197,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stats Section */}
         <div className="pb-12 border-b border-slate-200/60">
           <div className="text-sm font-medium text-slate-500 mb-4">Social</div>
           <div className="grid grid-cols-2 gap-6 max-w-md">
@@ -227,14 +215,12 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Preferences Section - Full Width */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-medium text-slate-500">Taste Preferences</h2>
           </div>
           
           <div className="space-y-6">
-            {/* Raw Text Display */}
             {!preferencesResult.parsed && preferencesResult.rawText && (
               <div className="prose prose-sm max-w-none">
                 <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
@@ -243,7 +229,6 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Structured Preferences Display */}
             {preferencesResult.parsed && (
               <>
                 {preferences.cuisines && preferences.cuisines.length > 0 && (
@@ -305,7 +290,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Your Reviews Section */}
         <div className="border-t border-slate-200/60 pt-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-medium text-slate-500">Your Reviews</h2>
@@ -320,7 +304,6 @@ export default function ProfilePage() {
                   className="glass-layer-1 rounded-2xl p-6 shadow-soft hover:shadow-md transition-all"
                 >
                   <div className="flex gap-6">
-                    {/* Image */}
                     {review.images?.image_url && (
                       <div className="flex-shrink-0">
                         <img
@@ -331,7 +314,6 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    {/* Restaurant Info */}
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-3">
                         <div>
@@ -365,7 +347,6 @@ export default function ProfilePage() {
                         </span>
                       </div>
 
-                      {/* Review Description */}
                       {review.description && (
                         <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
                           {review.description}

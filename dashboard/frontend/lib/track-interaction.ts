@@ -44,7 +44,6 @@ export async function trackInteraction(params: TrackInteractionParams): Promise<
     if (params.latitude !== undefined) formData.append('latitude', params.latitude.toString());
     if (params.longitude !== undefined) formData.append('longitude', params.longitude.toString());
 
-    // Fire-and-forget - don't wait for response
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/interactions/track`, {
       method: 'POST',
       headers: {
@@ -52,14 +51,9 @@ export async function trackInteraction(params: TrackInteractionParams): Promise<
       },
       body: formData,
     }).catch(err => {
-      // Silent fail - tracking is non-critical
-      console.debug('[Track] Failed to track interaction:', err);
     });
 
-    console.log(`[Track] ${params.interactionType} on ${params.restaurantName || 'restaurant'}`);
   } catch (error) {
-    // Silent fail - tracking should never break user experience
-    console.debug('[Track] Error:', error);
   }
 }
 
@@ -73,7 +67,6 @@ async function getAccessToken(): Promise<string> {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || '';
   } catch (error) {
-    console.debug('[Track] Failed to get access token:', error);
     return '';
   }
 }

@@ -72,9 +72,7 @@ export default function UserProfilePage() {
 
   const loadUserProfile = async () => {
     try {
-      console.log('🔍 Loading user profile for:', userId);
       
-      // Get profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -86,12 +84,8 @@ export default function UserProfilePage() {
         return;
       }
 
-      console.log('✅ Profile loaded:', profileData);
-      console.log('📊 Profile preferences field:', profileData.preferences);
-      console.log('📊 Profile preferences type:', typeof profileData.preferences);
       setProfile(profileData);
 
-      // Check if current user is following this user
       if (currentUser) {
         const { data: currentUserProfile } = await supabase
           .from('profiles')
@@ -102,7 +96,6 @@ export default function UserProfilePage() {
         setIsFollowing(currentUserProfile?.friends?.includes(userId) || false);
       }
 
-      // Load visits
       const { data: visitsData, error: visitsError } = await supabase
         .from('visits')
         .select('*')
@@ -116,7 +109,6 @@ export default function UserProfilePage() {
         setVisits(visitsData || []);
       }
 
-      // Load photos
       const { data: photosData, error: photosError} = await supabase
         .from('photos')
         .select('*')
@@ -130,7 +122,6 @@ export default function UserProfilePage() {
         setPhotos(photosData || []);
       }
 
-      // Load followers count (how many people follow THIS user)
       const { data: followersData, error: followersError } = await supabase
         .from('profiles')
         .select('id')
@@ -163,10 +154,8 @@ export default function UserProfilePage() {
       let updatedFriends;
 
       if (isFollowing) {
-        // Unfollow
         updatedFriends = currentFriends.filter((id: string) => id !== userId);
       } else {
-        // Follow
         updatedFriends = [...currentFriends, userId];
       }
 
@@ -181,7 +170,6 @@ export default function UserProfilePage() {
       if (!error) {
         setIsFollowing(!isFollowing);
         
-        // Update followers count
         if (isFollowing) {
           setFollowersCount(prev => Math.max(0, prev - 1));
         } else {
@@ -194,23 +182,17 @@ export default function UserProfilePage() {
   };
 
   const parsePreferences = (preferencesData: any) => {
-    // If it's already an object, return it
     if (typeof preferencesData === 'object' && preferencesData !== null) {
-      console.log('✅ Preferences is already an object:', preferencesData);
       return { parsed: true, data: preferencesData };
     }
     
-    // If it's a string, try to parse it
     if (typeof preferencesData === 'string' && preferencesData) {
       try {
-        // Check if it looks like JSON (starts with { or [)
         const trimmed = preferencesData.trim();
         if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
           const parsed = JSON.parse(trimmed);
-          console.log('✅ Parsed preferences from JSON string:', parsed);
           return { parsed: true, data: parsed };
         } else {
-          console.log('📝 Preferences is raw text, displaying as-is');
           return { parsed: false, rawText: trimmed };
         }
       } catch (error) {
@@ -253,13 +235,11 @@ export default function UserProfilePage() {
   }
 
   const preferencesResult = parsePreferences(profile.preferences || '{}');
-  console.log('🎯 Final parsed preferences:', preferencesResult);
   const preferences = preferencesResult.parsed ? preferencesResult.data : {};
 
   return (
     <div className="h-full overflow-y-auto bg-white">
       <div className="max-w-5xl mx-auto p-8 space-y-12">
-        {/* Profile Header */}
         <div className="grid grid-cols-[auto_1fr_auto] gap-8 items-start pb-12 border-b border-slate-200/60">
           <img
             src={profile.avatar_url || '/default-avatar.png'}
@@ -332,7 +312,6 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Stats Section */}
         <div className="grid grid-cols-2 gap-x-16 gap-y-6 pb-12 border-b border-slate-200/60">
           <div>
             <div className="text-sm font-medium text-slate-500 mb-4">Social</div>
@@ -369,14 +348,12 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Preferences Section - Full Width */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-medium text-slate-500">Taste Preferences</h2>
           </div>
           
           <div className="space-y-6">
-            {/* Raw Text Display */}
             {!preferencesResult.parsed && preferencesResult.rawText && (
               <div className="prose prose-sm max-w-none">
                 <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
@@ -385,7 +362,6 @@ export default function UserProfilePage() {
               </div>
             )}
 
-            {/* Structured Preferences Display */}
             {preferencesResult.parsed && (
               <>
                 {preferences.cuisines && preferences.cuisines.length > 0 && (
@@ -448,7 +424,6 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* Reservation Modal */}
       {profile && (
         <ReservationModal
           isOpen={showReservationModal}

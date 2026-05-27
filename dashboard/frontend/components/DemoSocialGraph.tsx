@@ -21,7 +21,6 @@ import '@xyflow/react/dist/style.css';
 import { TrendingUp, Utensils, Heart } from 'lucide-react';
 import Image from 'next/image';
 
-// Real users from your team with actual photos
 const demoUsers = [
   { 
     id: '1', 
@@ -103,7 +102,6 @@ const demoUsers = [
   },
 ];
 
-// Detailed sample similarities with food preferences
 const demoSimilarities = [
   { 
     source: '1', target: '2', similarity: 0.85, 
@@ -359,7 +357,6 @@ function DemoNode({ data }: { data: any }) {
   
   return (
     <>
-      {/* Handles at all sides for connections */}
       {handlePositions.map((position) => (
         <Handle
           key={`${position}-source`}
@@ -379,7 +376,6 @@ function DemoNode({ data }: { data: any }) {
         />
       ))}
       
-      {/* Node visual with real avatar image */}
       <div
         className="relative"
         style={{
@@ -401,7 +397,6 @@ function DemoNode({ data }: { data: any }) {
             unoptimized
           />
         </div>
-        {/* Name label below avatar */}
         <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap">
           <span className="text-sm font-semibold text-slate-700 bg-white/95 px-3 py-1 rounded-full shadow-md">
             {data.name}
@@ -426,7 +421,6 @@ function DemoGraphInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   useEffect(() => {
-    // Create massive circular layout - takes up most of the viewport
     const radius = 350;
     const centerX = 450;
     const centerY = 450;
@@ -459,7 +453,6 @@ function DemoGraphInner() {
     setNodes(demoNodes);
     setEdges(demoEdges);
 
-    // Fit view with minimal padding to maximize graph size
     setTimeout(() => fitView({ padding: 0.15, duration: 800 }), 100);
   }, [setNodes, setEdges, fitView]);
 

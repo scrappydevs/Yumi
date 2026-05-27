@@ -12,12 +12,10 @@ interface BlobProps {
 function Blob({ isAnimating }: BlobProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   
-  // Create sphere geometry - ultra-high subdivision for perfectly smooth blob
   const geometry = useMemo(() => {
     const geo = new THREE.SphereGeometry(1.5, 64, 64);
     const positionAttribute = geo.attributes.position;
     
-    // Store original positions for animation
     const originalPositions = new Float32Array(positionAttribute.array);
     geo.userData.originalPositions = originalPositions;
     
@@ -30,12 +28,10 @@ function Blob({ isAnimating }: BlobProps) {
     const mesh = meshRef.current;
     const time = state.clock.getElapsedTime();
     
-    // Gentle rotation
     mesh.rotation.x = time * (isAnimating ? 0.15 : 0.05);
     mesh.rotation.y = time * (isAnimating ? 0.2 : 0.08);
     mesh.rotation.z = time * (isAnimating ? 0.1 : 0.04);
     
-    // Subtle blob morphing
     const positionAttribute = mesh.geometry.attributes.position;
     const originalPositions = mesh.geometry.userData.originalPositions as Float32Array;
     
@@ -49,7 +45,6 @@ function Blob({ isAnimating }: BlobProps) {
       const y = originalPositions[i3 + 1];
       const z = originalPositions[i3 + 2];
       
-      // Soft waves
       const wave = Math.sin(x + time * speed) * Math.cos(y + time * speed * 0.8) * morphIntensity;
       
       const length = Math.sqrt(x * x + y * y + z * z);
@@ -66,7 +61,6 @@ function Blob({ isAnimating }: BlobProps) {
     positionAttribute.needsUpdate = true;
     mesh.geometry.computeVertexNormals();
     
-    // Gentle breathing
     const pulse = 1 + Math.sin(time * (isAnimating ? 1.2 : 0.5)) * (isAnimating ? 0.05 : 0.02);
     mesh.scale.setScalar(pulse);
   });
@@ -114,7 +108,6 @@ function GradientEnvironment() {
     canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
     
-    // Create vibrant gradient: purple-blue with high contrast
     const gradient = ctx.createLinearGradient(0, 0, 0, 512);
     gradient.addColorStop(0, '#F5F3FF');    // Light purple top
     gradient.addColorStop(0.25, '#DDD6FE'); // Vibrant purple
@@ -171,19 +164,14 @@ export function LiquidGlassBlob({ isAnimating = false, className = '' }: LiquidG
         frameloop="always"
       >
         <Suspense fallback={null}>
-          {/* Bright ambient light */}
           <ambientLight intensity={1.5} color="#F8FAFC" />
           
-          {/* Key light - intense purple */}
           <directionalLight position={[5, 5, 5]} intensity={5} color="#8B5CF6" />
           
-          {/* Fill light - intense blue */}
           <directionalLight position={[-5, -3, -5]} intensity={4.5} color="#3B82F6" />
           
-          {/* Rim light - bright cyan accent */}
           <directionalLight position={[0, 10, -5]} intensity={4} color="#06B6D4" />
           
-          {/* Accent point lights - vibrant purple and blue gradient */}
           <pointLight position={[4, 2, 4]} intensity={5} color="#A78BFA" />
           <pointLight position={[-4, -2, -4]} intensity={4.5} color="#60A5FA" />
           <pointLight position={[0, -4, 2]} intensity={4} color="#C084FC" />
@@ -191,7 +179,6 @@ export function LiquidGlassBlob({ isAnimating = false, className = '' }: LiquidG
           <pointLight position={[-2, 3, 3]} intensity={3.5} color="#DDD6FE" />
           <pointLight position={[3, -3, -2]} intensity={3.5} color="#BFDBFE" />
           
-          {/* Apple-style white environment with purple-blue gradient hints */}
           <Environment resolution={256} background={false}>
             <mesh scale={100}>
               <sphereGeometry args={[1, 64, 64]} />
@@ -205,7 +192,6 @@ export function LiquidGlassBlob({ isAnimating = false, className = '' }: LiquidG
                       canvas.height = 512;
                       const ctx = canvas.getContext('2d')!;
                       
-                      // Create vibrant gradient: purple-blue with high contrast
                       const gradient = ctx.createLinearGradient(0, 0, 0, 512);
                       gradient.addColorStop(0, '#F5F3FF');    // Light purple top
                       gradient.addColorStop(0.25, '#DDD6FE'); // Vibrant purple
@@ -226,7 +212,6 @@ export function LiquidGlassBlob({ isAnimating = false, className = '' }: LiquidG
             </mesh>
           </Environment>
           
-          {/* The Blob */}
           <Blob isAnimating={isAnimating} />
         </Suspense>
       </Canvas>

@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 
-// Lazy load the map component for better initial page load
 const RestaurantMapClean = dynamic(
   () => import('@/components/restaurant-map-clean').then((mod) => mod.RestaurantMapClean),
   {
