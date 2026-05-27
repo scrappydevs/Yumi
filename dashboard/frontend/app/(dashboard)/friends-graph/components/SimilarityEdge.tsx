@@ -26,7 +26,6 @@ function SimilarityEdge({
 }: EdgeProps<SimilarityEdgeType>) {
   const [isSelected, setIsSelected] = useState(false);
 
-  // Get edge path and center position (like auctor-1)
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -70,19 +69,9 @@ function SimilarityEdge({
   const tasteOverlap = parseObjectIfString(data?.tasteOverlap, {});
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering pane click
-    console.log('🔵 Edge CLICKED:', { 
-      id, 
-      source, 
-      target, 
-      similarityScore,
-      explanation,
-      sharedRestaurants,
-      sharedCuisines,
-      tasteOverlap,
-    });
+    e.stopPropagation();
     setIsSelected(!isSelected);
-  }, [id, source, target, similarityScore, explanation, sharedRestaurants, sharedCuisines, tasteOverlap, isSelected]);
+  }, [isSelected]);
 
   // Styling - highlight when selected
   const strokeWidth = isSelected ? 3 : 2;

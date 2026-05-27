@@ -263,11 +263,9 @@ const demoSimilarities = [
   },
 ];
 
-// Custom edge with tooltip (like auctor-1)
 function DemoEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  // Get edge path and center position (like auctor-1)
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -311,7 +309,6 @@ function DemoEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
         style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
       />
 
-      {/* Tooltip positioned at edge center (like auctor-1) */}
       {showTooltip && (
         <EdgeLabelRenderer>
           <div
@@ -357,7 +354,6 @@ function DemoEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
   );
 }
 
-// Mini node component with handles and real avatars (like auctor-1)
 function DemoNode({ data }: { data: any }) {
   const handlePositions = [Position.Top, Position.Right, Position.Bottom, Position.Left];
   

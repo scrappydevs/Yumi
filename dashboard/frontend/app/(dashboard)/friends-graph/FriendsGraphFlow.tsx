@@ -30,7 +30,6 @@ import { useGraphLayout } from './components/hooks/useGraphLayout';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 
-// Register node types (like auctor-1)
 type GraphNode = FriendNode;
 
 const nodeTypes: NodeTypes = {
@@ -50,7 +49,6 @@ function FriendsGraphFlow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<SimilarityEdgeType>([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
-  // Get current user
   useEffect(() => {
     async function getCurrentUser() {
       const supabase = createClient();
@@ -62,44 +60,32 @@ function FriendsGraphFlow() {
     getCurrentUser();
   }, []);
 
-  // Fetch graph data (similar to auctor-1's canvas loading)
   const { data: graphData, isLoading } = useGraphData(userId || undefined);
   const { layoutNodes } = useGraphLayout();
 
-  // Initialize graph when data loads - no filtering, distance = similarity
   useEffect(() => {
     if (graphData) {
       const { nodes: layoutedNodes, edges: layoutedEdges } = layoutNodes(
         graphData.friends,
         graphData.similarities
       );
-      
-      console.log('🎨 Graph layout complete:', {
-        nodes: layoutedNodes.length,
-        edges: layoutedEdges.length,
-        edgeData: layoutedEdges.map(e => ({ id: e.id, data: e.data }))
-      });
-      
+
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
-      
-      // Fit view after layout (like auctor-1)
+
       setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100);
     }
   }, [graphData, layoutNodes, setNodes, setEdges, fitView]);
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      console.log('👤 Node clicked:', node.id, node);
       setSelectedNode(node.id);
     },
     []
   );
 
   const onPaneClick = useCallback(() => {
-    console.log('🖱️ Pane clicked - clearing selections');
     setSelectedNode(null);
-    // Note: Edge selections are managed internally by each edge component
   }, []);
 
   if (isLoading) {
@@ -145,7 +131,6 @@ function FriendsGraphFlow() {
           maskColor="rgba(248, 250, 252, 0.4)"
         />
         
-        {/* User detail panel - positioned within ReactFlow like auctor-1 */}
         {selectedNode && (
           <Panel position="top-right">
             <UserDetailPanel
@@ -160,7 +145,6 @@ function FriendsGraphFlow() {
   );
 }
 
-// Wrapper with ReactFlowProvider (like auctor-1's ProExampleWrapper)
 function FriendsGraphWrapper() {
   return (
     <ReactFlowProvider>

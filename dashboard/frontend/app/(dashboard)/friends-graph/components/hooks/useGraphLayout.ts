@@ -33,7 +33,6 @@ export function useGraphLayout() {
         };
       });
 
-      // Constant edge styling - distance encodes similarity (like auctor-1)
       const edges: SimilarityEdgeType[] = similarities.map((sim) => ({
         id: `${sim.source}-${sim.target}`,
         source: sim.source,
